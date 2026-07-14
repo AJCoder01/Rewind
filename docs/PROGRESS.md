@@ -1,13 +1,13 @@
 # Rewind MVP progress
 
-Current status: the scaffold is complete and the fixture-backed non-effecting Phase 1 slice is in progress; provider integrations and remaining G0 decisions are still open.
+Current status: P0-A2 decisions and the executable scaffold are complete; cloud provisioning, database migration proof, traceability fixtures, and the remaining G0/G1 evidence are still open.
 
 | Field | Value |
 |---|---|
 | Status | Live checklist |
-| Current phase | Phase 0 foundation and fixture-backed Phase 1 non-effecting slice in progress |
+| Current phase | Phase 0 foundation completion and fixture-backed Phase 1 non-effecting slice |
 | Last updated | 2026-07-14 |
-| Implementation update | Scaffold and fixture-backed non-effecting Phase 1 slice are in progress; the historical phase row above is retained from kickoff. |
+| Implementation update | P0-A2 owner/provider/runtime/account/evidence decisions are resolved; no live provider integration is enabled. |
 
 This file records status and evidence only. It does not create or change requirements.
 
@@ -117,11 +117,11 @@ Do not infer implementation progress from completed documentation.
 
 ## Implementation phase tracker
 
-Detailed Person A/Person B tasks, async handoffs, subagent lanes, merge order, and exit criteria live in `IMPLEMENTATION_PLAN.md`. This file tracks status and evidence without duplicating that plan.
+Detailed Kaustubh Upadhya/Ayush Jha tasks, async handoffs, subagent lanes, merge order, and exit criteria live in `IMPLEMENTATION_PLAN.md`. This file tracks status and evidence without duplicating that plan.
 
-| Phase | Gate | Person A — Platform & Safety | Person B — Product, AI & Quality | Status | Evidence |
+| Phase | Gate | Kaustubh Upadhya — Platform & Safety | Ayush Jha — Product, AI & Quality | Status | Evidence |
 |---|---|---|---|---|---|
-| 0. Alignment and foundation | G0 | Decisions, scaffold, runtime, PostgreSQL, CI | Traceability, fixtures, UI-state inventory | In progress | Scaffold and fast-command evidence recorded; provider/runtime decisions remain open |
+| 0. Alignment and foundation | G0 | Decisions, scaffold, runtime, PostgreSQL, CI | Traceability, fixtures, UI-state inventory | In progress | P0-A2 decisions and local command evidence recorded; cloud provisioning/migration and traceability evidence remain |
 | 1. Non-effecting vertical slice | G1 | Contracts, persistence, auth, API, MCP | Composer/review shell, client parsing, Playwright | In progress | Fixture-backed create/review path and `npm run test:e2e` pass; broader traceability and integration evidence remain |
 | 2. Provider/model risk retirement | G2 | OAuth, Calendar/Gmail primitives, live spikes | Responses client, strict schemas, eval harness | Not started | TBD |
 | 3. Initial World PR | G3 | Exact plan/approval and artifact→Calendar→Gmail saga | Initial reasoning, World PR, approval/timeline UX | Not started | TBD |
@@ -132,26 +132,24 @@ Detailed Person A/Person B tasks, async handoffs, subagent lanes, merge order, a
 
 ### Current phase actions
 
-- [ ] Resolve `OPEN-012` with the actual Person A and Person B names.
-- [ ] Resolve remaining Phase 0 provider/runtime/account/evidence decisions.
+- [x] Resolve `OPEN-012`: Kaustubh Upadhya owns Platform & Safety; Ayush Jha owns Product, AI & Quality.
+- [x] Resolve P0-A2 provider/runtime/account/demo-date/evidence decisions. Evidence: `docs/DECISIONS.md` OPEN-002–009 and OPEN-012–013.
 - [x] Scaffold the single package and verify fast root commands.
 - [x] Merge the minimal `contracts.v1` and durable migration packet.
 - [~] Merge golden/traceability fixtures after the contract packet. Evidence: deterministic World PR fixture exists; broader traceability fixtures remain.
 - [ ] Create isolated worktrees using the path ownership in `IMPLEMENTATION_PLAN.md` before Phase 1 branches diverge.
-- [ ] Record Gate G0 commands and sanitized evidence here.
+- [x] Record the current local command results in `artifacts/test-runs/2026-07-14-p0-a2.md`; deployed PostgreSQL migration proof remains required before G0 closes.
 
 ## Current blockers and owners
 
 | Blocker | Impact | Owner | Next action | Status |
 |---|---|---|---|---|
-| Team roles unassigned | No accountable two-person workstream ownership | Team lead | Resolve OPEN-012 | Open |
-| Deployment/PostgreSQL providers unselected | Cannot prove callback/persistence | Person A | Resolve OPEN-003/004 | Open |
-| Google identity/OAuth audience/allowlist unknown | Calendar/Gmail risk cannot be retired | Person A + team lead | Resolve OPEN-006/007/008 | Open |
-| Demo date not selected | Cannot seed stable events | Person B + demo operator | Resolve OPEN-009 | Open |
-| OpenAI project/model access unverified | Planner feasibility unknown | Person B + Person A review | Resolve OPEN-010 and live schema smoke | Open |
+| Vercel/Supabase projects not provisioned | Cannot prove deployed callback or PostgreSQL migration | Kaustubh Upadhya | Sign in, create the selected Mumbai projects, then configure secrets | Open |
+| Google OAuth credentials and controlled IDs not configured | Calendar/Gmail risk cannot be retired | Kaustubh Upadhya + Ayush Jha | Create External/Testing client, store expected identity/calendar/allowlist privately, then run G2 preflight | Open |
+| OpenAI project/model access unverified | Planner feasibility unknown | Ayush Jha + Kaustubh Upadhya review | Resolve OPEN-010 and live schema smoke | Open |
 | Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Codex | Direct smoke runner now tears down cleanly; retain the conventional spec for CI migration | Resolved |
 
-These are setup decisions, not reasons to begin provider work. Git/remote setup, the initial scaffold, the minimal contract/migration packet, and the first fixture-backed vertical slice are complete or in progress. Next: close the remaining G0 decisions, finish the traceability fixtures, and freeze the G1 packet before provider work.
+The setup choices are now fixed, but provider resources and secrets are not configured. Next: provision Vercel/Supabase, prove the migration on the selected database, finish traceability fixtures, and freeze the G1 packet before live Google/OpenAI work.
 
 ## Verification evidence log
 
@@ -162,8 +160,9 @@ Add entries only after work is actually complete:
 | 2026-07-14 | Repository inspection | Empty directory; `git status` reported not a repository | Confirmed | Codex |
 | 2026-07-14 | Kickoff documentation | README, AGENTS, PRD, Architecture, Contracts, Safety, Test Plan, Demo Runbook, Decisions, Progress, Implementation Plan | Complete | Codex |
 | 2026-07-14 | Git remote | `main` pushed to `origin/main`; initial commit `5efe0b5` | Complete | Ayush Jha + Codex |
-| 2026-07-14 | Async implementation planning | Phase-based Person A/Person B plan, subagent policy, handoffs, and gates | Complete | Codex |
-| 2026-07-14 | Scaffold and fast checks | `npm run build`, `npm run lint`, `npm run typecheck`, `npm test` | Passed; production dependency audit is clean | Codex |
+| 2026-07-14 | Async implementation planning | Phase-based Kaustubh Upadhya/Ayush Jha plan, subagent policy, handoffs, and gates | Complete | Codex |
+| 2026-07-14 | P0-A2 decisions | OPEN-002–009 and OPEN-012–013 resolved with named owners and evidence paths | Complete; live provider proof deferred to its explicit gates | Codex |
+| 2026-07-14 | Scaffold and fast checks | `npm run build`, `npm run lint`, `npm run typecheck`, `npm test` | Passed; full dependency audit clean after Vitest 3.2.7 upgrade | Codex |
 | 2026-07-14 | Fixture API smoke | Authenticated fixture POST returned 201; authenticated World PR GET returned 200 with 3 actions and 2 timeline entries | Passed | Codex |
 | 2026-07-14 | Critical Playwright flow | `npm run test:e2e` reported the unauthenticated redirect, login, create, and review assertions as passed | Passed | Codex |
 | 2026-07-14 | Review and safety regression pass | 12 unit/contract tests cover strict action shape, plan digest reproduction, PostgreSQL insert order/idempotency claim and replay, auth origin/secret checks, and fixture service behavior | Passed | Codex |

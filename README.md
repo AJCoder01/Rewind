@@ -142,12 +142,11 @@ Current OpenAI documentation lists GPT-5.6 Sol as supporting the Responses API a
 
 ## First contributor actions
 
-1. Assign actual names to Person A and Person B (`OPEN-012`) using the ownership split in the [Implementation Plan](docs/IMPLEMENTATION_PLAN.md).
-2. Resolve the remaining Phase 0 account/provider/runtime/evidence decisions.
-3. Scaffold the single-package application and add only commands that have been verified.
-4. Merge the minimal `contracts.v1`/migration packet, then its golden fixtures.
-5. Create isolated Person A/Person B worktrees after that interface packet is frozen.
-6. Implement the non-effecting MCP → backend → PostgreSQL → dashboard vertical slice and pass Gate G1.
-7. Record phase-gate evidence in [Progress](docs/PROGRESS.md).
+1. Provision the selected Vercel and Supabase projects and add their secrets outside Git.
+2. Complete the G0 database migration and secret-scan evidence.
+3. Finish and freeze the golden contract and requirement-traceability fixtures.
+4. Create isolated Kaustubh Upadhya/Ayush Jha worktrees before further branches diverge.
+5. Close the non-effecting MCP → backend → PostgreSQL → dashboard Gate G1.
+6. Begin G2 provider/model risk retirement only after G0/G1 evidence is green.
 
 Do not begin Calendar, Gmail, Causal Revert, or animation work until the vertical-slice gate is green.

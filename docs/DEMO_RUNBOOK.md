@@ -12,20 +12,20 @@ This runbook operates the approved PRD. It cannot introduce product behavior. Ne
 
 ## 1. Roles
 
-Assign before Gate G0 closes:
+Assigned by `OPEN-012`:
 
 | Role | Owner |
 |---|---|
-| Demo operator, narrator, recording, product evidence | Person B |
-| Backend, provider effects, OAuth, deployment on-call | Person A |
-| Final go/no-go | Person A + Person B jointly |
+| Demo operator, narrator, recording, product evidence | Ayush Jha |
+| Backend, provider effects, OAuth, deployment on-call | Kaustubh Upadhya |
+| Final go/no-go | Kaustubh Upadhya + Ayush Jha jointly |
 | Safety veto | Either person may stop the run |
 
-Person B operates the demo while Person A watches logs/preflight without making live manual edits. Neither person may override a failed gate during recording.
+Ayush Jha operates the demo while Kaustubh Upadhya watches logs/preflight without making live manual edits. Neither person may override a failed gate during recording.
 
 ## 2. Controlled seed data
 
-Use a configurable future `DEMO_DATE=YYYY-MM-DD`. The UI and example prompt interpolate the same value so a stale hard-coded date cannot reach the demo.
+Use `DEMO_DATE=2026-08-20`. The UI and example prompt must read the configured value so a stale hard-coded date cannot reach the demo.
 
 ### Calendar
 
@@ -43,7 +43,7 @@ The seeder stores provider IDs and immutable **semantic** baseline snapshots in 
 
 ### Gmail
 
-Only addresses in `REWIND_RECIPIENT_ALLOWLIST` may receive mail. All belong to the team. Subjects include the run ID:
+Only addresses in `REWIND_RECIPIENT_ALLOWLIST` may receive mail. The secret is a structured `{UK,US}` mapping with one team-controlled address in each subset; literal addresses never enter Git or logs. Subjects include the run ID:
 
 ```text
 [Rewind <runId>] Acme UK renewal moved

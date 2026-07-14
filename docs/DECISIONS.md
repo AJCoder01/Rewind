@@ -246,18 +246,25 @@ Resolve these by the phase shown. Record the answer, date, owner, and evidence h
 | ID | Decision needed | Recommended default | Owner | Due | Status/evidence |
 |---|---|---|---|---|---|
 | OPEN-001 | Git initialization and remote repository | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` | Ayush Jha + Codex | Complete | Resolved 2026-07-14; initial commit `5efe0b5` pushed |
-| OPEN-002 | Node version | Current supported LTS pinned in `.nvmrc`/engines | Person A | Phase 0 / G0 | Open |
-| OPEN-003 | Deployment host/runtime limits | One Node-capable host that supports synchronous resumable routes | Person A | Phase 0 / G0 | Open |
-| OPEN-004 | PostgreSQL provider and region | Managed Postgres near app; no SQLite | Person A | Phase 0 / G0 | Open |
-| OPEN-005 | Dashboard demo authentication | Minimal single-operator secure session/passcode gate with CSRF | Person A + Person B review | Phase 0 / G0 | Open |
-| OPEN-006 | Google account/calendar owner | Dedicated team Workspace identity and owned calendar | Team lead | Phase 0 / G0 | Open |
-| OPEN-007 | OAuth audience | Internal/Trusted Workspace if possible; otherwise External Testing plus reauth plan | Person A | Phase 0 / G0 | Open |
-| OPEN-008 | Exact controlled recipient allowlist | Team-owned addresses only; separate UK/US subsets | Person A + demo operator | Phase 0 / G0 | Open |
-| OPEN-009 | `DEMO_DATE` and final event baselines | Future date; 10:00 UK, 11:00 US, 15:00 target ET | Person B + demo operator | Before Phase 2 seed | Open |
-| OPEN-010 | OpenAI project/model access and reasoning setting | Verify `gpt-5.6-sol` strict output; choose lowest effort that passes eval | Person B + Person A review | Phase 2 / G2 | Open |
-| OPEN-011 | Exact synthetic account-note fixture | Short company-wide notes with no regional input | Person B | Before Phase 3 | Open |
-| OPEN-012 | Team role assignments | Person A — Platform & Safety; Person B — Product, AI & Quality; shared go/no-go | Team lead | Before Phase 0 / G0 | Open |
-| OPEN-013 | Evidence storage location | Sanitized `artifacts/test-runs/`; private provider receipts elsewhere | Person B + Person A receipt producer | Before Phase 2 live tests | Open |
+| OPEN-002 | Node version | Node.js 24 LTS, locally pinned to `24.18.0`; deployments use the latest supported `24.x` patch | Kaustubh Upadhya | Complete | Resolved 2026-07-14; `.nvmrc`, package engines, and Node 24 verification |
+| OPEN-003 | Deployment host/runtime limits | Vercel Functions with Fluid Compute in Mumbai (`bom1`); synchronous routes must finish within the configured plan limit or fail closed | Kaustubh Upadhya | Complete | Resolved 2026-07-14; `vercel.json` and Vercel limits/region documentation |
+| OPEN-004 | PostgreSQL provider and region | Supabase Postgres in Mumbai (`ap-south-1`); pooled runtime URL plus separate migration URL | Kaustubh Upadhya | Complete | Resolved 2026-07-14; environment contract and Supabase connection/region documentation |
+| OPEN-005 | Dashboard demo authentication | Single-operator passcode gate, HMAC-signed `HttpOnly` session cookie, same-origin mutation checks, secure production cookie | Kaustubh Upadhya + Ayush Jha review | Complete | Resolved 2026-07-14; `lib/auth/session.ts`, auth route, and unit/E2E tests |
+| OPEN-006 | Google account/calendar owner | One Ayush-controlled dedicated demo Google identity owns the connected calendar and sender; expected email and OIDC `sub` stay in deployment secrets | Ayush Jha | Complete | Resolved 2026-07-14; owner selected; live identity/calendar proof remains a G2 preflight |
+| OPEN-007 | OAuth audience | External/Testing with only the selected demo identity as test user; reauthorize within 24 hours of the final recording | Kaustubh Upadhya | Complete | Resolved 2026-07-14; conservative path for the selected Google identity |
+| OPEN-008 | Exact controlled recipient allowlist | One Ayush-controlled UK inbox and one Kaustubh-controlled US inbox; literal addresses are stored only in the structured deployment secret and reconfirmed before live send | Kaustubh Upadhya + Ayush Jha | Complete | Resolved 2026-07-14; separate one-address subsets selected; live inbox-control proof remains a G2 preflight |
+| OPEN-009 | `DEMO_DATE` and final event baselines | `2026-08-20`; UK 10:00–10:30 ET, US 11:00–11:30 ET, target 15:00–15:30 ET | Ayush Jha | Complete | Resolved 2026-07-14; fixture and runbook use the same date/baselines |
+| OPEN-010 | OpenAI project/model access and reasoning setting | Verify `gpt-5.6-sol` strict output; choose lowest effort that passes eval | Ayush Jha + Kaustubh Upadhya review | Phase 2 / G2 | Open |
+| OPEN-011 | Exact synthetic account-note fixture | Short company-wide notes with no regional input | Ayush Jha | Before Phase 3 | Open |
+| OPEN-012 | Team role assignments | Kaustubh Upadhya — Platform & Safety; Ayush Jha — Product, AI & Quality; shared go/no-go | Ayush Jha | Complete | Resolved 2026-07-14; implementation plan and runbook name both owners |
+| OPEN-013 | Evidence storage location | Sanitized Markdown in `artifacts/test-runs/`; raw logs/screenshots ignored; private provider receipts in the restricted team Drive folder | Ayush Jha + Kaustubh Upadhya | Complete | Resolved 2026-07-14; tracked evidence index and `.gitignore` policy |
+
+### Phase 0 resolution notes
+
+- **Runtime and deployment:** Node.js `24.18.0` is the clean-checkout development pin. Vercel uses its latest supported `24.x` patch, Fluid Compute, and one Mumbai function region. Hobby's current five-minute maximum is sufficient for the short persisted MVP sagas; effect routes must declare and test a bounded `maxDuration` before G3. See [Vercel Function limits](https://vercel.com/docs/functions/limitations), [regions](https://vercel.com/docs/regions), and [supported Node.js versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions).
+- **Database:** Supabase Mumbai is co-located with the application. `DATABASE_URL` is the TLS Supavisor transaction-pool URL for serverless traffic; `DATABASE_MIGRATION_URL` is the direct or session-pool URL used only by the migration command. See [Supabase regions](https://supabase.com/docs/guides/platform/regions) and [database connections](https://supabase.com/docs/guides/database/connecting-to-postgres).
+- **Google and recipients:** literal email addresses, the expected Google `sub`, OAuth secrets, refresh-token ciphertext, token-encryption key, Calendar ID, and the structured `{UK,US}` recipient mapping never enter Git. G2 must prove account/calendar ownership and inbox control before any live write or send.
+- **Evidence:** committed Markdown contains commands, counts, redacted identifiers, and risks only. Full provider receipts remain access-controlled outside Git; the repository stores only redacted references or hashes.
 
 ### Resolution template
 
