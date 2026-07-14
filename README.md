@@ -13,12 +13,14 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Field | Value |
 |---|---|
 | Phase | Phase 0 — alignment and engineering foundation |
-| Implementation | Not started |
-| Repository at kickoff | Empty and not Git-initialized |
+| Implementation | Fixture-backed non-effecting G1 slice in progress |
+| Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-14 |
 
-There is no package manifest or executable command yet. Do not report setup, tests, or integrations as working until they exist and have been run successfully. The first implementation target is:
+The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, and a reviewable World PR. No Calendar, Gmail, OpenAI, or external-effect path is enabled yet. Verified locally: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, and `npm run test:e2e`.
+
+The implemented first slice is:
 
 ```text
 Codex MCP create_world_pr call
@@ -27,7 +29,7 @@ Codex MCP create_world_pr call
 → authenticated dashboard review page
 ```
 
-Calendar, Gmail, recovery, rules, and animation come only after that vertical slice works.
+Calendar, Gmail, recovery, rules, and animation remain deferred until the provider/model risk gates and the non-effecting slice are closed.
 
 ## Product in one minute
 

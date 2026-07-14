@@ -1,10 +1,13 @@
 # Rewind MVP progress
 
+Current status: the scaffold is complete and the fixture-backed non-effecting Phase 1 slice is in progress; provider integrations and remaining G0 decisions are still open.
+
 | Field | Value |
 |---|---|
 | Status | Live checklist |
-| Current phase | Phase 0 — alignment and engineering foundation; implementation not started |
+| Current phase | Phase 0 foundation and fixture-backed Phase 1 non-effecting slice in progress |
 | Last updated | 2026-07-14 |
+| Implementation update | Scaffold and fixture-backed non-effecting Phase 1 slice are in progress; the historical phase row above is retained from kickoff. |
 
 This file records status and evidence only. It does not create or change requirements.
 
@@ -23,9 +26,9 @@ This file records status and evidence only. It does not create or change require
 - [x] Official current OpenAI, Google Calendar, Gmail, OAuth, Codex MCP, and AGENTS guidance checked. Evidence: external links in canonical docs.
 - [x] Kickoff documentation set and phase-based async implementation plan created.
 - [x] Git repository initialized and remote configured. Evidence: `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git`; initial docs commit `5efe0b5`.
-- [ ] Application scaffold/package manifest exists.
-- [ ] Any command in README/AGENTS has been run successfully.
-- [ ] Any Calendar, Gmail, OpenAI, PostgreSQL, dashboard, or MCP integration exists.
+- [x] Application scaffold/package manifest exists. Evidence: one Next.js/TypeScript package, root scripts, strict TypeScript config, fixture mode, and Playwright config added on 2026-07-14.
+- [x] Advertised fast and browser commands have run successfully. Evidence: build, lint, typecheck, unit tests, and critical Playwright flow passed on 2026-07-14.
+- [x] Dashboard, MCP-to-backend HTTP, fixture store, and PostgreSQL repository paths exist. Calendar, Gmail, and OpenAI provider integrations remain disabled.
 
 Do not infer implementation progress from completed documentation.
 
@@ -33,23 +36,23 @@ Do not infer implementation progress from completed documentation.
 
 ### Intake and World PR
 
-- [ ] `create_world_pr` exists as the sole required MCP tool.
-- [ ] Dashboard composer and MCP call the same authenticated `createWorldPr` service.
-- [ ] In-progress/completed idempotency and the one effect-bearing-scenario lock are enforced; rule-matched clarification can precede the lock.
-- [ ] Backend persists a versioned World PR and returns a non-secret review URL.
-- [ ] Authenticated dashboard loads the World PR.
+- [x] `create_world_pr` exists as the sole required MCP tool. Evidence: `mcp/server.ts` exposes only this tool and never approves or executes.
+- [x] Dashboard composer and MCP use the same authenticated backend application service. Evidence: MCP is a thin bearer-authenticated HTTP client for `POST /api/v1/world-prs`; the route invokes `lib/services/world-pr.ts`.
+- [x] In-progress/completed idempotency and the one effect-bearing-scenario lock are enforced in the fixture and PostgreSQL repositories; rule-matched clarification remains deferred.
+- [x] Backend persists a versioned World PR and returns a non-secret review URL. Evidence: fixture create/read smoke returned 201/200 and an immutable plan digest.
+- [x] Authenticated dashboard loads the World PR. Evidence: `npm run test:e2e` exercised login, creation, and review rendering in fixture mode and exited successfully.
 - [ ] Exactly two tagged Calendar candidates are fetched from the controlled calendar.
 - [ ] Acme UK is ranked by deterministic visible evidence; Acme US is shown as an alternative.
-- [ ] World PR displays the original request, one important assumption, and evidence.
-- [ ] World PR previews exact Calendar date/time/time zone/duration.
-- [ ] World PR previews exact Gmail recipients and body.
-- [ ] World PR previews the exact account-brief content/hash/source provenance and passes output-independence validation.
-- [ ] Dependency edges and external-effect labels are visible.
+- [x] Fixture World PR displays the original request, one important assumption, and evidence.
+- [x] Fixture World PR previews exact Calendar date/time/IANA time zone/duration.
+- [x] Fixture World PR previews exact controlled Gmail recipients, subject, and body.
+- [x] Fixture World PR previews exact account-brief content/hash/source provenance and the semantic validator version.
+- [x] Fixture dependency edges and external-effect labels are visible.
 - [ ] Cancel/back controls work.
 
 ### Approval and initial execution
 
-- [ ] Initial plan is immutable, versioned, canonicalized, and SHA-256 hashed.
+- [x] Fixture initial plan is immutable, versioned, canonicalized, SHA-256 hashed, persisted in full, and covered by a digest-reproduction test.
 - [ ] Authenticated approval stores actor, timestamp, plan ID/version/digest.
 - [ ] Provider/recipient drift invalidates approval.
 - [ ] Durable unique action rows exist before dispatch.
@@ -118,8 +121,8 @@ Detailed Person A/Person B tasks, async handoffs, subagent lanes, merge order, a
 
 | Phase | Gate | Person A — Platform & Safety | Person B — Product, AI & Quality | Status | Evidence |
 |---|---|---|---|---|---|
-| 0. Alignment and foundation | G0 | Decisions, scaffold, runtime, PostgreSQL, CI | Traceability, fixtures, UI-state inventory | In progress | Git/remote complete; remaining evidence TBD |
-| 1. Non-effecting vertical slice | G1 | Contracts, persistence, auth, API, MCP | Composer/review shell, client parsing, Playwright | Not started | TBD |
+| 0. Alignment and foundation | G0 | Decisions, scaffold, runtime, PostgreSQL, CI | Traceability, fixtures, UI-state inventory | In progress | Scaffold and fast-command evidence recorded; provider/runtime decisions remain open |
+| 1. Non-effecting vertical slice | G1 | Contracts, persistence, auth, API, MCP | Composer/review shell, client parsing, Playwright | In progress | Fixture-backed create/review path and `npm run test:e2e` pass; broader traceability and integration evidence remain |
 | 2. Provider/model risk retirement | G2 | OAuth, Calendar/Gmail primitives, live spikes | Responses client, strict schemas, eval harness | Not started | TBD |
 | 3. Initial World PR | G3 | Exact plan/approval and artifact→Calendar→Gmail saga | Initial reasoning, World PR, approval/timeline UX | Not started | TBD |
 | 4. Causal Revert | G4 | Recovery validation/approval/execution/resume | Recovery prompt/evals and causal UX | Not started | TBD |
@@ -131,9 +134,9 @@ Detailed Person A/Person B tasks, async handoffs, subagent lanes, merge order, a
 
 - [ ] Resolve `OPEN-012` with the actual Person A and Person B names.
 - [ ] Resolve remaining Phase 0 provider/runtime/account/evidence decisions.
-- [ ] Scaffold the single package and verify fast root commands.
-- [ ] Merge the minimal `contracts.v1` and durable migration packet.
-- [ ] Merge golden/traceability fixtures after the contract packet.
+- [x] Scaffold the single package and verify fast root commands.
+- [x] Merge the minimal `contracts.v1` and durable migration packet.
+- [~] Merge golden/traceability fixtures after the contract packet. Evidence: deterministic World PR fixture exists; broader traceability fixtures remain.
 - [ ] Create isolated worktrees using the path ownership in `IMPLEMENTATION_PLAN.md` before Phase 1 branches diverge.
 - [ ] Record Gate G0 commands and sanitized evidence here.
 
@@ -146,8 +149,9 @@ Detailed Person A/Person B tasks, async handoffs, subagent lanes, merge order, a
 | Google identity/OAuth audience/allowlist unknown | Calendar/Gmail risk cannot be retired | Person A + team lead | Resolve OPEN-006/007/008 | Open |
 | Demo date not selected | Cannot seed stable events | Person B + demo operator | Resolve OPEN-009 | Open |
 | OpenAI project/model access unverified | Planner feasibility unknown | Person B + Person A review | Resolve OPEN-010 and live schema smoke | Open |
+| Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Codex | Direct smoke runner now tears down cleanly; retain the conventional spec for CI migration | Resolved |
 
-These are setup decisions, not reasons to begin UI polish. Git/remote setup is already complete. The next actions are owner assignment, scaffold, minimal contract/migration packet, golden fixtures, then the non-effecting vertical slice.
+These are setup decisions, not reasons to begin provider work. Git/remote setup, the initial scaffold, the minimal contract/migration packet, and the first fixture-backed vertical slice are complete or in progress. Next: close the remaining G0 decisions, finish the traceability fixtures, and freeze the G1 packet before provider work.
 
 ## Verification evidence log
 
@@ -159,6 +163,10 @@ Add entries only after work is actually complete:
 | 2026-07-14 | Kickoff documentation | README, AGENTS, PRD, Architecture, Contracts, Safety, Test Plan, Demo Runbook, Decisions, Progress, Implementation Plan | Complete | Codex |
 | 2026-07-14 | Git remote | `main` pushed to `origin/main`; initial commit `5efe0b5` | Complete | Ayush Jha + Codex |
 | 2026-07-14 | Async implementation planning | Phase-based Person A/Person B plan, subagent policy, handoffs, and gates | Complete | Codex |
+| 2026-07-14 | Scaffold and fast checks | `npm run build`, `npm run lint`, `npm run typecheck`, `npm test` | Passed; production dependency audit is clean | Codex |
+| 2026-07-14 | Fixture API smoke | Authenticated fixture POST returned 201; authenticated World PR GET returned 200 with 3 actions and 2 timeline entries | Passed | Codex |
+| 2026-07-14 | Critical Playwright flow | `npm run test:e2e` reported the unauthenticated redirect, login, create, and review assertions as passed | Passed | Codex |
+| 2026-07-14 | Review and safety regression pass | 12 unit/contract tests cover strict action shape, plan digest reproduction, PostgreSQL insert order/idempotency claim and replay, auth origin/secret checks, and fixture service behavior | Passed | Codex |
 
 ## MVP definition of done
 

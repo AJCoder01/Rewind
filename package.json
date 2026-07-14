@@ -1,0 +1,46 @@
+{
+  "name": "rewind",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "tsx scripts/test-e2e.ts",
+    "eval:recovery": "tsx scripts/eval-recovery.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "preflight:demo": "tsx scripts/preflight-demo.ts",
+    "reset:demo": "tsx scripts/reset-demo.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "mcp": "tsx mcp/server.ts"
+  },
+  "overrides": {
+    "postcss": "8.5.10"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "next": "15.5.20",
+    "pg": "8.16.3",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.3.1",
+    "@playwright/test": "1.61.1",
+    "@types/node": "22.15.29",
+    "@types/pg": "8.15.4",
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
+    "eslint": "9.27.0",
+    "eslint-config-next": "15.5.20",
+    "tsx": "4.19.4",
+    "typescript": "5.8.3",
+    "vitest": "3.1.4"
+  }
+}

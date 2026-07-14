@@ -211,9 +211,13 @@ interface ClarificationView {
 interface InitialPlanView {
   pointer: PlanPointer;
   selectedCandidate: { candidateId: string; label: string };
-  alternatives: Array<{ candidateId: string; label: string }>;
-  assumptions: Assumption[];
-  actions: InitialPlannedAction[];
+  alternatives: [{ candidateId: string; label: string }];
+  assumptions: [Assumption];
+  actions: [
+    AccountBriefAction,
+    CalendarMoveAction,
+    MailNotificationAction
+  ];
 }
 
 interface RecoveryPlanView {
@@ -530,11 +534,15 @@ interface InitialPlanV1 {
   planId: string;
   version: number;
   request: string;
-  candidateSet: CalendarCandidate[];
+  candidateSet: [CalendarCandidate, CalendarCandidate];
   selectedCandidateId: string;
-  alternativeCandidateIds: string[];
-  assumptions: Assumption[];
-  actions: InitialPlannedAction[];
+  alternativeCandidateIds: [string];
+  assumptions: [Assumption];
+  actions: [
+    AccountBriefAction,
+    CalendarMoveAction,
+    MailNotificationAction
+  ];
   accountBriefContentHash: string;
   executionOrder: [
     "initial.artifact.account_brief",
@@ -598,6 +606,8 @@ interface Approval {
   approvedAt: string;
 }
 ```
+
+Persist the complete `InitialPlanV1` payload in `plans.payload`; the dashboard's `InitialPlanView` is only a projection. Every digest field uses lowercase `sha256:` followed by exactly 64 hexadecimal characters. Recompute the plan digest from every field above except `digest` itself; storing only the read-model projection is invalid because it cannot reproduce the approved payload.
 
 Approval is valid only when:
 
