@@ -11,7 +11,7 @@ This file records why a decision was made and which choices remain open. Accepte
 ## Status vocabulary
 
 - **Accepted:** current MVP decision; implementation should follow it.
-- **Proposed:** recommended but awaiting a named owner or Day 1 proof.
+- **Proposed:** recommended but awaiting a named owner or required phase-gate proof.
 - **Superseded:** retained for history; replacement is named.
 - **Rejected:** considered and not selected.
 
@@ -26,7 +26,7 @@ This file records why a decision was made and which choices remain open. Accepte
 | ADR-005 | Make the artifact genuinely region-independent | Accepted |
 | ADR-006 | Allow ranked UK selection before a rule, with visible alternative/evidence | Accepted |
 | ADR-007 | Use one package: Next.js app plus thin MCP process | Accepted |
-| ADR-008 | Use PostgreSQL from Day 1 | Accepted |
+| ADR-008 | Use PostgreSQL from the foundation phase | Accepted |
 | ADR-009 | Bind approval to immutable versioned plan digests | Accepted |
 | ADR-010 | Use a durable per-action saga/ledger | Accepted |
 | ADR-011 | Use Calendar ETag conflict checks and narrow start/end writes | Accepted |
@@ -72,7 +72,7 @@ This file records why a decision was made and which choices remain open. Accepte
 
 **Decision:** One Google identity, one owned calendar, exactly two tagged one-off events, one operator, one active effect-bearing scenario, and allowlisted team recipients. Active-rule evaluation happens before lock acquisition, so a clarification-only intake may coexist without a plan/action/lock.
 
-**Why:** It is the smallest surface that can prove the interaction with real providers in seven days.
+**Why:** It is the smallest surface that can prove the interaction with real providers in the compressed MVP cycle.
 
 **Consequence:** Recurring/all-day/shared events, arbitrary recipients, multiple tenants, and production data are rejected, not “best effort.”
 
@@ -96,17 +96,17 @@ This file records why a decision was made and which choices remain open. Accepte
 
 **Decision:** Keep pages, route handlers, domain/services/adapters, tests, and a thin stdio MCP entry in one TypeScript package.
 
-**Why:** Shared schemas and application services matter more than monorepo isolation for a seven-day build.
+**Why:** Shared schemas and application services matter more than monorepo isolation for this compressed MVP build.
 
 **Consequence:** No workspace/package split unless deployment proves it necessary.
 
-### ADR-008 — Use PostgreSQL from Day 1
+### ADR-008 — Use PostgreSQL from the foundation phase
 
-**Decision:** Use PostgreSQL for local/deployed state; do not plan a SQLite-to-Postgres migration midweek.
+**Decision:** Use PostgreSQL for local/deployed state; do not plan a later SQLite-to-Postgres migration.
 
 **Why:** Immutable plans, unique action keys, scenario locks, leases, and deployed persistence are core reliability mechanisms.
 
-**Consequence:** Selecting/provisioning the provider is a Day 1 open decision, but the database type is not.
+**Consequence:** Selecting/provisioning the provider is a Phase 0 open decision, but the database type is not.
 
 ### ADR-009 — Bind approval to immutable versioned plan digests
 
@@ -190,7 +190,7 @@ This file records why a decision was made and which choices remain open. Accepte
 
 ### ADR-019 — Configure and record the model
 
-**Decision:** Use `OPENAI_MODEL`, initially target `gpt-5.6-sol`, and record actual model/prompt/schema/reasoning metadata per plan. Day 1 verifies project access and strict output.
+**Decision:** Use `OPENAI_MODEL`, initially target `gpt-5.6-sol`, and record actual model/prompt/schema/reasoning metadata per plan. The provider/model risk gate verifies project access and strict output.
 
 **Why:** Model availability and aliases change; product contracts should depend on validated schemas, not a marketing name hard-coded throughout code.
 
@@ -206,7 +206,7 @@ This file records why a decision was made and which choices remain open. Accepte
 
 ### ADR-021 — Make Playwright/live/eval gates mandatory
 
-**Decision:** Keep the source brief's minimum of 24/25 correct correction paraphrases, adopt 25/25 as the team's explicit recording target, require a separate 100%-passing negative/safety suite with zero unsafe adapter calls, plus the critical Playwright flow, Day 1 live provider/model spikes, and five consecutive live rehearsals.
+**Decision:** Keep the source brief's minimum of 24/25 correct correction paraphrases, adopt 25/25 as the team's explicit recording target, require a separate 100%-passing negative/safety suite with zero unsafe adapter calls, plus the critical Playwright flow, provider/model risk spikes, and five consecutive live rehearsals.
 
 **Why:** “If feasible” test coverage conflicts with a demo whose central claim is reliable external recovery.
 
@@ -241,23 +241,23 @@ This file records why a decision was made and which choices remain open. Accepte
 
 ## Open decisions
 
-Resolve these before or during Day 1. Record the answer, date, owner, and evidence here; update canonical docs if behavior changes.
+Resolve these by the phase shown. Record the answer, date, owner, and evidence here; update canonical docs if behavior changes.
 
 | ID | Decision needed | Recommended default | Owner | Due | Status/evidence |
 |---|---|---|---|---|---|
-| OPEN-001 | Git initialization and remote repository | Initialize immediately; protect main once remote exists | TBD | Before scaffold | Open |
-| OPEN-002 | Node version | Current supported LTS pinned in `.nvmrc`/engines | Backend owner | Scaffold | Open |
-| OPEN-003 | Deployment host/runtime limits | One Node-capable host that supports synchronous resumable routes | Backend owner | Day 1 | Open |
-| OPEN-004 | PostgreSQL provider and region | Managed Postgres near app; no SQLite | Backend owner | Day 1 | Open |
-| OPEN-005 | Dashboard demo authentication | Minimal single-operator secure session/passcode gate with CSRF | Backend + frontend | Day 1 | Open |
-| OPEN-006 | Google account/calendar owner | Dedicated team Workspace identity and owned calendar | Team lead | Day 1 | Open |
-| OPEN-007 | OAuth audience | Internal/Trusted Workspace if possible; otherwise External Testing plus reauth plan | OAuth owner | Day 1 | Open |
-| OPEN-008 | Exact controlled recipient allowlist | Team-owned addresses only; separate UK/US subsets | Demo owner | Day 1 | Open |
-| OPEN-009 | `DEMO_DATE` and final event baselines | Future date; 10:00 UK, 11:00 US, 15:00 target ET | Demo owner | Before seed | Open |
-| OPEN-010 | OpenAI project/model access and reasoning setting | Verify `gpt-5.6-sol` strict output; choose lowest effort that passes eval | AI owner | Day 1 | Open |
-| OPEN-011 | Exact synthetic account-note fixture | Short company-wide notes with no regional input | Product owner | Day 2 | Open |
-| OPEN-012 | Team role assignments | One backend/AI, one frontend/product, shared go/no-go | Team lead | Before work | Open |
-| OPEN-013 | Evidence storage location | Sanitized `artifacts/test-runs/`; private provider receipts elsewhere | Backend owner | Before live tests | Open |
+| OPEN-001 | Git initialization and remote repository | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` | Ayush Jha + Codex | Complete | Resolved 2026-07-14; initial commit `5efe0b5` pushed |
+| OPEN-002 | Node version | Current supported LTS pinned in `.nvmrc`/engines | Person A | Phase 0 / G0 | Open |
+| OPEN-003 | Deployment host/runtime limits | One Node-capable host that supports synchronous resumable routes | Person A | Phase 0 / G0 | Open |
+| OPEN-004 | PostgreSQL provider and region | Managed Postgres near app; no SQLite | Person A | Phase 0 / G0 | Open |
+| OPEN-005 | Dashboard demo authentication | Minimal single-operator secure session/passcode gate with CSRF | Person A + Person B review | Phase 0 / G0 | Open |
+| OPEN-006 | Google account/calendar owner | Dedicated team Workspace identity and owned calendar | Team lead | Phase 0 / G0 | Open |
+| OPEN-007 | OAuth audience | Internal/Trusted Workspace if possible; otherwise External Testing plus reauth plan | Person A | Phase 0 / G0 | Open |
+| OPEN-008 | Exact controlled recipient allowlist | Team-owned addresses only; separate UK/US subsets | Person A + demo operator | Phase 0 / G0 | Open |
+| OPEN-009 | `DEMO_DATE` and final event baselines | Future date; 10:00 UK, 11:00 US, 15:00 target ET | Person B + demo operator | Before Phase 2 seed | Open |
+| OPEN-010 | OpenAI project/model access and reasoning setting | Verify `gpt-5.6-sol` strict output; choose lowest effort that passes eval | Person B + Person A review | Phase 2 / G2 | Open |
+| OPEN-011 | Exact synthetic account-note fixture | Short company-wide notes with no regional input | Person B | Before Phase 3 | Open |
+| OPEN-012 | Team role assignments | Person A — Platform & Safety; Person B — Product, AI & Quality; shared go/no-go | Team lead | Before Phase 0 / G0 | Open |
+| OPEN-013 | Evidence storage location | Sanitized `artifacts/test-runs/`; private provider receipts elsewhere | Person B + Person A receipt producer | Before Phase 2 live tests | Open |
 
 ### Resolution template
 

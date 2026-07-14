@@ -369,4 +369,4 @@ Open choices requiring owners are tracked in `DECISIONS.md#open-decisions`. If a
 
 ## 15. Post-MVP hypotheses
 
-Only after the controlled Calendar/Gmail proof is reliable should the team investigate adapters for CRM, ticketing, project-management systems, document permissions, customer support, or financial workflows; broader team-scoped guardrails; and richer conflict/reconciliation support. These are narrative possibilities, not approved roadmap items, and none may enter the seven-day build without replacing an equal-or-larger MVP requirement through an explicit PRD decision.
+Only after the controlled Calendar/Gmail proof is reliable should the team investigate adapters for CRM, ticketing, project-management systems, document permissions, customer support, or financial workflows; broader team-scoped guardrails; and richer conflict/reconciliation support. These are narrative possibilities, not approved roadmap items, and none may enter the current MVP phases without replacing an equal-or-larger requirement through an explicit PRD decision.

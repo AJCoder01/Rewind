@@ -10,10 +10,13 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 
 ## Status
 
-**Phase:** documentation kickoff  
-**Implementation:** not started  
-**Repository at kickoff:** empty and not Git-initialized  
-**Last updated:** 2026-07-14
+| Field | Value |
+|---|---|
+| Phase | Phase 0 — alignment and engineering foundation |
+| Implementation | Not started |
+| Repository at kickoff | Empty and not Git-initialized |
+| Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
+| Last updated | 2026-07-14 |
 
 There is no package manifest or executable command yet. Do not report setup, tests, or integrations as working until they exist and have been run successfully. The first implementation target is:
 
@@ -115,18 +118,19 @@ Read these in order:
 5. [Test plan](docs/TEST_PLAN.md) — how every critical claim is proved.
 6. [Demo runbook](docs/DEMO_RUNBOOK.md) — seed data, preflight, narration, and reset.
 7. [Decisions](docs/DECISIONS.md) — accepted trade-offs, rejected options, and open decisions.
-8. [Progress](docs/PROGRESS.md) — live checklist and evidence links.
-9. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
+8. [Implementation plan](docs/IMPLEMENTATION_PLAN.md) — phase-based split for two asynchronous owners, subagent lanes, handoffs, and gates.
+9. [Progress](docs/PROGRESS.md) — live phase-gate checklist and evidence links.
+10. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
 
-Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot be traded away, Architecture owns **how**, Contracts own boundary shapes, and executable schemas/tests become canonical for exact fields once implemented. Progress and the runbook never create new requirements.
+Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot be traded away, Architecture owns **how**, Contracts own boundary shapes, and the Implementation Plan owns **sequence, responsibility, and handoffs**. Executable schemas/tests become canonical for exact fields once implemented. Progress and the runbook never create new requirements.
 
 ## Planned stack
 
 - Next.js, React, TypeScript, Tailwind CSS, and restrained Framer Motion
-- Next.js route handlers and PostgreSQL from Day 1
+- Next.js route handlers and PostgreSQL from the foundation phase
 - Zod as the shared validation layer
 - OpenAI Responses API with strict Structured Outputs and a model selected through `OPENAI_MODEL`
-- `gpt-5.6-sol` as the initial model candidate, subject to a Day 1 access and schema smoke test
+- `gpt-5.6-sol` as the initial model candidate, subject to the provider/model risk-gate access and schema smoke test
 - Google Calendar API with `calendar.events.owned`
 - Gmail API with `gmail.send`; no mailbox reading
 - Official TypeScript MCP SDK with one primary tool: `create_world_pr`
@@ -136,10 +140,12 @@ Current OpenAI documentation lists GPT-5.6 Sol as supporting the Responses API a
 
 ## First contributor actions
 
-1. Assign owners (`OPEN-012`), then resolve the Day 1 account/provider/evidence questions in [Decisions](docs/DECISIONS.md#open-decisions).
-2. Initialize Git and scaffold the single-package Next.js application.
-3. Add real scripts to `package.json`, then update this README and `AGENTS.md` with commands that have been executed successfully.
-4. Implement only the MCP → backend → database → dashboard vertical slice.
-5. Record verification evidence in [Progress](docs/PROGRESS.md).
+1. Assign actual names to Person A and Person B (`OPEN-012`) using the ownership split in the [Implementation Plan](docs/IMPLEMENTATION_PLAN.md).
+2. Resolve the remaining Phase 0 account/provider/runtime/evidence decisions.
+3. Scaffold the single-package application and add only commands that have been verified.
+4. Merge the minimal `contracts.v1`/migration packet, then its golden fixtures.
+5. Create isolated Person A/Person B worktrees after that interface packet is frozen.
+6. Implement the non-effecting MCP → backend → PostgreSQL → dashboard vertical slice and pass Gate G1.
+7. Record phase-gate evidence in [Progress](docs/PROGRESS.md).
 
 Do not begin Calendar, Gmail, Causal Revert, or animation work until the vertical-slice gate is green.

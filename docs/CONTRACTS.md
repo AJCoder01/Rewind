@@ -988,7 +988,7 @@ interface ModelMetadata {
 }
 ```
 
-`OPENAI_MODEL` supplies the model. Day 1 starts with `gpt-5.6-sol` if the project can access it and strict-schema evaluation passes. Store the actual returned model metadata. A fallback source must be visibly logged and is forbidden during the recorded demo unless explicitly disclosed.
+`OPENAI_MODEL` supplies the model. The provider/model risk phase initially tests `gpt-5.6-sol` if the project can access it and strict-schema evaluation passes. Store the actual returned model metadata. A fallback source must be visibly logged and is forbidden during the recorded demo unless explicitly disclosed.
 
 ## 13. Plan hashing and idempotency
 
@@ -1000,6 +1000,7 @@ interface ModelMetadata {
 - A concurrent identical request reads the existing resource's current durable state and returns it with `replayPending: true`; it does not wait by holding a database transaction and does not enter the saga.
 - Reusing a key with a different request returns `409 idempotency_conflict`.
 - Reusing a completed key with the identical request returns the stored result and dispatches no action. The dashboard creates one key per logical submission and reuses it for double-click/network retries; MCP reuses one key for the full tool invocation.
+- Reusing a safely failed key with the identical request returns the stored redacted error and dispatches no work. A deliberate resubmission after correcting input/configuration uses a new key.
 - Provider operation keys are stable per `(planId, actionKey)` and never recycled across plan versions.
 
 ## 14. Compatibility and versioning

@@ -43,7 +43,7 @@ Approval records are immutable and contain actor, timestamp, plan ID/version, an
 
 ### 2.1 Setup and live-spike exception
 
-Seed and Day 1 integration-spike utilities may perform controlled writes before the product approval UI exists only under all of these constraints:
+Seed and provider-risk-spike utilities may perform controlled writes before the product approval UI exists only under all of these constraints:
 
 - they are explicit admin/test commands unavailable from HTTP, MCP, browser, and CI;
 - an authenticated operator interactively confirms the exact configured calendar/event or allowlisted mail target and unique run ID;
@@ -117,7 +117,7 @@ Validate the connected identity from the signed OpenID Connect ID token's subjec
 
 The authorization-code callback requires high-entropy single-use `state`, OIDC `nonce`, PKCE S256, an exact allowlisted redirect URI, and short-lived transaction storage bound to the initiating browser session. Validate signature, `iss`, `aud`, `exp`, `iat`, `nonce`, `email_verified`, and the expected stable `sub`; reject replay, mismatch, expiry, or a different configured account. Consume `state`/`nonce` atomically before storing tokens.
 
-OAuth is a Day 1 risk:
+OAuth is a foundation/provider-risk-phase blocker:
 
 - Prefer an Internal/Trusted Google Workspace app when the team environment supports it.
 - If an External app remains in Testing, authorize only named test users and plan around the current seven-day authorization/refresh-token expiry.
@@ -199,7 +199,7 @@ The application does not have read/compose/modify scopes and therefore cannot po
 | Before/desired/after Calendar fields | Restore, verify, audit | Typed JSONB | 7 days |
 | Mail subject/body and recipient list | Exact approval and deterministic send | Encrypted-at-rest plan/action data | 7 days |
 | Gmail message/thread IDs | Receipt and timeline | PostgreSQL | 7 days |
-| Account brief and source hash | Demonstrate preserve/provenance | PostgreSQL | Reset removes active artifact; archive deleted by day 7 |
+| Account brief and source hash | Demonstrate preserve/provenance | PostgreSQL | Reset removes active artifact; archive deleted within 7 days after the final demo |
 | Plan/model metadata and audit events | Approval integrity, debugging, evidence | PostgreSQL, redacted logs | 7 days |
 | OAuth refresh token | Live provider access | Encrypted secret/token store | Revoke/delete after final demo or incident |
 | Sent messages | External consequence | Controlled Gmail sender/recipient accounts | Not changed by reset; account owners clean up separately |
@@ -247,7 +247,7 @@ The product timeline comes from explicitly redacted audit events, not copied ser
 | Reset overwrites external edit | Approved reset plan, two-event preflight, conditional restore | `reset_conflict`; zero writes/lock retained |
 | Reset races after preflight | Per-write receipt/rolling ETag and honest partial state | No reset claim; lock retained/new plan required |
 | Seed/spike utility misused | TTY-only admin policy, demo tags/allowlists, CI/prod refusal | Command rejects before dispatch |
-| OAuth token expires | Day 1 test, preflight, T-24h reauth | Integration unavailable; no fake success |
+| OAuth token expires | Provider-risk gate, preflight, T-24h reauth | Integration unavailable; no fake success |
 | Secret appears in logs/client | Redaction tests and server-only secret access | Build/test fails; rotate if exposed |
 
 ## 12. Incident response for the demo

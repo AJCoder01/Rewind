@@ -12,16 +12,16 @@ This runbook operates the approved PRD. It cannot introduce product behavior. Ne
 
 ## 1. Roles
 
-Assign before Day 1 ends:
+Assign before Gate G0 closes:
 
 | Role | Owner |
 |---|---|
-| Demo operator and narrator | TBD |
-| Backend/AI/OAuth on-call | TBD |
-| Frontend/recording on-call | TBD |
-| Final go/no-go owner | TBD |
+| Demo operator, narrator, recording, product evidence | Person B |
+| Backend, provider effects, OAuth, deployment on-call | Person A |
+| Final go/no-go | Person A + Person B jointly |
+| Safety veto | Either person may stop the run |
 
-One person operates the demo; the on-call owners watch logs/preflight without making live manual edits.
+Person B operates the demo while Person A watches logs/preflight without making live manual edits. Neither person may override a failed gate during recording.
 
 ## 2. Controlled seed data
 

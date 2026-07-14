@@ -5,7 +5,7 @@
 | Status | Approved target architecture |
 | Scope | Single-tenant, single-scenario hackathon MVP |
 | Runtime | One TypeScript application plus a thin MCP process |
-| Database | PostgreSQL from Day 1 |
+| Database | PostgreSQL from the foundation phase |
 | Last updated | 2026-07-14 |
 
 This document owns how the PRD is implemented. It does not broaden product scope. Exact interface fields live in `CONTRACTS.md`; safety invariants in `SAFETY.md` override convenience.
@@ -35,7 +35,7 @@ flowchart LR
     Service --> AI["OpenAI Responses API"]
     Service --> Cal["Google Calendar adapter"]
     Service --> Mail["Gmail send adapter"]
-    Service --> Artifact["Account-brief generator"]
+    Service --> Artifact["Approved artifact store"]
 ```
 
 Codex calls only Rewind's high-level `create_world_pr` tool. It never receives Google credentials and never calls Calendar or Gmail directly. Dashboard and MCP creation converge on the same `createWorldPr` application service.
@@ -85,10 +85,10 @@ Do not add a generic `RewindableAction` interface. Calendar restoration and mail
 | Application services | Use-case ordering and durable boundaries | Raw unvalidated provider/model data |
 | Domain | State transitions, plan digest, dependency and recovery validation, allowlist policy | Network calls |
 | PostgreSQL | Tasks, immutable plans, approvals, action ledger, artifacts, rules, audit events, scenario lock | Provider truth beyond stored snapshots/receipts |
-| AI service | Assumption wording for the fixed selected candidate, correction intent, recovery classifications/explanations, rule copy | Candidate ranking/selection, recipient selection, arbitrary IDs, dependencies as executable truth, provider payloads, code |
+| AI service | Propose bounded assumptions/dependency edges, account-brief content, correction intent, recovery classifications/templates, and typed rule copy | Recipient selection, arbitrary IDs, deterministic semantic validation, provider payloads, code |
 | Calendar adapter | Fetch tagged candidates, typed snapshots, conditional start/end changes, verification | Gmail notifications or conflict rebasing |
 | Gmail adapter | Build deterministic MIME from approved template, one send attempt, typed receipt | Reading/searching mailboxes, deleting/undoing mail, automatic retry after ambiguity |
-| Artifact adapter | Generate/store account brief from fixed approved source and provenance | Event/region input |
+| Artifact adapter | Store the exact approved account-brief bytes/hash/provenance and return a typed receipt | Generating/regenerating content or accepting event/region input |
 | MCP process | Expose minimal tools and call backend with auth/idempotency | Approval, execution, Google credentials, database access |
 
 ## 5. Core flows
@@ -331,7 +331,7 @@ This is at-most-once policy, not exactly-once delivery; Gmail's send method expo
 
 ### 8.3 Artifact
 
-The account brief is model-generated during planning from one versioned, seeded parent-account source. The source ID/hash and exact output/content hash are stored in the immutable plan. No selected event, region, attendee, time, or provider result enters the generation input. A closed validator also rejects output containing a known region, event/candidate ID or title, attendee, meeting time/date, or unsupported claim. The UI shows the full brief before approval; execution stores the exact approved bytes without another model call. If input independence, output validation, or byte/hash equality cannot be proved, `preserve` is invalid and recovery planning fails closed.
+The account brief is model-generated during planning from one versioned, seeded parent-account source. The source ID/hash and exact output/content hash are stored in the immutable plan. No selected event, region, attendee, time, or provider result enters the generation input. A closed validator also rejects output containing a known region, event/candidate ID or title, attendee, meeting time/date, or unsupported claim. The UI shows the full brief before approval. The artifact adapter is a storage adapter: execution creates the active artifact record from the exact approved bytes/hash and never generates or regenerates content. If input independence, output validation, or byte/hash equality cannot be proved, `preserve` is invalid and recovery planning fails closed.
 
 ### 8.4 Prevention rule
 
@@ -388,6 +388,7 @@ Current OpenAI guidance recommends Responses for text-generation applications an
 - Require `Idempotency-Key` on every mutating HTTP endpoint.
 - Atomically claim `(actor, endpoint, key)` with the canonical body hash before saga work. Records move through `in_progress | completed | failed` and carry the resource/request ID from the first transaction.
 - A concurrent identical request returns `200` with that existing resource's current durable state (and `replayPending: true` while the first call runs); it never enters the saga. A different body returns `409 idempotency_conflict`. Dashboard code creates one key per logical submission and reuses it across double-click/network retries.
+- A safe terminal failure before any external-effect marker stores a redacted canonical error under that key. Identical replay returns the same stored error; a deliberate new submission uses a new key.
 - Run candidate lookup and the active-rule precheck before locking. A matching clarification record has no plan/action and owns no lock.
 - Use one `scenario_locks` row to reject a second request only when it tries to begin effect-bearing planning or resolve a clarification while another run owns the lock.
 - Acquire the row with a planning lease. An expired planning/analyzing owner may be marked failed and released only after a transaction proves there is no approval, action row, or external-effect start marker. Inject/reconcile crashes after acquisition, task creation, Calendar read, model call, and plan persistence.
@@ -428,7 +429,7 @@ No state named `completed` or `recovered` is allowed when an approved action is 
 - Approval actor identity is the authenticated demo operator.
 - Provider adapters re-enforce target ownership and recipient allowlisting at the final execution boundary.
 
-The exact demo authentication implementation is a Day 1 decision, but these properties are not optional.
+The exact demo authentication implementation is a foundation-phase decision, but these properties are not optional.
 
 ## 13. Reset semantics
 
@@ -467,22 +468,24 @@ No analytics product UI is required.
 
 ## 15. Runtime and deployment constraints
 
-- PostgreSQL must exist from Day 1; do not plan a midweek SQLite migration.
+- PostgreSQL must exist from the foundation phase; do not plan a later SQLite migration.
 - Planning, approval execution, recovery, resume, and reset requests run their short persisted sagas synchronously and return the resulting durable state. GET may observe an in-flight `executing`/`recovering` state, but no fire-and-forget work continues after a response.
-- Select a host on Day 1 that allows the longest approved execution route to complete or be safely resumed within its request limits.
+- Select a host during the foundation phase that allows the longest approved execution route to complete or be safely resumed within its request limits.
 - Local development and deployed dashboard must use the same application-service code.
 - The deployed Google OAuth redirect URI, secure cookies, MCP base URL, and review URL must be proven before UI polish.
 
 ## 16. First vertical slice
 
-The first implementation contains no Calendar, Gmail, recovery, or AI call:
+The first implementation contains no live Calendar, Gmail, recovery, or AI call:
 
 1. authenticated MCP `create_world_pr` receives a request;
 2. backend validates input and idempotency key;
-3. PostgreSQL stores a task and placeholder versioned World PR;
-4. MCP returns `worldPrId`, `preview_ready`, and a non-secret review URL;
-5. authenticated dashboard loads that record;
-6. duplicate create replays the same response;
-7. unauthorized and second-active-scenario requests fail correctly.
+3. a test/development-only deterministic adapter supplies the two controlled candidates, rule result, and a complete contract-valid fixture plan;
+4. PostgreSQL stores the task and immutable fixture-backed plan;
+5. MCP returns `worldPrId`, `preview_ready`, and a non-secret review URL;
+6. authenticated dashboard loads that complete review record;
+7. duplicate create replays the same response;
+8. unauthorized and second-active-scenario requests fail correctly;
+9. deployed live mode refuses to start if any fake adapter is selected.
 
-Only after this slice is tested may Day 1 integration spikes begin.
+Only after this slice is tested may the provider/model risk-retirement phase begin. An incomplete placeholder remains `analyzing`; it is never exposed as `preview_ready`.

@@ -25,6 +25,7 @@ Safety constraints are requirements, not trade-offs.
 - `docs/SAFETY.md` owns non-negotiable approval, auth, OAuth, recipient, data, and fail-closed rules.
 - `docs/ARCHITECTURE.md` owns runtime structure, state, data, and execution semantics.
 - `docs/CONTRACTS.md` owns boundary shapes until executable schemas exist.
+- `docs/IMPLEMENTATION_PLAN.md` owns phase sequencing, Person A/Person B allocation, async handoffs, subagent boundaries, and phase gates; it does not create product requirements.
 - Zod schemas, database migrations, and contract tests become canonical for exact implemented fields. Keep the docs synchronized.
 - `docs/DECISIONS.md` records rationale and open choices; it does not override current canonical behavior.
 - `docs/PROGRESS.md` records status and evidence only.
@@ -44,6 +45,17 @@ If documents conflict, stop and reconcile the canonical files before implementin
 - Task requests outside the fixed Acme Calendar/mail/account-brief scenario fail as unsupported.
 
 Do not add excluded integrations, generic workflow engines, a monorepo, generalized adapters, queues, rule dashboards, analytics, accounts, billing, or additional scenarios without explicit approval.
+
+## Parallel implementation rules
+
+- Follow the Person A/Person B path ownership in `docs/IMPLEMENTATION_PLAN.md`.
+- Freeze schemas, migrations, and golden fixtures before producer and consumer branches diverge.
+- Do not edit package/lock files, migrations, contract barrel exports, `AGENTS.md`, `README.md`, or `PROGRESS.md` concurrently.
+- Use isolated Git worktrees and short phase/task branches for humans and implementation subagents.
+- Every handoff names requirement IDs, schema/fixture versions, commands run, evidence, and remaining risk.
+- Development subagents receive one bounded objective and exclusive files. They never merge to `main`, receive secrets, run live provider commands, or change canonical requirements.
+- Only humans run TTY-gated Calendar/Gmail/reset operations and approve live effects.
+- Finish each phase with independent requirement and safety audits before the next integration gate.
 
 ## Repository conventions
 

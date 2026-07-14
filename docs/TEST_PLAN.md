@@ -39,26 +39,59 @@ npm run reset:demo
 
 Live tests require explicit environment gating, controlled accounts, and a confirmation such as `LIVE_INTEGRATION_TESTS=1` so ordinary CI cannot send mail.
 
-## 3. Day 1 must-pass risk spikes
+## 3. Phase-gated must-pass risks
 
-Feature work stops until all of these are green:
+### Gate G1 — Non-effecting vertical slice
 
 1. MCP `create_world_pr` calls the authenticated backend, creates one PostgreSQL record, returns a review URL, and the authenticated dashboard loads it.
 2. Replaying the same create idempotency key returns the same task; a different payload with the same key returns `idempotency_conflict`.
-3. A rule-matched request can return `clarification_required` without a lock while one effect-bearing scenario is active; a request that passes precheck and tries to plan returns `scenario_busy`.
-4. The deployed Google OAuth/OIDC callback works with state, nonce, PKCE, exact redirect matching and signed-claim validation; access-token refresh succeeds. Replay/mismatched state/nonce/sub/aud/iss/expiry/email verification all fail.
-5. The OIDC subject/email claim and configured calendar equal the expected test identity/calendar without requesting Gmail read/profile access.
-6. Exact tagged lookup returns precisely two owned, timed, non-recurring seeded events.
-7. One Calendar event is conditionally moved and restored with rolling expected ETags and no unintended attendee email; the immutable semantic baseline never stores an ETag.
-8. A deliberate intervening Calendar edit produces `provider_conflict`, not overwrite.
-9. One allowlisted Gmail message sends and returns a message receipt; a double click cannot create a second action dispatch.
-10. Gmail's closed error matrix passes: only local pre-handoff failure is retryable; 4xx rejection is permanent; 408/429/5xx, transport loss, malformed 2xx, timeout, or process death after `dispatch_started_at` is uncertain and never auto-retried.
-11. A live OpenAI call using the selected model satisfies the exact strict schemas for assumption/dependency, artifact, recovery, and rule proposals; invalid semantic output is rejected.
-12. The generated account brief's exact bytes/hash are previewed, approved, and persisted unchanged; forbidden region/event/attendee/time leakage fails planning.
-13. An approved reset plan preflights both events, restores both semantic baselines, records new rolling ETags, releases local scenario state, and clearly leaves sent mail intact. Conflict causes zero writes; injected second-write race yields an honest partial state and retained lock.
-14. Seed/live-spike commands enforce TTY confirmation, demo tags/allowlists, receipts, and CI/production refusal.
+3. A fixture-backed active rule can return `clarification_required` without a lock; a request that passes precheck and tries to plan while another fixture scenario owns the lock returns `scenario_busy`.
+4. The development/test preview is a complete contract-valid fixture plan, never an incomplete placeholder labelled `preview_ready`.
+5. No live Calendar, Gmail, or OpenAI adapter can run in the G1 test configuration.
 
-OAuth, conditional Calendar restore, Gmail replay prevention, and strict model output are release-blocking risks.
+### Gate G2 — Provider and model risk retirement
+
+1. The deployed Google OAuth/OIDC callback works with state, nonce, PKCE, exact redirect matching and signed-claim validation; access-token refresh succeeds. Replay/mismatched state/nonce/sub/aud/iss/expiry/email verification all fail.
+2. The OIDC subject/email claim and configured calendar equal the expected test identity/calendar without requesting Gmail read/profile access.
+3. Exact tagged lookup returns precisely two owned, timed, non-recurring seeded events.
+4. One Calendar event is conditionally moved and restored with rolling expected ETags and no unintended attendee email; the immutable semantic baseline never stores an ETag.
+5. A deliberate intervening Calendar edit produces `provider_conflict`, not overwrite.
+6. One human-confirmed allowlisted live Gmail message sends and returns a message receipt; replay of its application action cannot create a second dispatch.
+7. Deterministic transport fakes—not intentionally ambiguous live sends—prove Gmail's closed error matrix: only local pre-handoff failure is retryable; 4xx rejection is permanent; 408/429/5xx, transport loss, malformed 2xx, timeout, or process death after `dispatch_started_at` is uncertain and never auto-retried.
+8. A live OpenAI call using the selected model satisfies the strict smoke schemas; invalid semantic output is rejected.
+9. Seed/provider-spike commands enforce TTY confirmation, demo tags/allowlists, receipts, and CI/production refusal.
+10. A TTY-gated low-level Calendar spike proves two-event preflight, conditional restore, conflict, rolling ETags, and injected partial receipts. It exposes no reset route, archive/lock/rule/artifact cleanup, or `reset_complete` state.
+
+OAuth, conditional Calendar restore, Gmail replay prevention, and strict model output are release-blocking risks. Feature integration stops while any G2 item is red.
+
+### Gate G3 — Initial workflow product proof
+
+1. The generated account brief's exact bytes/hash are previewed, approved, and persisted unchanged.
+2. Forbidden region/event/attendee/time leakage fails planning.
+3. Approval replay dispatches no duplicate artifact, Calendar write, or Gmail send.
+4. FR-01–04 and FR-06–18 pass with deterministic adapters; FR-05's pre-lock port remains fixture-covered for the initial no-rule run.
+5. One controlled live initial flow completes artifact storage, Calendar update, and Gmail notification with exact receipts.
+
+### Gate G4 — Recovery product proof
+
+1. FR-19–27 pass with deterministic adapters and the full failure-injection matrix.
+2. At least 24/25 correction paraphrases pass; recording target is 25/25.
+3. The separate negative/safety suite passes 100% with zero unsafe adapter calls.
+4. One controlled live recovery reaches `recovered` with exact UK restore, US move, UK correction, and US notification receipts.
+
+### Gate G5 — Guardrail/reset product proof
+
+1. A persisted active rule is evaluated through normal intake before selection/lock and returns a renderable `clarification_required` record with no plan/action/lock.
+2. Rule activation is separately approved, and clarification resolution accepts only a recorded candidate.
+3. An approved reset plan preflights both events, restores both semantic baselines, records new rolling ETags, releases local scenario state, and clearly leaves sent mail intact.
+4. Reset conflict causes zero writes; an injected second-write race yields an honest partial state and retained lock.
+
+### Gate G6 — Hardening and release evidence
+
+1. Lint, typecheck, unit, contract, integration, Playwright, eval, accessibility, secret/redaction, and explicitly gated live suites pass on a clean checkout.
+2. OAuth/account substitution, replay, stale ETag, ambiguous Gmail, crash/lease, partial recovery/reset, and fake-in-live-mode tests fail closed.
+3. Five consecutive controlled live flows pass without database edits, restart, duplicate effects, hidden fallback, mock substitution, uncontrolled recipients, or unresolved delivery.
+4. The implementation, executable schemas, commands, runbook, and sanitized evidence agree before freeze.
 
 ## 4. Test layers
 
