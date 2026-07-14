@@ -1,0 +1,271 @@
+# Rewind decision log
+
+| Field | Value |
+|---|---|
+| Status | Active |
+| Format | Lightweight ADRs |
+| Last updated | 2026-07-14 |
+
+This file records why a decision was made and which choices remain open. Accepted behavior must also appear in the canonical PRD, Safety, Architecture, or Contracts document; this log alone does not define runtime behavior.
+
+## Status vocabulary
+
+- **Accepted:** current MVP decision; implementation should follow it.
+- **Proposed:** recommended but awaiting a named owner or Day 1 proof.
+- **Superseded:** retained for history; replacement is named.
+- **Rejected:** considered and not selected.
+
+## Index
+
+| ID | Decision | Status |
+|---|---|---|
+| ADR-001 | Frame the trigger as late-arriving context | Accepted |
+| ADR-002 | Define “causal” as approved recorded lineage | Accepted |
+| ADR-003 | Put safety/correctness above visual polish | Accepted |
+| ADR-004 | Lock one single-tenant controlled effect-bearing scenario | Accepted |
+| ADR-005 | Make the artifact genuinely region-independent | Accepted |
+| ADR-006 | Allow ranked UK selection before a rule, with visible alternative/evidence | Accepted |
+| ADR-007 | Use one package: Next.js app plus thin MCP process | Accepted |
+| ADR-008 | Use PostgreSQL from Day 1 | Accepted |
+| ADR-009 | Bind approval to immutable versioned plan digests | Accepted |
+| ADR-010 | Use a durable per-action saga/ledger | Accepted |
+| ADR-011 | Use Calendar ETag conflict checks and narrow start/end writes | Accepted |
+| ADR-012 | Use direct Gmail send with at-most-once/uncertain semantics | Accepted |
+| ADR-013 | Keep AI proposals inside deterministic closed-world validation | Accepted |
+| ADR-014 | Separate existing recovery outcomes from new Apply actions | Accepted |
+| ADR-015 | Use one typed Acme rule and `clarification_required` | Accepted |
+| ADR-016 | Rename and constrain reset to “Reset demo state” | Accepted |
+| ADR-017 | Make date/time zone/duration explicit | Accepted |
+| ADR-018 | Require authenticated dashboard/MCP trust boundaries | Accepted |
+| ADR-019 | Configure and record the model; do not hard-code product behavior to a name | Accepted |
+| ADR-020 | Keep deterministic fallback off during recorded proof | Accepted |
+| ADR-021 | Make Playwright/live/eval gates mandatory | Accepted |
+| ADR-022 | Use npm scripts in the single root package | Accepted |
+
+## Accepted decisions
+
+### ADR-001 — Frame the trigger as late-arriving context
+
+**Decision:** Replace “the world changed” as the literal demo explanation with “relevant context arrived after execution” or “late information invalidated a reasonable assumption.” The user manually pastes the Sales clarification.
+
+**Why:** “I meant Acme US” is a delayed clarification of intent, not necessarily an external-world change. Precise wording removes an easy credibility objection and avoids implying Slack/mail monitoring.
+
+**Consequence:** The broad vision may still cover changed external facts later, but this demo proves post-execution context correction only.
+
+### ADR-002 — Define “causal” as approved recorded lineage
+
+**Decision:** Rewind records dependency edges in the approved World PR and uses them during recovery. It does not claim to infer full causality from arbitrary logs.
+
+**Why:** The recovery quality depends on the plan's dependency truth. This boundary makes the technical claim testable and honest.
+
+**Consequence:** Only actions routed through Rewind and represented in the approved plan are recoverable.
+
+### ADR-003 — Put safety/correctness above visual polish
+
+**Decision:** Trade-off order is safety/correctness, demo reliability, clarity, polish, depth, extensibility.
+
+**Why:** A product that changes calendars and emails people cannot rank visual polish above the correctness of external effects.
+
+**Consequence:** A conflict or uncertainty may stop the demo; it may never be styled as success.
+
+### ADR-004 — Lock one single-tenant controlled effect-bearing scenario
+
+**Decision:** One Google identity, one owned calendar, exactly two tagged one-off events, one operator, one active effect-bearing scenario, and allowlisted team recipients. Active-rule evaluation happens before lock acquisition, so a clarification-only intake may coexist without a plan/action/lock.
+
+**Why:** It is the smallest surface that can prove the interaction with real providers in seven days.
+
+**Consequence:** Recurring/all-day/shared events, arbitrary recipients, multiple tenants, and production data are rejected, not “best effort.”
+
+### ADR-005 — Make the artifact genuinely region-independent
+
+**Decision:** Rename the generic “renewal risk summary” to an Acme parent-account risk brief generated during planning only from one versioned company-wide synthetic source. Validate output against regional/event/attendee/time leakage, show exact content, bind source/content hashes into the plan, and persist those approved bytes without regeneration.
+
+**Why:** A normal renewal summary likely depends on region, making `preserve` contrived or unsafe. Recorded independent inputs make preservation causally credible.
+
+**Consequence:** If event/region/attendee/time enters artifact input or output, or stored bytes differ from the approved content hash, recovery validation must reject `preserve`.
+
+### ADR-006 — Allow ranked UK selection before a rule, with visible alternative/evidence
+
+**Decision:** Initially, no “always confirm region” rule exists. Rewind ranks UK because it is the nearest upcoming tagged match on the configured demo date, displays both UK and US, and requires World PR approval. The later active rule changes policy to clarification-first. No “recently referenced” signal is used because the approved integrations do not supply one.
+
+**Why:** Without visible evidence, a safety product should ask immediately and the demo's initial error looks negligent. The decision preserves the post-execution story while showing why the original approval was reasonable.
+
+**Consequence:** The World PR must make the alternative and absence of the rule visible. This is a controlled product policy, not a general confidence algorithm.
+
+### ADR-007 — Use one package: Next.js app plus thin MCP process
+
+**Decision:** Keep pages, route handlers, domain/services/adapters, tests, and a thin stdio MCP entry in one TypeScript package.
+
+**Why:** Shared schemas and application services matter more than monorepo isolation for a seven-day build.
+
+**Consequence:** No workspace/package split unless deployment proves it necessary.
+
+### ADR-008 — Use PostgreSQL from Day 1
+
+**Decision:** Use PostgreSQL for local/deployed state; do not plan a SQLite-to-Postgres migration midweek.
+
+**Why:** Immutable plans, unique action keys, scenario locks, leases, and deployed persistence are core reliability mechanisms.
+
+**Consequence:** Selecting/provisioning the provider is a Day 1 open decision, but the database type is not.
+
+### ADR-009 — Bind approval to immutable versioned plan digests
+
+**Decision:** Store plans as immutable versioned payloads and bind approval to a SHA-256 canonical digest, actor, and timestamp.
+
+**Why:** Task-level “approved” status cannot prove which recipients, content, targets, or provider versions the user authorized.
+
+**Consequence:** Any relevant change creates a new plan version and approval. `approved` is an event/record, not a long-lived task state.
+
+### ADR-010 — Use a durable per-action saga/ledger
+
+**Decision:** Persist one unique row for every approved action with before/desired/after state, status, attempts, lease, receipt, and redacted error. Persist before and after each external call.
+
+**Why:** Calendar, Gmail, OpenAI, and PostgreSQL cannot form one atomic transaction. Task-level status alone cannot prevent duplicate or hidden partial execution.
+
+**Consequence:** The UI includes partial, retryable, uncertain, conflict, and permanent states. Resume skips succeeded actions and only retries known-safe work. An expired in-progress Calendar action is reconciled against remote state; an expired in-progress Gmail send becomes delivery-uncertain.
+
+### ADR-011 — Use Calendar ETag conflict checks and narrow start/end writes
+
+**Decision:** Save preview/before/after ETags; refetch before execution/recovery; use `If-Match`; change/restore only start/end; disable Calendar attendee email with `sendUpdates=none`.
+
+**Why:** Blind snapshot replay could erase a legitimate later edit or send duplicate provider notifications.
+
+**Consequence:** Any drift fails closed. Generic rebasing is explicitly excluded.
+
+### ADR-012 — Use direct Gmail send with at-most-once/uncertain semantics
+
+**Decision:** Request only `gmail.send`, send deterministic approved MIME once, prevent application replay, persist `dispatch_started_at` before transport handoff, and mark every ambiguous post-handoff failure `delivery_uncertain` with no automatic retry. Only local failures proven before the marker are retryable; explicit non-timeout 4xx rejection is permanent.
+
+**Why:** `gmail.compose` would enable draft-based reconciliation but is a broader restricted scope. Least privilege wins for the controlled demo.
+
+**Consequence:** Rewind cannot always determine whether a timed-out send arrived. It must stop honestly rather than claim exactly-once delivery.
+
+### ADR-013 — Keep AI proposals inside deterministic closed-world validation
+
+**Decision:** The model performs the four promised reasoning jobs inside closed universes: propose the initial assumption and dependency edges, classify recovery, and propose the one typed guardrail; it also drafts the account brief from fixed source facts. Deterministic code supplies/ranks candidate facts, requires the seeded UK winner and complete valid dependency map, owns IDs/recipients/time/templates/provider calls, validates artifact output and every proposal, then expands exact actions.
+
+**Why:** Strict schema alone cannot prove an entity, recipient, dependency, or action is valid.
+
+**Consequence:** The model contribution is meaningful but bounded. Unknown/duplicate/omitted/incompatible output is rejected. Retry once, then show a safe failure.
+
+### ADR-014 — Separate existing recovery outcomes from new Apply actions
+
+**Decision:** Existing succeeded actions receive only `restore | correct | preserve`. `apply` is a UI grouping for new allowlisted US actions and is never attached to an existing action ID.
+
+**Why:** The original recovery schema mixed classifications of past effects with creation of future actions.
+
+**Consequence:** Model and API schemas use `executedActionId` for decisions and a separate `newActions` array.
+
+### ADR-015 — Use one typed Acme rule and `clarification_required`
+
+**Decision:** Support one executable predicate for Acme company/region ambiguity. It is proposed after recovery, separately activated, and evaluated in normal intake after candidate lookup but before selection, plan generation, or effect-bearing lock acquisition.
+
+**Why:** A free-form string cannot safely drive a rule engine, and applying the rule after selection would not prevent the same failure.
+
+**Consequence:** The task state includes a renderable persisted `clarification_required` payload with candidates but no plan/action/lock. The proof uses normal `POST /world-prs`, not a test-only rule endpoint; no generic rules dashboard or cross-company learning claim.
+
+### ADR-016 — Rename and constrain reset to “Reset demo state”
+
+**Decision:** Reset has its own immutable two-event plan/digest and separate approval. Semantic baselines exclude ETags; rolling expected ETags update after every write. Reset preflights both events before writing, conditionally restores, reports a race/partial result honestly, and only after full verification archives/releases local scenario state, removes/deactivates the rule/artifact, and creates a new run ID. It retains sent mail and audit evidence.
+
+**Why:** Sent email cannot be undone or erased from recipient inboxes by the application.
+
+**Consequence:** UI/API require exact reset-plan approval and acknowledgement that sent mail remains. A partial reset retains the lock and needs a new plan. Unique run IDs distinguish repeated messages.
+
+### ADR-017 — Make date/time zone/duration explicit
+
+**Decision:** Use one configurable future `DEMO_DATE`, explicit “3:00 PM ET,” `America/New_York`, and a fixed preserved 30-minute duration.
+
+**Why:** “3 PM” creates a second ambiguity involving date, time zone, and duration.
+
+**Consequence:** All-day/recurring/missing-time-zone input is outside the demo boundary.
+
+### ADR-018 — Require authenticated dashboard/MCP trust boundaries
+
+**Decision:** Dashboard approval requires a secure authenticated session and CSRF protection; MCP uses a scoped create/read bearer token; IDs/URLs are not authorization.
+
+**Why:** An enumerable/forwarded review link cannot be allowed to trigger calendar/mail effects.
+
+**Consequence:** A minimal demo gate is required even though user accounts/RBAC are excluded.
+
+### ADR-019 — Configure and record the model
+
+**Decision:** Use `OPENAI_MODEL`, initially target `gpt-5.6-sol`, and record actual model/prompt/schema/reasoning metadata per plan. Day 1 verifies project access and strict output.
+
+**Why:** Model availability and aliases change; product contracts should depend on validated schemas, not a marketing name hard-coded throughout code.
+
+**Consequence:** A model/config change reruns all eval gates and creates new plan metadata.
+
+### ADR-020 — Keep deterministic fallback off during recorded proof
+
+**Decision:** An isolated scenario fallback may exist only behind a disabled development flag for validator/failure testing. It cannot silently run or be represented as model reasoning in the recorded demo.
+
+**Why:** Hidden fallback would undermine the claimed model contribution and violate honest-failure rules.
+
+**Consequence:** Two invalid model attempts produce a visible safe failure during the live flow.
+
+### ADR-021 — Make Playwright/live/eval gates mandatory
+
+**Decision:** Keep the source brief's minimum of 24/25 correct correction paraphrases, adopt 25/25 as the team's explicit recording target, require a separate 100%-passing negative/safety suite with zero unsafe adapter calls, plus the critical Playwright flow, Day 1 live provider/model spikes, and five consecutive live rehearsals.
+
+**Why:** “If feasible” test coverage conflicts with a demo whose central claim is reliable external recovery.
+
+**Consequence:** Feature freeze and recording are blocked until these gates are evidenced.
+
+### ADR-022 — Use npm scripts in the single root package
+
+**Decision:** Use npm and one root `package.json` for setup, dev, lint, typecheck, unit, E2E, eval, seed, preflight, and reset commands.
+
+**Why:** npm is universally available with Node and avoids adding package-manager/workspace decisions to a one-package hackathon build.
+
+**Consequence:** README/AGENTS commands remain planned until the package is scaffolded and each script has been run successfully.
+
+## Rejected alternatives
+
+| Alternative | Status | Reason |
+|---|---|---|
+| “The world changed” as the literal Acme story | Rejected | Demo shows delayed clarification; broader wording overclaims |
+| Hide the alternative US event | Rejected | Makes UK selection look arbitrary and weakens approval credibility |
+| Ask for region on the first run without any learned-policy contrast | Rejected for this demo | Eliminates the failure/recovery proof; future active rule does require it |
+| Region-specific risk summary preserved by user instruction | Rejected | User preference cannot prove causal independence |
+| Generic `RewindableAction`/compensation interface | Rejected | Obscures irreversible mail vs reversible Calendar semantics and expands scope |
+| SQLite first, migrate later | Rejected | Midweek persistence/concurrency migration risks the demo |
+| Full Calendar snapshot overwrite on restore | Rejected | Can destroy legitimate changes and unsupported fields |
+| Gmail drafts with `gmail.compose` | Rejected for MVP | Better limited reconciliation, but broader restricted mailbox scope |
+| Automatic retry of timed-out Gmail send | Rejected | Can duplicate irreversible communication |
+| Free-form executable prevention-rule condition | Rejected | Unsafe and unnecessary for one scenario |
+| Automatic rule activation | Rejected | One correction is insufficient authority to change future behavior |
+| Task status `rule_created` | Rejected | Rule lifecycle should not overwrite recovered task state |
+| Dynamic graph library | Rejected | Fixed four/five-node visual is clearer and more reliable |
+| Hidden deterministic recovery fallback | Rejected | Misrepresents model use and masks failure |
+
+## Open decisions
+
+Resolve these before or during Day 1. Record the answer, date, owner, and evidence here; update canonical docs if behavior changes.
+
+| ID | Decision needed | Recommended default | Owner | Due | Status/evidence |
+|---|---|---|---|---|---|
+| OPEN-001 | Git initialization and remote repository | Initialize immediately; protect main once remote exists | TBD | Before scaffold | Open |
+| OPEN-002 | Node version | Current supported LTS pinned in `.nvmrc`/engines | Backend owner | Scaffold | Open |
+| OPEN-003 | Deployment host/runtime limits | One Node-capable host that supports synchronous resumable routes | Backend owner | Day 1 | Open |
+| OPEN-004 | PostgreSQL provider and region | Managed Postgres near app; no SQLite | Backend owner | Day 1 | Open |
+| OPEN-005 | Dashboard demo authentication | Minimal single-operator secure session/passcode gate with CSRF | Backend + frontend | Day 1 | Open |
+| OPEN-006 | Google account/calendar owner | Dedicated team Workspace identity and owned calendar | Team lead | Day 1 | Open |
+| OPEN-007 | OAuth audience | Internal/Trusted Workspace if possible; otherwise External Testing plus reauth plan | OAuth owner | Day 1 | Open |
+| OPEN-008 | Exact controlled recipient allowlist | Team-owned addresses only; separate UK/US subsets | Demo owner | Day 1 | Open |
+| OPEN-009 | `DEMO_DATE` and final event baselines | Future date; 10:00 UK, 11:00 US, 15:00 target ET | Demo owner | Before seed | Open |
+| OPEN-010 | OpenAI project/model access and reasoning setting | Verify `gpt-5.6-sol` strict output; choose lowest effort that passes eval | AI owner | Day 1 | Open |
+| OPEN-011 | Exact synthetic account-note fixture | Short company-wide notes with no regional input | Product owner | Day 2 | Open |
+| OPEN-012 | Team role assignments | One backend/AI, one frontend/product, shared go/no-go | Team lead | Before work | Open |
+| OPEN-013 | Evidence storage location | Sanitized `artifacts/test-runs/`; private provider receipts elsewhere | Backend owner | Before live tests | Open |
+
+### Resolution template
+
+When closing an open item, add a dated note:
+
+```text
+OPEN-NNN — Resolved YYYY-MM-DD by <owner>
+Decision:
+Evidence:
+Canonical docs/code updated:
+```
