@@ -1,483 +1,265 @@
-# Rewind implementation plan
+# Rewind master implementation plan
 
 | Field | Value |
 |---|---|
-| Status | Ready for owner assignment and execution |
-| Planning model | Dependency-gated phases, not calendar days |
-| Team shape | Two asynchronous human owners plus bounded development subagents |
-| Current phase | Phase 0 — alignment and engineering foundation |
+| Status | Active canonical execution queue |
+| Execution model | One sequential task at a time |
+| Current gate | G0 — foundation |
+| Current restart point | `S007` — provision the selected Supabase project |
 | Last updated | 2026-07-14 |
 
-This document owns implementation sequencing, ownership, handoffs, and phase gates. It does not override product behavior in `PRD.md`, safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, or boundary shapes in `CONTRACTS.md`.
-
-## 1. Two-person ownership
-
-`OPEN-012` assigns **Kaustubh Upadhya** to Platform & Safety and **Ayush Jha** to Product, AI & Quality.
-
-| Area | Kaustubh Upadhya — Platform & Safety | Ayush Jha — Product, AI & Quality |
-|---|---|---|
-| Mission | Make state and external effects correct, durable, authenticated, and recoverable | Make reasoning bounded, plans understandable, UX complete, and quality measurable |
-| Root/toolchain | Sole writer for package manifest, lockfile, TypeScript/Next configuration, CI, environment contract | Requests dependency/config changes through Kaustubh Upadhya |
-| Backend | HTTP routes, application services, domain state, PostgreSQL, migrations, auth, MCP | Consumes frozen API/read-model contracts |
-| Provider effects | OAuth, Calendar, Gmail, artifact persistence, reset, seed/preflight/live scripts | Never calls provider adapters directly |
-| Deterministic safety | Plan hashing, idempotency, leases, state transitions, semantic validation, exact plan expansion | Reviews output completeness and supplies adversarial fixtures |
-| AI | Reviews every executable field and owns deterministic validation | Owns prompts, Responses client, model-only schemas, retry behavior, artifact generation, and evals |
-| Frontend | Reviews API wiring and security boundaries | Owns pages, components, client API, visualization, accessibility, and animation |
-| Tests | Domain, contract, database, integration, provider fakes, failure injection, live smoke | AI evals, component tests, Playwright, accessibility, comprehension, evidence |
-| Canonical docs | `ARCHITECTURE.md`, `CONTRACTS.md`, `SAFETY.md`, implementation command truth | `PRD.md`, `TEST_PLAN.md`, `DEMO_RUNBOOK.md`, `PROGRESS.md`, evidence curation |
-
-### Exclusive path ownership
-
-Kaustubh Upadhya is the default writer for:
-
-```text
-app/api/**
-lib/contracts/**
-lib/domain/**
-lib/services/**
-lib/db/**
-lib/auth/**
-lib/adapters/**
-mcp/**
-scripts/seed-*
-scripts/preflight-*
-scripts/reset-*
-db/migrations/**
-tests/unit/domain/**
-tests/contract/**
-tests/integration/**
-tests/providers/**
-package.json and lock/config files
-```
-
-Ayush Jha is the default writer for:
-
-```text
-app/page.tsx
-app/pr/**
-app/(product)/**
-app/layout.tsx
-app/globals.css
-components/**
-lib/ai/**
-evals/**
-tests/e2e/**
-tests/components/**
-tests/fixtures/contracts/**
-tests/fixtures/traceability/**
-artifacts/test-runs/**
-product-facing documentation
-```
-
-Kaustubh Upadhya creates the initial root app files during scaffold, then hands `app/page.tsx`, `app/pr/**`, `app/layout.tsx`, and `app/globals.css` to Ayush Jha in one recorded ownership change before UI work begins.
-
-### Shared-document default writers
-
-| File | Default writer | Required review |
-|---|---|---|
-| `DECISIONS.md`, `ARCHITECTURE.md`, `CONTRACTS.md`, `SAFETY.md` | Kaustubh Upadhya | Ayush Jha reviews product/rendering impact |
-| `PRD.md`, `TEST_PLAN.md`, `DEMO_RUNBOOK.md`, `PROGRESS.md` | Ayush Jha | Kaustubh Upadhya reviews safety/runtime claims |
-| `README.md`, `AGENTS.md` | Kaustubh Upadhya | Ayush Jha reviews product-facing wording |
-| `IMPLEMENTATION_PLAN.md` | Ayush Jha as plan curator | Both owners approve sequencing/ownership changes |
-
-High-conflict files have one writer at a time: package/lock files, migrations, contract barrel exports, `AGENTS.md`, `README.md`, and `PROGRESS.md`. A contract change is a dedicated handoff, not an opportunistic edit in a consumer branch.
-
-## 2. Asynchronous operating protocol
-
-Each phase follows the same event-driven workflow:
-
-1. **Freeze the interface packet.** Merge schemas, migrations, state transitions, and golden success/error fixtures before producer and consumer work diverges.
-2. **Work in isolated branches/worktrees.** Use short branches such as `phase-3/a-initial-execution` and `phase-3/b-world-pr-ui`.
-3. **Build against fakes at boundaries.** Ayush Jha uses versioned golden HTTP/read-model fixtures while Kaustubh Upadhya builds services and provider adapters. Kaustubh Upadhya uses model-proposal fixtures while Ayush Jha builds the real AI client.
-4. **Handoff through artifacts, not assumptions.** Every handoff includes requirement IDs, schema version, fixture paths, commands run, sanitized evidence, known risks, and explicit excluded behavior.
-5. **Merge in dependency order.** Contracts/migrations → producers → consumers → wiring → E2E/live evidence.
-6. **Run the phase gate.** A phase is complete only when its gate passes; “code finished” is not a completion state.
-
-### Pull-request contract
-
-Every implementation PR states:
-
-- owner and reviewer;
-- phase/task IDs;
-- covered FR/SAFE/NFR IDs;
-- owned paths and any shared-file exception;
-- input/output contract version;
-- external-effect risk;
-- tests and commands run;
-- sanitized evidence location;
-- remaining blocker or follow-up.
-
-The other person reviews every cross-boundary change. Kaustubh Upadhya has veto authority for external-effect safety; Ayush Jha has veto authority for user-visible claim accuracy and acceptance-evidence integrity. A disputed change remains unmerged until the canonical docs agree.
-
-## 3. Critical path and parallel lanes
-
-```text
-Phase 0: foundation + contracts
-        ↓
-Phase 1: MCP → API → PostgreSQL → dashboard
-        ↓
-Phase 2: provider/model risk retirement
-        ↓
-Phase 3: approved initial World PR execution
-        ↓
-Phase 4: approved Causal Revert
-        ↓
-Phase 5: guardrail + approved reset
-        ↓
-Phase 6: hardening + five-run evidence
-        ↓
-Phase 7: submission + cleanup
-```
-
-External setup for PostgreSQL, deployment, Google OAuth, the controlled calendar/recipients, demo date, and OpenAI access starts in Phase 0 because those dependencies can block later gates. Preparatory work for a later phase may start against frozen fixtures, but live behavior and integration claims cannot bypass the preceding gate.
-
-## 4. Phase 0 — Alignment and engineering foundation
+This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
+
+## 1. How to execute this plan
+
+- Work from the lowest-numbered unfinished task. Do not start a later gate while the current gate is red.
+- Keep only one implementation task active. A task may contain code, tests, documentation, and evidence that must land together.
+- Use a short branch for the active task. Merge contracts/migrations before code that produces or consumes them.
+- A task is complete only when its acceptance checks pass and sanitized evidence is linked from `PROGRESS.md`.
+- Update Zod schemas, migrations, contract tests, and canonical documentation together whenever a boundary changes.
+- Use deterministic adapters in automated tests. Never present fixture or mock output as live-provider evidence.
+- Only a human may run TTY-gated Google Calendar, Gmail, provider-spike, reset, or other live external-effect commands.
+- Any auth, approval, allowlist, digest, ETag, uncertain-delivery, or persistence ambiguity fails closed and stops the current gate.
+
+### Status legend
+
+- `[x]` Complete with evidence
+- `[~]` Partially implemented; acceptance evidence is incomplete
+- `[ ]` Not started
+- `[!]` Blocked by a named external prerequisite recorded in `PROGRESS.md`
+
+## 2. Sequential task queue
+
+### G0 — Foundation, credentials, contracts, and evidence
+
+- [x] **S001 — Establish the repository.** Initialize Git, configure `main → origin/main`, publish the documentation baseline, and record the remote/commit evidence.
+- [x] **S002 — Resolve foundation decisions.** Select Node, deployment, PostgreSQL, dashboard auth, Google identity/OAuth audience, controlled recipient structure, demo date, evidence location, and the single sequential execution model.
+- [x] **S003 — Scaffold the application.** Create one strict TypeScript/Next.js npm package, pin Node 24, define root commands, add `.env.example` names only, and keep secrets out of Git.
+- [x] **S004 — Establish the minimal executable contract packet.** Add strict API-v1 lifecycle/error/create/read schemas, opaque IDs, canonical SHA-256 plan hashing, and contract/digest tests.
+- [x] **S005 — Establish durable storage foundations.** Add the initial PostgreSQL migration for tasks, plans, approvals, action executions, artifacts, rules, idempotency, scenario locks, demo event versions, and audit events; add a fail-closed migration runner.
+- [x] **S006 — Prove the local fixture slice.** Implement signed dashboard sessions, same-origin mutation checks, scoped MCP authentication, `create_world_pr`, create/read routes, a complete fixture-backed plan, a review page, unit tests, production build, and the critical fixture browser smoke.
+- [ ] **S007 — Provision Supabase PostgreSQL.** Create the selected Mumbai (`ap-south-1`) project, store the runtime transaction-pool URL and separate migration URL outside Git, restrict database credentials, and record only redacted project/region evidence.
+- [ ] **S008 — Apply and verify the real migration.** Run `npm run db:migrate`, prove repeatability, inspect every table/check/foreign-key/unique constraint, test `(plan_id, action_key)` and idempotency uniqueness, and add a database readiness check.
+- [ ] **S009 — Provision and verify Vercel.** Connect the GitHub repository, use Node 24 and Fluid Compute in Mumbai (`bom1`), configure private environment variables, deploy over TLS, and prove health/readiness, secure cookies, base URL, MCP base URL, and review URL behavior.
+- [ ] **S010 — Prepare Google Cloud access without live effects.** Create the project, enable Calendar/Gmail APIs, configure External/Testing audience and the exact test identity, register exact local/deployed redirects, request only OIDC + `calendar.events.owned` + `gmail.send`, and store no credential in Git.
+- [ ] **S011 — Prepare OpenAI project access.** Create/confirm the API project, keep the key in local/deployment secrets, verify the configured model is available, and defer product model calls until G2 strict-schema tests exist.
+- [ ] **S012 — Finalize the private environment contract.** Generate strong session, passcode, MCP, and token-encryption secrets; configure expected Google email/subject, Calendar ID, structured `{UK,US}` allowlist, demo date, model, database URLs, and startup validation. Never log literal values.
+- [ ] **S013 — Add fast CI and repository security checks.** Run install, lint, typecheck, unit/contract tests, production build, dependency audit, secret scan, migration validation against ephemeral PostgreSQL, and fake-in-production checks on every change.
+- [ ] **S014 — Freeze the controlled content and UI inventory.** Finalize the synthetic parent-account note fixture, demo copy, required UI states, component boundaries, viewport, reduced-motion behavior, and sanitized evidence format.
+- [ ] **S015 — Build executable requirement traceability.** Map FR-01–32, SAFE-01–10, and NFR-01–10 to code paths, tests, fixture IDs, and evidence under `tests/fixtures/traceability/**`.
+- [ ] **S016 — Create the complete golden contract fixture set.** Add strict success/error/read-model fixtures for analyzing, clarification, preview, executing, completed, correction, recovery, attention, recovered, rule, reset, cancelled, and failed states.
+- [ ] **S017 — Validate the scaffold for accessibility and testability.** Confirm semantic structure, keyboard reachability, focus order, non-color state labels, reduced-motion baseline, stable test selectors, and honest fixture labeling.
+- [ ] **S018 — Close G0 on a clean checkout.** Install with Node 24, apply migrations, build, lint, typecheck, run fast tests and secret scanning, verify no secret/client leak, update all command truth, and store sanitized G0 evidence.
+
+#### Gate G0 acceptance
+
+- [ ] Supabase and Vercel are provisioned and the real migration/readiness checks pass.
+- [ ] Google/OpenAI access prerequisites exist without enabling unapproved product effects.
+- [ ] Contracts, migrations, golden fixtures, and traceability are frozen in dependency order.
+- [ ] Clean-checkout build/lint/typecheck/test/security checks pass with no committed secret.
+
+### G1 — Non-effecting MCP → API → PostgreSQL → dashboard slice
+
+- [~] **S019 — Complete lifecycle and error contracts.** Implement every G1 task/error state as strict Zod schemas and reject extra/unknown fields at every boundary.
+- [~] **S020 — Complete PostgreSQL repositories.** Persist and read tasks, plans, read models, idempotency records, locks, and audit events transactionally; parse all stored JSON back through canonical schemas.
+- [~] **S021 — Complete intake serialization.** Evaluate the fixture rule before lock acquisition, support clarification without plan/action/lock, implement planning leases, return `scenario_busy` correctly, and handle identical/conflicting/in-progress/failed idempotency replay without a second saga.
+- [~] **S022 — Complete trust boundaries.** Enforce dashboard session expiry, CSRF/origin checks, resource scope, MCP bearer scope, redacted errors, and production refusal when required auth configuration is missing.
+- [~] **S023 — Complete deterministic fixture isolation.** Supply exactly two candidates and one complete contract-valid plan only in test/development; reject unsupported tasks and make deployed live startup fail if a fake adapter is selected.
+- [~] **S024 — Complete thin application routes.** Keep handlers to authenticate, validate, call one service, and map results for create/read/cancel/status without duplicating domain rules.
+- [~] **S025 — Complete the MCP entry point.** Expose only `create_world_pr` and optional status, return a non-secret review URL, and prohibit approval, recovery, rule activation, reset, or provider credentials.
+- [~] **S026 — Complete the non-effecting product UI.** Build composer, loading, empty, review, assumption/evidence, exact actions, dependency labels, timeline shell, safe errors, cancel/back, expired-session, and fake-mode labels using strict client parsing.
+- [~] **S027 — Complete G1 automated tests.** Cover identical/conflicting/concurrent/failed replay, rule clarification without lock, scenario busy, unsupported request, unauthorized create/read, expired session, CSRF, malformed read models, duplicate click, refresh, keyboard flow, and reduced motion.
+- [ ] **S028 — Prove the deployed non-effecting slice.** Run MCP → authenticated API → Supabase → authenticated dashboard on the deployed environment with fixture providers visibly disabled from live claims.
+- [ ] **S029 — Freeze the G1 interface packet.** Freeze schemas, migrations, golden HTTP/read-model fixtures, error matrix, fixture versions, and the create/read browser evidence before provider work.
+- [ ] **S030 — Close G1.** Record all G1 command outputs, deployed screenshots, replay/auth results, fake-mode proof, known risks, and requirement links.
+
+#### Gate G1 acceptance
+
+- [ ] Identical create returns the same resource; conflicting reuse fails; concurrent create never starts a second saga.
+- [ ] Clarification can exist without a plan/action/lock; effect-bearing competition returns `scenario_busy`.
+- [ ] Authenticated MCP and dashboard share one service and durable PostgreSQL state.
+- [ ] Mandatory browser E2E passes with a complete plan and no live provider/model call.
+
+### G2 — OAuth, provider, and model risk retirement
+
+- [ ] **S031 — Implement the OAuth transaction flow.** Add state, OIDC nonce, PKCE S256, exact redirect validation, short-lived session-bound transaction storage, atomic one-use consumption, and encrypted token persistence.
+- [ ] **S032 — Enforce connected identity claims.** Validate signature, issuer, audience, expiry, issued-at, nonce, verified email, stable subject, expected account, refresh behavior, and account substitution failure without Gmail mailbox/profile reads.
+- [ ] **S033 — Add OAuth negative tests.** Prove replay, missing/mismatched state/nonce/PKCE, wrong redirect/audience/issuer/subject/account, expired token, and unverified email all fail closed.
+- [ ] **S034 — Define explicit provider ports and deterministic fakes.** Add scenario-specific Calendar, Gmail, artifact, and model interfaces plus failure injection; do not add a generic compensation framework.
+- [ ] **S035 — Implement controlled Calendar discovery and seeding.** Build TTY-gated seed/preflight commands that refuse CI/production/unknown targets and produce exactly two owned, timed, non-recurring tagged Acme events with immutable semantic baselines and rolling expected ETags.
+- [ ] **S036 — Implement and prove Calendar primitives.** Persist before/desired/after/receipt states; use `If-Match`, `sendUpdates=none`, start/end-only writes, duration/time-zone retention, verification, rolling ETags, restore, attendee/owner/type checks, and deliberate conflict handling.
+- [ ] **S037 — Implement Gmail at-most-once delivery.** Enforce the structured allowlist and exact approved template, persist `dispatch_started_at` before handoff, distinguish local retryable failure, explicit permanent 4xx, and every post-handoff uncertain class, and never auto-resend uncertainty.
+- [ ] **S038 — Prove one controlled Gmail success.** After human confirmation, send one uniquely identified message to an allowlisted team inbox, persist its receipt and replay key, and prove replay creates no second dispatch.
+- [ ] **S039 — Implement the artifact boundary.** Generate only during planning from the versioned parent-account source, reject region/event/attendee/time leakage, bind source/content hashes, and persist approved bytes without regeneration.
+- [ ] **S040 — Implement the OpenAI Responses client.** Use `store: false`, the configured model, strict Structured Outputs, refusal/truncation handling, metadata capture, one bounded retry, and final safe failure.
+- [ ] **S041 — Define versioned model-only schemas.** Add strict initial, recovery, and prevention-rule proposal schemas over closed supplied ID/template universes; keep every executable provider field in deterministic code.
+- [ ] **S042 — Build model safety and evaluation harnesses.** Cover valid schema output, malformed output, refusal, truncation, unknown IDs/templates/recipients, semantic rejection, prompt injection, and no hidden deterministic success fallback.
+- [ ] **S043 — Run the controlled provider/model spikes.** Prove live OAuth refresh, exact Calendar lookup, conditional move/restore/conflict, low-level two-event preflight/partial receipts, one allowlisted Gmail success, and live strict model output; keep product reset and product execution disabled.
+- [ ] **S044 — Build honest connection/preflight UI.** Show connected identity, configuration gaps, preflight failures, and fake/live state without implying that the product workflow has passed.
+- [ ] **S045 — Close G2.** Store redacted receipts and negative-test evidence; block G3 while any OAuth, ETag, Gmail uncertainty, strict-output, secret, or fake-in-live risk is red.
+
+#### Gate G2 acceptance
+
+- [ ] OAuth/account binding and refresh work in the deployed environment; all substitution/replay cases fail.
+- [ ] Calendar lookup/move/restore/conflict and rolling versions are proven on controlled events.
+- [ ] Gmail success and the complete ambiguous-delivery policy are proven without unsafe live ambiguity tests.
+- [ ] Strict model schemas and deterministic semantic rejection are proven live.
+- [ ] Production cannot start with fake providers.
+
+### G3 — Initial World PR, approval, and execution
+
+- [ ] **S046 — Finalize execution persistence.** Extend the foundation tables without replacing them; enforce immutable versioned plans/approvals, durable action rows, leases, typed receipts/errors, and unique `(plan_id, action_key)`.
+- [ ] **S047 — Implement live candidate resolution.** Retrieve exactly the two tagged candidates, run the pre-lock rule port, acquire the scenario lock only for planning, rank UK deterministically, show US as alternative, and support stale refresh/supersession.
+- [ ] **S048 — Implement initial reasoning.** Prompt for one bounded assumption, dependency edges, and the parent-account brief; capture model metadata and reject any output outside the closed candidate/action universe.
+- [ ] **S049 — Deterministically expand the initial plan.** Validate evidence, ranking, provenance, recipients, time conversion, templates, dependencies, and action order; build exact artifact → Calendar → Gmail actions and hash the full immutable payload.
+- [ ] **S050 — Persist and render the exact World PR.** Show request, selected/alternative entities, assumption/evidence, exact times/time zone/duration, recipients, full mail, full brief/hash/source, dependency edges, external-effect labels, plan version, and digest.
+- [ ] **S051 — Implement initial approval/cancel/replan.** Store authenticated actor/time/plan/version/digest; cancel safely and release only the correct lock; invalidate approval on target/recipient/content/dependency/template/provider-version drift.
+- [ ] **S052 — Prepare the durable action ledger.** Create all action rows before dispatch, persist around every call, implement leases/reconciliation, skip succeeded actions, and permit retry only when explicitly safe.
+- [ ] **S053 — Execute the exact approved artifact.** Persist the approved bytes and hashes first; never regenerate at execution.
+- [ ] **S054 — Execute the exact approved Calendar move.** Refetch and revalidate ETag, attendee set, ownership, event type, allowlist, and approved version; conditionally change only start/end with `sendUpdates=none`; verify and persist the new ETag.
+- [ ] **S055 — Execute the exact approved Gmail notification.** Send only after reversible work succeeds, use only approved content/recipients, and persist receipt or honest permanent/uncertain outcome.
+- [ ] **S056 — Build execution/timeline UX.** Show durable timestamps, receipts, in-progress, partial, conflict, retryable, permanent, uncertain, cancelled, failed, and completed states without false success.
+- [ ] **S057 — Complete initial-workflow verification.** Test approval replay, duplicate click, process death/reconciliation, stale plan/ETag, allowlist drift, artifact equality/leakage, action order, resume, and all FR-01–18/SAFE proofs with deterministic adapters.
+- [ ] **S058 — Run one controlled live initial flow.** Complete artifact → Calendar → Gmail with exact approval and redacted receipts, then verify no duplicate effect or fixture substitution.
+- [ ] **S059 — Close G3.** Link the live proof, deterministic E2E, failure tests, plan digest, receipt trail, and requirement traceability.
+
+#### Gate G3 acceptance
+
+- [ ] No effect occurs before exact authenticated approval and no approval replay duplicates an action.
+- [ ] Exact approved brief bytes, Calendar mutation, and Gmail content/recipients match the plan.
+- [ ] Partial, stale, conflict, permanent, and uncertain outcomes remain honest and durable.
+- [ ] One controlled live initial flow completes without a fake.
+
+### G4 — Late context and Causal Revert
+
+- [ ] **S060 — Add late-context intake.** Accept context only from fully `completed` initial execution; require an explicit known corrected target; clarify underspecified/contradictory text; support cancel-and-resubmit supersession.
+- [ ] **S061 — Ground recovery in current provider state.** Fetch and validate both UK and US events before an approvable plan; reject drift, unknown target, invalid initial state, or unresolved delivery.
+- [ ] **S062 — Implement the recovery proposal call.** Use the strict recovery schema over known executed-action IDs, corrected candidate IDs, allowed outcomes, and allowed new-action templates.
+- [ ] **S063 — Deterministically validate recovery.** Account for every succeeded initial action exactly once; reject omissions, duplicates, unknown/incompatible outcomes, recipient injection, unsafe preserve, and unknown templates/targets.
+- [ ] **S064 — Expand and persist the exact recovery plan.** Build Restore UK Calendar, Correct UK mail, Preserve the independent brief, Apply US Calendar, and Apply US mail with exact targets, times, messages, preconditions, order, version, and digest.
+- [ ] **S065 — Build the Causal Revert UX.** Render the corrected assumption and fixed Restore/Correct/Preserve/Apply graph in about five seconds, with exact preview, cancel/revise flow, accessible labels, restrained animation, and reduced-motion static state.
+- [ ] **S066 — Implement recovery approval.** Bind the authenticated approval to the exact immutable recovery plan; any relevant change requires a new version and approval.
+- [ ] **S067 — Preflight all recovery Calendar actions.** Validate both events before the first recovery side effect; any conflict produces zero recovery mail and an honest attention state.
+- [ ] **S068 — Execute recovery in the fixed order.** Restore UK Calendar start/end, move US Calendar to 15:00 ET, send UK correction, then send US notification; verify/persist after every step and leave the brief unchanged.
+- [ ] **S069 — Implement recovery resume and attention behavior.** Skip succeeded work, reconcile Calendar ambiguity, never retry uncertain Gmail, retain honest partial/conflict/validation/final-failure states, and reach `recovered` only when every approved action succeeds.
+- [ ] **S070 — Complete the 25-paraphrase evaluation.** Require exact safe classification/templates for at least 24/25 and target 25/25 before recording; record schema, retry, classification, and adapter-call metrics.
+- [ ] **S071 — Complete the negative/safety suite.** Require 100% clarify/reject behavior and zero unsafe adapter calls for unknown/ambiguous targets, injected recipients/templates, prompt injection, unsafe preserve, drift, and partial/uncertain initial state.
+- [ ] **S072 — Complete recovery E2E and failure injection.** Cover all FR-19–27, crash/lease, preflight conflict, invalid model twice, partial Calendar/mail outcomes, keyboard/reduced motion, and five-second comprehension.
+- [ ] **S073 — Run one controlled live recovery.** Reach `recovered` with exact UK restore, US move, UK correction, US notification, preserved artifact, and redacted receipts.
+- [ ] **S074 — Close G4.** Link evaluation, safety, deterministic E2E, live recovery, visual comprehension, and traceability evidence.
+
+#### Gate G4 acceptance
+
+- [ ] FR-19–27 pass with deterministic adapters and one controlled live recovery.
+- [ ] Paraphrase gate is at least 24/25 and recording target is 25/25.
+- [ ] Negative/safety suite is 100% with zero unsafe adapter calls.
+- [ ] Recovery never falls through from conflict, partial, invalid, or uncertain state to success.
+
+### G5 — Prevention rule, clarification proof, and approved reset
+
+- [ ] **S075 — Generate one bounded prevention-rule proposal.** After complete recovery, produce at most one Acme-scoped `ask_for_confirmation` rule with rationale, provenance, version, and digest.
+- [ ] **S076 — Persist and separately activate the rule.** Keep it inactive until a distinct authenticated confirmation; audit activation and prohibit arbitrary conditions/actions.
+- [ ] **S077 — Enforce the active rule before selection/lock.** After candidate retrieval, persist `clarification_required` with recorded choices and create no plan, action, or effect-bearing lock.
+- [ ] **S078 — Resolve clarification safely.** Accept only a snapshotted known candidate, acquire a free lock only when planning begins, and return `scenario_busy` without losing the clarification when another run owns the lock.
+- [ ] **S079 — Build and prove the guardrail UX.** Show rule scope/rationale/status, activate separately, submit Try guardrail through normal intake, and visibly prove the no-plan/no-action/no-lock state.
+- [ ] **S080 — Prepare an immutable reset plan.** Include both semantic baselines, both current expected ETags, exact fields to restore, cleanup effects, new run behavior, and the explicit warning that sent mail remains.
+- [ ] **S081 — Approve reset separately.** Require authenticated digest approval plus mail-retention acknowledgement; reject reset during execution/recovery or when preconditions are stale.
+- [ ] **S082 — Execute reset safely.** Preflight both events before writing, conditionally restore only start/end, update each rolling ETag after verification, archive proof, remove/deactivate rule and artifact, release the lock only after complete success, and create a new run ID.
+- [ ] **S083 — Handle reset conflict/partial outcomes honestly.** Preflight drift causes zero writes; a second-write race stores the first new ETag, retains the lock, and enters `attention_required.partial_reset`; never blind-retry or claim atomic success.
+- [ ] **S084 — Build reset UX and copy.** Show plan/digest, mail acknowledgement, progress, conflict, partial state, completion, and retained-mail truth; never say sent email was undone, deleted, or reset.
+- [ ] **S085 — Complete rule/reset tests and live proof.** Cover precedence, activation replay, clarification locks, candidate validation, reset digest, in-progress rejection, success, zero-write conflict, second-write race, rolling ETags, archive/cleanup/lock semantics, accessibility, E2E, and one controlled live reset.
+- [ ] **S086 — Close G5.** Link normal-intake clarification proof, reset receipts/baselines/ETags, retained-mail assertion, and FR-28–32/NFR-09 evidence.
+
+#### Gate G5 acceptance
+
+- [ ] Rule activation is separate from recovery and creates only the fixed confirmation behavior.
+- [ ] Try guardrail proves persisted clarification with no plan/action/lock.
+- [ ] Reset conflict writes nothing; partial reset remains attention-required with the lock retained.
+- [ ] Complete reset restores both baselines, updates ETags, archives proof, cleans local demo state, releases the lock, creates a new run, and retains sent mail.
+
+### G6 — Hardening, accessibility, and five-run release evidence
+
+- [ ] **S087 — Complete unit and contract coverage.** Cover every allowed/forbidden state transition, success derivation, retry matrix, lock/lease behavior, strict schema, digest mutation, unknown IDs/templates/recipients, explicit target, provenance, time conversion, allowlist, and honest copy.
+- [ ] **S088 — Complete integration/failure coverage.** Run transactional repository, route/auth/CSRF, model retry, provider fake, action order, persistence checkpoints, resume/reconciliation, recovery, rule, and reset matrices from `TEST_PLAN.md`.
+- [ ] **S089 — Complete security/privacy verification.** Test OAuth substitution, auth/session/MCP scope, CSRF, secret storage, log redaction, client bundle, data minimization, unsupported requests, fake-in-live startup, incident handling, and zero mailbox reads.
+- [ ] **S090 — Complete browser/product-quality verification.** Run the full compose → initial approval/execution → correction → recovery → rule → clarification → reset flow plus cancel/revise, replay/refresh, all error states, keyboard, focus, non-color status, reduced motion, demo viewport, and no-tab-switch main flow.
+- [ ] **S091 — Finalize planner evaluation evidence.** Produce the P01–P25 report, 100% negative/safety report, retry/error metrics, deterministic expansion equality, and zero fallback/unsafe-adapter evidence.
+- [ ] **S092 — Verify clean checkout and deployed limits.** Run the complete command suite, database migration, deployment/preflight, crash/lease behavior, route durations, provider receipts, startup guards, and documentation/command agreement.
+- [ ] **S093 — Run five consecutive complete live flows.** For each new run ID, record preflight, plan digests, Calendar baseline/version transitions, three Gmail receipts, artifact preservation, rule proof, approved reset, final baselines/ETags, duplicate/conflict/uncertain counts, and pass/fail.
+- [ ] **S094 — Fix every release-blocking issue.** Repeat the affected narrow tests and then the full gate; no database edit, restart, manual Calendar repair, hidden retry, mock substitution, uncontrolled recipient, or unresolved provider outcome may appear in a passing run.
+- [ ] **S095 — Freeze the release candidate.** Freeze code, prompts, schemas, migrations, fixtures, seed data, copy, commands, and sanitized evidence; reconcile PRD/Safety/Architecture/Contracts/Test Plan/Runbook/Progress.
+- [ ] **S096 — Close G6.** Require zero P0/P1 safety/acceptance issues and complete evidence for FR-01–32, SAFE-01–10, and NFR-01–10.
+
+#### Gate G6 acceptance
+
+- [ ] Every automated, evaluation, accessibility, security, and explicitly gated live suite passes on a clean checkout.
+- [ ] Five consecutive live runs pass without manual repair, duplicate effects, hidden fallback, mocks, uncontrolled recipients, or unresolved delivery.
+- [ ] Code, executable schemas, commands, runbook, and evidence agree and are frozen.
+
+### G7 — Demo, submission, and cleanup
+
+- [ ] **S097 — Finalize the under-three-minute runbook.** Lock narration, operator steps, error behavior, reset preparation, limitations, and the causal visualization payoff.
+- [ ] **S098 — Produce sanitized submission assets.** Record the live video and primary screenshots, show real controlled receipts without addresses/secrets, and keep claims inside the recorded-lineage MVP boundary.
+- [ ] **S099 — Run final go/no-go.** Re-run clean-checkout build, deployed preflight, connected identity, provider baselines, allowlist, model configuration, rule/reset state, and evidence links immediately before recording/submission.
+- [ ] **S100 — Record and submit the controlled live demo.** Use no manual database edits, server restart, provider-console repair, mock substitution, or hidden retry; stop honestly on any failed safety gate.
+- [ ] **S101 — Verify public materials.** Confirm no token, address, private provider ID, mail body, prompt, production data, misleading undo claim, or unsupported production-safety claim is published.
+- [ ] **S102 — Revoke and clean up.** Revoke temporary OAuth grants/tokens and MCP links, remove temporary secrets/access, retain/delete controlled evidence according to the documented window, and record completion without deleting required audit proof early.
+- [ ] **S103 — Close G7 and the MVP.** Archive final evidence, record limitations and cleanup status, and mark implementation complete only when every preceding gate is green.
+
+#### Gate G7 acceptance
 
-### Kaustubh Upadhya tasks
-
-- **P0-A1:** Close the stale Git decision and record the existing `main → origin/main` setup.
-- **P0-A2:** Resolve Node, deployment, PostgreSQL, dashboard-auth, Google identity/OAuth, allowlist, demo-date, and evidence-location decisions with named owners.
-- **P0-A3:** Scaffold one strict TypeScript/Next.js npm package and pin the runtime.
-- **P0-A4:** Add PostgreSQL connectivity/migration runner, health/readiness, redacted logging, and `.env.example` with names only.
-- **P0-A5:** Establish fast CI for lint, typecheck, unit tests, secret scanning, and migration validation.
-- **P0-A6:** Own package/lock/config files and publish the initial directory/path contract.
-- **P0-A7:** Implement and freeze the minimal `contracts.v1` lifecycle/error/create/read schemas before Ayush Jha creates golden fixtures.
-- **P0-A8:** Add the minimum durable tables required before any live write: task/plan/idempotency/scenario-lock/audit, action-execution/receipt fields, and `demo_event_state` rolling versions. Later phases may extend but not replace these migrations.
-- **P0-A9:** Hand the root product page/layout/global-style paths to Ayush Jha after scaffold and contract fixtures are ready.
-
-### Ayush Jha tasks
-
-- **P0-B1:** Resolve the synthetic account-note fixture, UI state inventory, demo copy, viewport, and evidence format.
-- **P0-B2:** Convert FR-01–32, SAFE-01–10, and NFR-01–10 into a traceability fixture consumed by tests/evidence.
-- **P0-B3:** After P0-A7 merges, define golden HTTP/read-model fixtures under `tests/fixtures/contracts/v1/**` for loading, clarification, preview, executing, completed, recovery, attention, and reset states.
-- **P0-B4:** Store requirement traceability under `tests/fixtures/traceability/**`; never edit Kaustubh Upadhya's `lib/contracts/**` concurrently.
-- **P0-B5:** Produce low-fidelity layouts and component boundaries without depending on live services.
-- **P0-B6:** Review the scaffold for accessibility/testability and open explicit dependency requests rather than editing root config concurrently.
-
-### Bounded subagent lanes
-
-- **A-subagent:** Audit scaffold/config, migration conventions, and secret/logging defaults. Output a patch or report limited to Kaustubh Upadhya paths.
-- **B-subagent:** Build the requirement traceability table and audit UI state coverage against PRD/Contracts. No canonical requirement edits.
-- **Reviewer subagent:** Read-only cross-document check after the interface packet is proposed.
-
-### Gate G0
-
-- [x] `OPEN-012` assigns Kaustubh Upadhya and Ayush Jha as the two human owners.
-- [ ] All foundation-blocking decisions have owners and evidence.
-- [ ] Clean checkout installs, builds, migrates, lints, typechecks, and runs fast tests.
-- [ ] No secret is committed or exposed to the client.
-- [ ] Scaffold → minimal contracts/migrations → golden fixtures merge in that order before Phase 1 consumers branch.
-
-## 5. Phase 1 — Non-effecting vertical slice
-
-This phase proves the shared path without Calendar, Gmail, or live model calls. Test/development uses a **complete contract-valid fixture plan**; an incomplete placeholder must never be labeled `preview_ready`.
-
-### Kaustubh Upadhya tasks
-
-- **P1-A1:** Implement repositories, contract parsers, and read-model mappers against the frozen Phase 0 schemas/fixtures; any schema delta is a separate reviewed contract PR.
-- **P1-A2:** Apply/test the frozen migrations and implement task, plan, idempotency, scenario-lock, and audit repositories.
-- **P1-A3:** Implement authenticated dashboard create/read routes and session/CSRF boundary, including the fixture rule-precheck-before-lock path required by G1.
-- **P1-A4:** Implement scoped MCP authentication plus `create_world_pr` and optional read status.
-- **P1-A5:** Test identical replay, conflicting replay, unauthorized access, scenario busy, and failed-idempotency replay.
-- **P1-A6:** Provide a deterministic fixture adapter that returns the complete controlled candidate/plan read model only in test/development.
-
-### Ayush Jha tasks
-
-- **P1-B1:** Build composer, review shell, timeline shell, loading, empty, and safe error states against golden fixtures.
-- **P1-B2:** Implement strict API-v1 Zod parsing and reject malformed/unknown read models; top-level envelope versioning is provided by the `/api/v1` route while nested plan/model/rule payloads retain explicit schema versions.
-- **P1-B3:** Build Playwright page objects and the compose → review URL → persisted page path.
-- **P1-B4:** Test keyboard flow, duplicate click, expired session, unauthorized review URL, and reduced-motion baseline.
-- **P1-B5:** Keep fake/provider state visibly labelled in development and impossible to confuse with live evidence.
-
-### Bounded subagent lanes
-
-- **A-subagent:** Generate idempotency/state-transition/database contract tests from the frozen schemas.
-- **B-subagent:** Implement isolated loading/error/review components and component tests from fixed fixtures.
-- **Reviewer subagent:** Read-only auth and requirement audit of the merged vertical slice.
-
-### Handoff packet
-
-```text
-CreateWorldPrRequest
-CreateWorldPrResponse
-WorldPrView
-TaskStatus / AttentionReason / ApiErrorResponse
-golden create/read success and error JSON
-```
-
-### Gate G1
-
-```text
-MCP → authenticated API → PostgreSQL → authenticated dashboard
-```
-
-- [ ] Identical creation returns the same resource and conflicting reuse fails.
-- [ ] Auth/session/MCP scope tests pass.
-- [ ] Minimal browser E2E passes against a complete fixture-backed plan.
-- [ ] No live provider/model adapter can run in this phase configuration.
-
-## 6. Phase 2 — Provider and model risk retirement
-
-This gate proves external feasibility before feature integration. It does not require the finished artifact approval flow or product reset UI; those belong to Phases 3 and 5.
-
-### Kaustubh Upadhya tasks
-
-- **P2-A1:** Complete OIDC state/nonce/PKCE, exact callback/claim/account validation, encrypted token storage, and refresh handling.
-- **P2-A2:** Define typed Calendar, Gmail, artifact-store, and deterministic fake-adapter interfaces.
-- **P2-A3:** Prove tagged Calendar lookup, conditional move/restore, rolling ETags, `sendUpdates=none`, and deliberate conflict while persisting every before/after/receipt/version in the Phase 0 durable tables.
-- **P2-A4:** Prove one human-confirmed allowlisted live Gmail success and persist its `dispatch_started_at`/receipt/replay key. Prove explicit rejection and every uncertainty/error class with deterministic transport fakes rather than intentionally creating ambiguous live sends.
-- **P2-A5:** Build TTY-gated seed, provider-spike, cleanup, and preflight utilities; refuse CI/production/live-unknown targets.
-- **P2-A6:** Through a TTY-gated low-level Calendar spike only, prove two-event preflight, conditional writes, rolling versions, conflict, and injected partial receipts. Do not expose a reset route, archive a scenario, release a product lock, clean up a rule/artifact, or emit `reset_complete`; the full reset workflow belongs to Phase 5.
-
-### Ayush Jha tasks
-
-- **P2-B1:** Implement the Responses API client with `store: false`, strict schema parsing, model metadata, and one bounded retry.
-- **P2-B2:** Define versioned initial, recovery, and rule proposal schemas in the model-only boundary.
-- **P2-B3:** Test refusal, truncation, malformed output, unknown IDs, semantic rejection, and final safe failure.
-- **P2-B4:** Build the 25-paraphrase evaluation harness and separate negative/safety harness with initial fixtures.
-- **P2-B5:** Build honest connected/disconnected/preflight UI states without claiming the product workflow works.
-
-### Bounded subagent lanes
-
-- **A-subagent:** Implement deterministic Calendar/Gmail fake adapters and the failure-injection matrix; no live credentials.
-- **B-subagent:** Expand adversarial model/eval fixtures and grade them against golden classifications.
-- **Reviewer subagent:** Read-only OAuth, Gmail ambiguity, Calendar conflict, and log-redaction audit.
-
-### Gate G2
-
-- [ ] OAuth/account binding and token refresh work in the target environment.
-- [ ] Calendar lookup/move/restore/conflict behavior is proven with controlled events.
-- [ ] Gmail success and ambiguous-delivery policies are proven with an allowlisted test recipient.
-- [ ] Strict model output and semantic rejection are proven live.
-- [ ] Fake adapters are test/development-only and deployed live mode fails startup if any fake is selected.
-- [ ] Any red OAuth, ETag, Gmail-uncertainty, or strict-output risk blocks Phase 3 integration.
-
-## 7. Phase 3 — Initial World PR and approved execution
-
-### Kaustubh Upadhya tasks
-
-- **P3-A1:** Extend/finalize the Phase 0 plan/action/approval/artifact/demo-event-state tables with product fields and immutable digest behavior; do not replace the already-proven durable receipt/version foundation.
-- **P3-A2:** Implement live candidate retrieval, invoke the pre-lock `RuleEvaluatorPort` established in Phase 1 (no active rule exists in the initial run), acquire the lock, validate deterministic UK ranking, and support stale-plan refresh. Persisted rule activation/proof arrives in Phase 5 through the same port.
-- **P3-A3:** Validate Ayush Jha's initial reasoning proposal and expand exact safe actions/recipients/times/templates.
-- **P3-A4:** Bind approval to the exact immutable plan and create durable action rows before execution.
-- **P3-A5:** Execute approved artifact storage → Calendar move → Gmail notification with receipts, leases, reconciliation, cancel, and safe resume.
-- **P3-A6:** Store the exact account-brief bytes/hash from the approved plan; the artifact adapter never regenerates content.
-
-### Ayush Jha tasks
-
-- **P3-B1:** Finalize the initial assumption/dependency/account-brief prompt and output schema.
-- **P3-B2:** Generate a schema-valid brief during planning and hand exact content/source/content hashes to Kaustubh Upadhya. Kaustubh Upadhya owns deterministic provenance, forbidden-dimension/leakage validation, plan expansion, and byte-equality enforcement.
-- **P3-B3:** Build World PR request/entity/alternative/assumption/evidence/dependency/action/brief cards.
-- **P3-B4:** Build exact approval/cancel, timeline, receipt, stale-preview, conflict, partial, and uncertain UI states.
-- **P3-B5:** Complete initial AI tests, component tests, and browser E2E against deterministic adapters.
-
-### Handoff packet
-
-```text
-InitialReasoningProposalV1
-→ Kaustubh Upadhya deterministic validator/expander
-→ InitialPlanV1
-→ WorldPrView
-```
-
-### Bounded subagent lanes
-
-- **A-subagent:** Generate digest/idempotency/action-ledger/reconciliation tests from initial-plan fixtures.
-- **B-subagent:** Build isolated World PR/timeline components and accessibility tests.
-- **Reviewer subagent:** Independently trace FR-01–18 and SAFE requirements to tests/evidence.
-
-### Gate G3
-
-- [ ] FR-01–04 and FR-06–18 pass end to end; FR-05's pre-lock evaluator port remains fixture-covered until Phase 5 proves persisted active-rule behavior.
-- [ ] No external action occurs before exact approval.
-- [ ] Approval replay creates no duplicate artifact, Calendar mutation, or email.
-- [ ] Exact approved brief bytes are persisted unchanged.
-- [ ] One controlled live initial flow passes with receipts and no fake substitution.
-
-## 8. Phase 4 — Recovery and Causal Revert
-
-### Kaustubh Upadhya tasks
-
-- **P4-A1:** Implement context/cancel/replan state transitions and explicit corrected-target validation.
-- **P4-A2:** Read/validate both provider events before creating an approvable recovery plan.
-- **P4-A3:** Validate Ayush Jha's recovery proposal: complete action coverage, compatible outcomes, known targets/templates, no recipient injection.
-- **P4-A4:** Expand and hash the exact recovery plan, bind approval, and preflight both Calendar actions before the first recovery write.
-- **P4-A5:** Execute UK restore → US move → UK correction → US notification with durable partial/resume/conflict/uncertain behavior.
-
-### Ayush Jha tasks
-
-- **P4-B1:** Finalize the recovery prompt, strict proposal schema, P01–P25 fixtures, and negative/safety suite.
-- **P4-B2:** Build context entry, clarification, revision/cancel, exact recovery preview, and approval UX.
-- **P4-B3:** Build the fixed Restore/Correct/Preserve/Apply visual, restrained animation, and reduced-motion static state.
-- **P4-B4:** Build retryable, conflict, partial, validation-failure, and delivery-uncertain attention UX.
-- **P4-B5:** Complete recovery Playwright and approximately five-second comprehension checks.
-
-### Handoff packet
-
-```text
-RecoveryProposalV1
-→ Kaustubh Upadhya deterministic semantic validator
-→ RecoveryPlanV1
-→ RecoveryPlanView
-```
-
-### Bounded subagent lanes
-
-- **A-subagent:** Generate recovery state/failure/preflight/resume tests from golden plans.
-- **B-subagent:** Expand paraphrases/adversarial fixtures and build isolated causal-visual tests.
-- **Reviewer subagent:** Red-team unknown IDs, prompt injection, preservation claims, mail correction semantics, and partial recovery.
-
-### Gate G4
-
-- [ ] FR-19–27 pass.
-- [ ] At least 24/25 paraphrases pass; recording target is 25/25.
-- [ ] Negative/safety suite passes 100% with zero unsafe adapter calls.
-- [ ] Complete deterministic recovery E2E and failure matrix pass.
-- [ ] One controlled live recovery reaches `recovered` with exact receipts.
-
-## 9. Phase 5 — Prevention guardrail and approved reset
-
-### Kaustubh Upadhya tasks
-
-- **P5-A1:** Implement typed rule proposal persistence, digest activation, and audit events.
-- **P5-A2:** Evaluate active rules after candidate lookup but before selection/lock; persist clarification-only intake with no plan/action/lock.
-- **P5-A3:** Implement clarification resolution against the recorded candidate set and acquire a free scenario lock only when planning begins.
-- **P5-A4:** Implement immutable reset preparation/approval, two-event preflight, conditional writes, rolling ETags, partial-reset state, archive, cleanup, and lock release.
-
-### Ayush Jha tasks
-
-- **P5-B1:** Finalize the bounded rule prompt/schema and rule rationale display.
-- **P5-B2:** Build rule proposal/activation, normal-intake Try guardrail, and candidate clarification UX.
-- **P5-B3:** Build reset preview/digest, sent-mail acknowledgement, conflict, partial-reset, and completion UX.
-- **P5-B4:** Verify copy never claims sent email was undone, deleted, or reset.
-- **P5-B5:** Complete rule/reset Playwright, accessibility, and product-quality checks.
-
-### Bounded subagent lanes
-
-- **A-subagent:** Generate rule-precedence, lock-lifecycle, reset-race, and rolling-ETag tests.
-- **B-subagent:** Build clarification/reset components and copy/accessibility tests.
-- **Reviewer subagent:** Independently audit FR-28–32, reset approval, mail-retention truth, and lock release.
-
-### Gate G5
-
-- [ ] Normal intake returns a renderable clarification record with no plan/action/lock.
-- [ ] Rule activation remains separate from recovery approval.
-- [ ] Reset preflight conflict causes zero writes.
-- [ ] Partial reset remains attention-required with the lock retained.
-- [ ] Complete reset restores both semantic baselines, records new ETags, archives the run/proof, removes the rule/artifact, releases the lock, and retains sent mail.
-
-## 10. Phase 6 — Hardening and release evidence
-
-### Kaustubh Upadhya tasks
-
-- **P6-A1:** Run full contract/database/integration/provider/failure/OAuth/auth/CSRF/secret/log-redaction suites.
-- **P6-A2:** Verify crash/lease reconciliation, deployment limits, clean-checkout setup, live preflight, and provider receipts.
-- **P6-A3:** Own live reliability fixes; safety/correctness blockers take precedence over polish.
-- **P6-A4:** Run preflight/admin/provider monitoring and collect redacted provider receipts while Ayush Jha operates the five live product flows. Do not make live manual state edits.
-
-### Ayush Jha tasks
-
-- **P6-B1:** Run full Playwright, eval, component, accessibility, reduced-motion, viewport, and comprehension suites.
-- **P6-B2:** Curate sanitized plan digests, receipts, screenshots, evaluation report, and five-run evidence.
-- **P6-B3:** Reconcile executable schemas/commands with all canonical docs and update `PROGRESS.md`.
-- **P6-B4:** Operate and record five consecutive controlled live product flows while Kaustubh Upadhya monitors provider/preflight state.
-- **P6-B5:** Finalize demo runbook, narration, primary screenshot, limitations, and submission copy.
-
-### Bounded subagent lanes
-
-- **A-subagent:** Read-only security/failure audit plus test-gap report; implementation patches remain in exclusive worktrees.
-- **B-subagent:** Accessibility, requirement-traceability, evidence-sanitization, and documentation-link audit.
-- **Reviewer subagent:** Independent P0/P1 release audit after both workstreams merge.
-
-### Gate G6
-
-- [ ] All verified root commands pass on a clean checkout.
-- [ ] P01–P25 and the negative/safety suite pass at the agreed gates.
-- [ ] Five consecutive live runs pass without database edits, restart, duplicate effects, hidden fallback, mocks, uncontrolled recipients, or unresolved delivery.
-- [ ] No P0/P1 safety or acceptance issue remains.
-- [ ] Code, prompts, schemas, seed data, and demo copy are frozen.
-
-## 11. Phase 7 — Submission and cleanup
-
-### Kaustubh Upadhya tasks
-
-- **P7-A1:** Run final clean-checkout/deployment/preflight verification.
-- **P7-A2:** Monitor the recorded live run without manual state edits.
-- **P7-A3:** Revoke temporary credentials/links and execute the documented retention cleanup after the submission window.
-
-### Ayush Jha tasks
-
-- **P7-B1:** Record and sanitize the under-three-minute video and screenshots.
-- **P7-B2:** Publish the narrative, evaluation/five-run summary, limitations, and Codex collaboration note.
-- **P7-B3:** Verify all public claims remain inside the controlled MVP boundary.
-
-### Gate G7
-
-- [ ] Kaustubh Upadhya and Ayush Jha jointly approve go/no-go.
 - [ ] The recorded flow contains real controlled receipts and no hidden fallback.
-- [ ] Public assets contain no tokens, addresses, secrets, or misleading claims.
-- [ ] Cleanup/revocation has an owner and recorded completion date.
+- [ ] Public assets are sanitized and all claims remain inside the controlled MVP boundary.
+- [ ] Credential revocation and retention cleanup are recorded.
 
-## 12. Subagent operating rules
+## 3. Required command suite
 
-Development subagents accelerate implementation; runtime multi-agent orchestration remains outside the Rewind product scope.
+Commands become completion evidence only after they run successfully in the intended environment:
 
-### Recommended concurrency
+```text
+npm install
+npm run dev
+npm run build
+npm run lint
+npm run typecheck
+npm test
+npm run test:e2e
+npm run test:integration:live
+npm run eval:recovery
+npm run db:migrate
+npm run seed:demo
+npm run preflight:demo
+npm run reset:demo
+```
 
-Use two human workstreams plus one bounded implementation/test subagent per person. Start reviewer subagents at a phase gate after writer work is stable. More concurrency is useful only when paths and contracts are isolated.
+Live commands require explicit environment gating, TTY confirmation, controlled accounts, allowlists, and human operation. Ordinary CI must be unable to send Gmail or mutate Calendar.
 
-### Required subagent brief
+## 4. Requirement coverage index
 
-Every subagent receives:
+| Requirement group | Plan tasks that implement and prove it |
+|---|---|
+| FR-01–06 — intake, idempotency, scenario lock, candidates, rule precheck, ranking | `S019`–`S030`, `S035`, `S047`, `S057` |
+| FR-07–11 — World PR, exact preview, cancel, approval, stale invalidation | `S048`–`S051`, `S056`–`S059` |
+| FR-12–18 — action ledger, Calendar, Gmail, artifact, timeline, resume | `S046`, `S052`–`S059` |
+| FR-19–27 — late context, recovery planning/approval/execution/attention | `S060`–`S074` |
+| FR-28–32 — prevention rule, clarification proof, approved reset, retained mail | `S075`–`S086` |
+| SAFE-01–10 — approvals, MCP/auth, account/allowlist, ETag, Gmail uncertainty, deterministic AI boundary, secret/data minimization | `S010`–`S013`, `S022`, `S031`–`S045`, `S050`–`S059`, `S063`–`S069`, `S076`–`S085`, `S089` |
+| NFR-01 — five consecutive live runs | `S093`–`S096` |
+| NFR-02–04 — replay, stale overwrite, unknown adapter input | `S021`, `S027`, `S036`–`S043`, `S052`–`S057`, `S063`, `S067`–`S072`, `S083`, `S088` |
+| NFR-05 — 25 paraphrases plus 100% negative/safety suite | `S070`–`S072`, `S091` |
+| NFR-06 — digest/actor/action/target/receipt traceability | `S046`, `S049`–`S059`, `S064`–`S069`, `S087`–`S096` |
+| NFR-07–08 — five-second comprehension, accessibility, reduced motion | `S017`, `S026`, `S065`, `S072`, `S084`, `S090` |
+| NFR-09 — complete reset with retained mail | `S080`–`S086`, `S093` |
+| NFR-10 — no secret/address/body/production-data leakage | `S012`–`S013`, `S037`, `S089`, `S098`–`S102` |
 
-- `AGENTS.md` and the exact relevant canonical sections;
-- one bounded objective and phase/task IDs;
-- an exclusive file list and explicit files it must not edit;
-- frozen input/output fixtures;
-- acceptance commands;
-- required evidence format;
-- prohibition on secrets and live provider effects.
+## 5. Completion definition
 
-### Allowed subagent tasks
+- [ ] Every task `S001`–`S103` is complete with evidence or is explicitly superseded by an approved canonical decision.
+- [ ] Gates G0–G7 are green in order.
+- [ ] FR-01–32, SAFE-01–10, and NFR-01–10 trace to executable code, tests, and evidence.
+- [ ] External effects are authenticated, exact-approved, allowlisted, conditional, durable, idempotent, and honestly reported.
+- [ ] Model output remains inside strict closed schemas and deterministic semantic validation.
+- [ ] The complete live flow passes five consecutive times and the final recorded run contains no fake substitution.
+- [ ] Final code, schemas, migrations, commands, docs, demo assets, cleanup, and public claims agree.
 
-- generate contract/state-transition/failure tests;
-- implement deterministic fake adapters and fixtures;
-- expand eval/negative fixtures;
-- build isolated UI components, page objects, and tests;
-- audit accessibility, redaction, requirement coverage, and documentation consistency;
-- independently review migrations, idempotency, Calendar conflicts, Gmail uncertainty, artifact equality, and reset races.
-
-### Prohibited subagent actions
-
-- editing the same schema, migration, lockfile, config, or canonical document concurrently;
-- merging or pushing directly to `main`;
-- receiving OAuth tokens, API keys, recipient addresses, or live credentials;
-- running Calendar/Gmail/reset live commands;
-- weakening requirements, safety behavior, tests, or evidence thresholds;
-- inventing new product scope or dependencies without human approval.
-
-Only a human runs TTY-gated live commands and approves external effects. Every subagent change has a named human owner and reviewer.
-
-## 13. Additional acceleration mechanisms
-
-- **Git worktrees:** isolate Kaustubh Upadhya, Ayush Jha, and subagent patches without shared working-tree collisions.
-- **Contract-first fixtures:** unblock UI, AI, and service work before live integrations are ready.
-- **Generated types/fixtures:** derive TypeScript/read-model helpers from canonical Zod schemas instead of duplicating shapes.
-- **Deterministic fake adapters:** make failure and state tests fast and repeatable; keep them impossible in deployed live mode.
-- **Risk-first spikes:** retire OAuth, Calendar ETag, Gmail ambiguity, and strict model output before feature integration.
-- **Small ordered PRs:** contracts/migrations, producer, consumer, wiring, then evidence; avoid long-lived frontend/backend branches.
-- **Parallel CI lanes:** run fast lint/type/unit/contract tests first, then integration, Playwright, eval, and explicitly gated live tests.
-- **Fixture and prompt versioning:** make async handoffs reproducible and prevent silent consumer drift.
-- **Single evidence index:** Ayush Jha curates sanitized outputs in one location; Kaustubh Upadhya supplies receipts without editing the index concurrently.
-- **Stop-the-line gates:** any unsafe external-effect ambiguity or canonical-doc conflict pauses integration until reconciled.
-
-## 14. Definition of implementation complete
-
-- [ ] Every phase gate G0–G7 has evidence and both owners' approval.
-- [ ] All PRD functional/safety/non-functional requirements are traced to code and tests.
-- [ ] External effects are exact-approved, allowlisted, conditional, durable, and honestly reported.
-- [ ] Model outputs remain inside closed schemas and deterministic semantic validation.
-- [ ] The complete live flow passes five consecutive times.
-- [ ] Final docs, commands, schemas, migrations, and deployment behavior agree.
-
-Live status and evidence belong in [PROGRESS.md](PROGRESS.md); exact schemas belong in [CONTRACTS.md](CONTRACTS.md); test definitions belong in [TEST_PLAN.md](TEST_PLAN.md).
+Live status and evidence belong in [PROGRESS.md](PROGRESS.md); exact implemented schemas belong in [CONTRACTS.md](CONTRACTS.md); test definitions belong in [TEST_PLAN.md](TEST_PLAN.md).

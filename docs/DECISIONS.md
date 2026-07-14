@@ -241,23 +241,23 @@ This file records why a decision was made and which choices remain open. Accepte
 
 ## Open decisions
 
-Resolve these by the phase shown. Record the answer, date, owner, and evidence here; update canonical docs if behavior changes.
+Resolve these by the gate shown. Record the answer, date, and evidence here; update canonical docs if behavior changes.
 
-| ID | Decision needed | Recommended default | Owner | Due | Status/evidence |
-|---|---|---|---|---|---|
-| OPEN-001 | Git initialization and remote repository | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` | Ayush Jha + Codex | Complete | Resolved 2026-07-14; initial commit `5efe0b5` pushed |
-| OPEN-002 | Node version | Node.js 24 LTS, locally pinned to `24.18.0`; deployments use the latest supported `24.x` patch | Kaustubh Upadhya | Complete | Resolved 2026-07-14; `.nvmrc`, package engines, and Node 24 verification |
-| OPEN-003 | Deployment host/runtime limits | Vercel Functions with Fluid Compute in Mumbai (`bom1`); synchronous routes must finish within the configured plan limit or fail closed | Kaustubh Upadhya | Complete | Resolved 2026-07-14; `vercel.json` and Vercel limits/region documentation |
-| OPEN-004 | PostgreSQL provider and region | Supabase Postgres in Mumbai (`ap-south-1`); pooled runtime URL plus separate migration URL | Kaustubh Upadhya | Complete | Resolved 2026-07-14; environment contract and Supabase connection/region documentation |
-| OPEN-005 | Dashboard demo authentication | Single-operator passcode gate, HMAC-signed `HttpOnly` session cookie, same-origin mutation checks, secure production cookie | Kaustubh Upadhya + Ayush Jha review | Complete | Resolved 2026-07-14; `lib/auth/session.ts`, auth route, and unit/E2E tests |
-| OPEN-006 | Google account/calendar owner | One Ayush-controlled dedicated demo Google identity owns the connected calendar and sender; expected email and OIDC `sub` stay in deployment secrets | Ayush Jha | Complete | Resolved 2026-07-14; owner selected; live identity/calendar proof remains a G2 preflight |
-| OPEN-007 | OAuth audience | External/Testing with only the selected demo identity as test user; reauthorize within 24 hours of the final recording | Kaustubh Upadhya | Complete | Resolved 2026-07-14; conservative path for the selected Google identity |
-| OPEN-008 | Exact controlled recipient allowlist | One Ayush-controlled UK inbox and one Kaustubh-controlled US inbox; literal addresses are stored only in the structured deployment secret and reconfirmed before live send | Kaustubh Upadhya + Ayush Jha | Complete | Resolved 2026-07-14; separate one-address subsets selected; live inbox-control proof remains a G2 preflight |
-| OPEN-009 | `DEMO_DATE` and final event baselines | `2026-08-20`; UK 10:00–10:30 ET, US 11:00–11:30 ET, target 15:00–15:30 ET | Ayush Jha | Complete | Resolved 2026-07-14; fixture and runbook use the same date/baselines |
-| OPEN-010 | OpenAI project/model access and reasoning setting | Verify `gpt-5.6-sol` strict output; choose lowest effort that passes eval | Ayush Jha + Kaustubh Upadhya review | Phase 2 / G2 | Open |
-| OPEN-011 | Exact synthetic account-note fixture | Short company-wide notes with no regional input | Ayush Jha | Before Phase 3 | Open |
-| OPEN-012 | Team role assignments | Kaustubh Upadhya — Platform & Safety; Ayush Jha — Product, AI & Quality; shared go/no-go | Ayush Jha | Complete | Resolved 2026-07-14; implementation plan and runbook name both owners |
-| OPEN-013 | Evidence storage location | Sanitized Markdown in `artifacts/test-runs/`; raw logs/screenshots ignored; private provider receipts in the restricted team Drive folder | Ayush Jha + Kaustubh Upadhya | Complete | Resolved 2026-07-14; tracked evidence index and `.gitignore` policy |
+| ID | Decision | Due | Status/evidence |
+|---|---|---|---|
+| OPEN-001 | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` | Complete | Resolved 2026-07-14; initial commit `5efe0b5` pushed |
+| OPEN-002 | Node.js 24 LTS, locally pinned to `24.18.0`; deployments use the latest supported `24.x` patch | Complete | Resolved 2026-07-14; `.nvmrc`, package engines, and Node 24 verification |
+| OPEN-003 | Vercel Functions with Fluid Compute in Mumbai (`bom1`); synchronous routes must finish within the configured limit or fail closed | Complete | Resolved 2026-07-14; `vercel.json` and Vercel limits/region documentation |
+| OPEN-004 | Supabase Postgres in Mumbai (`ap-south-1`); pooled runtime URL plus separate migration URL | Complete | Resolved 2026-07-14; environment contract and Supabase connection/region documentation |
+| OPEN-005 | Single-operator passcode gate, HMAC-signed `HttpOnly` session cookie, same-origin mutation checks, secure production cookie | Complete | Resolved 2026-07-14; auth implementation and unit/E2E tests |
+| OPEN-006 | One dedicated team-controlled demo Google identity owns the connected calendar and sender; expected email and OIDC `sub` stay in deployment secrets | Complete | Resolved 2026-07-14; live identity/calendar proof remains a G2 preflight |
+| OPEN-007 | External/Testing OAuth audience with only the selected demo identity as test user; reauthorize within 24 hours of final recording | Complete | Resolved 2026-07-14; conservative path for the selected identity |
+| OPEN-008 | One team-controlled UK inbox and one team-controlled US inbox; literal addresses stay only in the structured deployment secret and are reconfirmed before live send | Complete | Resolved 2026-07-14; live inbox-control proof remains a G2 preflight |
+| OPEN-009 | `DEMO_DATE=2026-08-20`; UK 10:00–10:30 ET, US 11:00–11:30 ET, target 15:00–15:30 ET | Complete | Resolved 2026-07-14; fixture and runbook use the same date/baselines |
+| OPEN-010 | Verify configured OpenAI model access and strict output; choose the lowest reasoning effort that passes evaluation | G2 | Open; scheduled by `S011` and `S040`–`S045` |
+| OPEN-011 | Freeze the exact short company-wide synthetic account-note fixture with no regional input | G0 | Open; scheduled by `S014` |
+| OPEN-012 | Use one canonical sequential implementation queue with no person-specific task lanes | Complete | Superseded 2026-07-14; `IMPLEMENTATION_PLAN.md` now owns `S001`–`S103` in order |
+| OPEN-013 | Sanitized Markdown in `artifacts/test-runs/`; raw logs/screenshots ignored; private provider receipts remain outside Git | Complete | Resolved 2026-07-14; tracked evidence index and `.gitignore` policy |
 
 ### Phase 0 resolution notes
 
@@ -271,7 +271,7 @@ Resolve these by the phase shown. Record the answer, date, owner, and evidence h
 When closing an open item, add a dated note:
 
 ```text
-OPEN-NNN — Resolved YYYY-MM-DD by <owner>
+OPEN-NNN — Resolved YYYY-MM-DD
 Decision:
 Evidence:
 Canonical docs/code updated:

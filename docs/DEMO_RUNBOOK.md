@@ -12,16 +12,16 @@ This runbook operates the approved PRD. It cannot introduce product behavior. Ne
 
 ## 1. Roles
 
-Assigned by `OPEN-012`:
+Select operational roles during the T-30 preflight; these are live-demo safety roles, not implementation task assignments.
 
-| Role | Owner |
+| Role | Rule |
 |---|---|
-| Demo operator, narrator, recording, product evidence | Ayush Jha |
-| Backend, provider effects, OAuth, deployment on-call | Kaustubh Upadhya |
-| Final go/no-go | Kaustubh Upadhya + Ayush Jha jointly |
-| Safety veto | Either person may stop the run |
+| Demo operator | One authenticated human runs the product flow, narration, and recording |
+| Safety observer | A second human, when available, watches preflight/provider state and makes no manual live edits |
+| Final go/no-go | The present team confirms every required gate is green before recording |
+| Safety veto | Any present human may stop the run |
 
-Ayush Jha operates the demo while Kaustubh Upadhya watches logs/preflight without making live manual edits. Neither person may override a failed gate during recording.
+No role may override a failed gate, edit provider state manually during recording, or substitute a mock result for a failed live integration.
 
 ## 2. Controlled seed data
 

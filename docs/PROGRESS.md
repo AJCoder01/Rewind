@@ -1,13 +1,13 @@
 # Rewind MVP progress
 
-Current status: P0-A2 decisions and the executable scaffold are complete; cloud provisioning, database migration proof, traceability fixtures, and the remaining G0/G1 evidence are still open.
+Current status: master-plan tasks `S001`–`S006` are complete; the first unfinished task is `S007` (provision Supabase PostgreSQL), and Gate G0 remains open.
 
 | Field | Value |
 |---|---|
 | Status | Live checklist |
-| Current phase | Phase 0 foundation completion and fixture-backed Phase 1 non-effecting slice |
+| Current phase | G0 foundation; restart at `S007` |
 | Last updated | 2026-07-14 |
-| Implementation update | P0-A2 owner/provider/runtime/account/evidence decisions are resolved; no live provider integration is enabled. |
+| Implementation update | One sequential `S001`–`S103` plan replaces the prior person-specific workstreams; no live provider integration is enabled. |
 
 This file records status and evidence only. It does not create or change requirements.
 
@@ -24,7 +24,7 @@ This file records status and evidence only. It does not create or change require
 - [x] Workspace inspected. Evidence: directory was empty and not a Git repository on 2026-07-14.
 - [x] Product/technical loopholes pressure-tested and resolved in canonical docs. Evidence: `PRD.md` and `DECISIONS.md`.
 - [x] Official current OpenAI, Google Calendar, Gmail, OAuth, Codex MCP, and AGENTS guidance checked. Evidence: external links in canonical docs.
-- [x] Kickoff documentation set and phase-based async implementation plan created.
+- [x] Kickoff documentation set and dependency-gated implementation plan created.
 - [x] Git repository initialized and remote configured. Evidence: `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git`; initial docs commit `5efe0b5`.
 - [x] Application scaffold/package manifest exists. Evidence: one Next.js/TypeScript package, root scripts, strict TypeScript config, fixture mode, and Playwright config added on 2026-07-14.
 - [x] Advertised fast and browser commands have run successfully. Evidence: build, lint, typecheck, unit tests, and critical Playwright flow passed on 2026-07-14.
@@ -117,37 +117,35 @@ Do not infer implementation progress from completed documentation.
 
 ## Implementation phase tracker
 
-Detailed Kaustubh Upadhya/Ayush Jha tasks, async handoffs, subagent lanes, merge order, and exit criteria live in `IMPLEMENTATION_PLAN.md`. This file tracks status and evidence without duplicating that plan.
+The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`. This file tracks evidence without duplicating task ownership.
 
-| Phase | Gate | Kaustubh Upadhya — Platform & Safety | Ayush Jha — Product, AI & Quality | Status | Evidence |
-|---|---|---|---|---|---|
-| 0. Alignment and foundation | G0 | Decisions, scaffold, runtime, PostgreSQL, CI | Traceability, fixtures, UI-state inventory | In progress | P0-A2 decisions and local command evidence recorded; cloud provisioning/migration and traceability evidence remain |
-| 1. Non-effecting vertical slice | G1 | Contracts, persistence, auth, API, MCP | Composer/review shell, client parsing, Playwright | In progress | Fixture-backed create/review path and `npm run test:e2e` pass; broader traceability and integration evidence remain |
-| 2. Provider/model risk retirement | G2 | OAuth, Calendar/Gmail primitives, live spikes | Responses client, strict schemas, eval harness | Not started | TBD |
-| 3. Initial World PR | G3 | Exact plan/approval and artifact→Calendar→Gmail saga | Initial reasoning, World PR, approval/timeline UX | Not started | TBD |
-| 4. Causal Revert | G4 | Recovery validation/approval/execution/resume | Recovery prompt/evals and causal UX | Not started | TBD |
-| 5. Guardrail and reset | G5 | Rule engine, clarification lock, reset saga | Guardrail/clarification/reset UX | Not started | TBD |
-| 6. Hardening and evidence | G6 | Security, provider failures, deployment, live runs | E2E, eval, accessibility, evidence/runbook | Not started | TBD |
-| 7. Submission and cleanup | G7 | Final preflight, monitoring, revocation/retention | Video, screenshots, narrative, public-claim review | Not started | TBD |
+| Gate | Sequential scope | Status | Evidence |
+|---|---|---|---|
+| G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | In progress | `S001`–`S006` complete; start `S007`; cloud provisioning/migration and traceability remain |
+| G1 | `S019`–`S030`: non-effecting MCP → API → PostgreSQL → dashboard | In progress behind G0 | Fixture create/review path and browser smoke pass; durable deployed/replay/error coverage remains |
+| G2 | `S031`–`S045`: OAuth, Calendar/Gmail/artifact/model primitives and live spikes | Not started | TBD |
+| G3 | `S046`–`S059`: initial World PR, approval, execution, receipts | Not started | TBD |
+| G4 | `S060`–`S074`: late context, Causal Revert, recovery execution/evals | Not started | TBD |
+| G5 | `S075`–`S086`: prevention rule, clarification proof, approved reset | Not started | TBD |
+| G6 | `S087`–`S096`: hardening, accessibility, five-run evidence, freeze | Not started | TBD |
+| G7 | `S097`–`S103`: demo, submission, revocation, cleanup | Not started | TBD |
 
 ### Current phase actions
 
-- [x] Resolve `OPEN-012`: Kaustubh Upadhya owns Platform & Safety; Ayush Jha owns Product, AI & Quality.
-- [x] Resolve P0-A2 provider/runtime/account/demo-date/evidence decisions. Evidence: `docs/DECISIONS.md` OPEN-002–009 and OPEN-012–013.
-- [x] Scaffold the single package and verify fast root commands.
-- [x] Merge the minimal `contracts.v1` and durable migration packet.
-- [~] Merge golden/traceability fixtures after the contract packet. Evidence: deterministic World PR fixture exists; broader traceability fixtures remain.
-- [ ] Create isolated worktrees using the path ownership in `IMPLEMENTATION_PLAN.md` before Phase 1 branches diverge.
-- [x] Record the current local command results in `artifacts/test-runs/2026-07-14-p0-a2.md`; deployed PostgreSQL migration proof remains required before G0 closes.
+- [x] `S001`–`S006`: repository, decisions, scaffold, minimal contracts/migration, and local fixture slice.
+- [ ] `S007`: provision Supabase PostgreSQL in Mumbai and store both connection URLs privately.
+- [ ] `S008`: apply and verify the real migration.
+- [ ] `S009`–`S012`: provision Vercel/Google/OpenAI prerequisites and finalize private environment/startup validation.
+- [ ] `S013`–`S018`: CI/security, controlled fixtures, traceability, accessibility review, and clean-checkout G0 evidence.
 
-## Current blockers and owners
+## Current blockers
 
-| Blocker | Impact | Owner | Next action | Status |
-|---|---|---|---|---|
-| Vercel/Supabase projects not provisioned | Cannot prove deployed callback or PostgreSQL migration | Kaustubh Upadhya | Sign in, create the selected Mumbai projects, then configure secrets | Open |
-| Google OAuth credentials and controlled IDs not configured | Calendar/Gmail risk cannot be retired | Kaustubh Upadhya + Ayush Jha | Create External/Testing client, store expected identity/calendar/allowlist privately, then run G2 preflight | Open |
-| OpenAI project/model access unverified | Planner feasibility unknown | Ayush Jha + Kaustubh Upadhya review | Resolve OPEN-010 and live schema smoke | Open |
-| Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Codex | Direct smoke runner now tears down cleanly; retain the conventional spec for CI migration | Resolved |
+| Blocker | Impact | Next action | Status |
+|---|---|---|---|
+| Supabase/Vercel accounts are not authenticated/provisioned | Cannot run the real migration or deployed slice | Complete `S007`, then `S008` and `S009` | Open |
+| Google OAuth credentials and controlled IDs are not configured | Calendar/Gmail risk cannot be retired | Complete `S010` and `S012`, then G2 OAuth/provider tasks | Open |
+| OpenAI project/model access is unverified | Planner feasibility is unknown | Complete `S011`, then `S040`–`S045` | Open |
+| Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Direct smoke runner tears down cleanly; retain conventional spec for CI migration | Resolved |
 
 The setup choices are now fixed, but provider resources and secrets are not configured. Next: provision Vercel/Supabase, prove the migration on the selected database, finish traceability fixtures, and freeze the G1 packet before live Google/OpenAI work.
 
@@ -159,9 +157,9 @@ Add entries only after work is actually complete:
 |---|---|---|---|---|
 | 2026-07-14 | Repository inspection | Empty directory; `git status` reported not a repository | Confirmed | Codex |
 | 2026-07-14 | Kickoff documentation | README, AGENTS, PRD, Architecture, Contracts, Safety, Test Plan, Demo Runbook, Decisions, Progress, Implementation Plan | Complete | Codex |
-| 2026-07-14 | Git remote | `main` pushed to `origin/main`; initial commit `5efe0b5` | Complete | Ayush Jha + Codex |
-| 2026-07-14 | Async implementation planning | Phase-based Kaustubh Upadhya/Ayush Jha plan, subagent policy, handoffs, and gates | Complete | Codex |
-| 2026-07-14 | P0-A2 decisions | OPEN-002–009 and OPEN-012–013 resolved with named owners and evidence paths | Complete; live provider proof deferred to its explicit gates | Codex |
+| 2026-07-14 | Git remote | `main` pushed to `origin/main`; initial commit `5efe0b5` | Complete | Repository evidence |
+| 2026-07-14 | Master implementation plan | One sequential `S001`–`S103` queue with ordered G0–G7 gates | Complete | Codex |
+| 2026-07-14 | Foundation decisions | OPEN-002–009 and OPEN-012–013 resolved with evidence paths | Complete; live provider proof deferred to explicit gates | Codex |
 | 2026-07-14 | Scaffold and fast checks | `npm run build`, `npm run lint`, `npm run typecheck`, `npm test` | Passed; full dependency audit clean after Vitest 3.2.7 upgrade | Codex |
 | 2026-07-14 | Fixture API smoke | Authenticated fixture POST returned 201; authenticated World PR GET returned 200 with 3 actions and 2 timeline entries | Passed | Codex |
 | 2026-07-14 | Critical Playwright flow | `npm run test:e2e` reported the unauthenticated redirect, login, create, and review assertions as passed | Passed | Codex |

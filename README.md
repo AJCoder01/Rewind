@@ -120,11 +120,11 @@ Read these in order:
 5. [Test plan](docs/TEST_PLAN.md) — how every critical claim is proved.
 6. [Demo runbook](docs/DEMO_RUNBOOK.md) — seed data, preflight, narration, and reset.
 7. [Decisions](docs/DECISIONS.md) — accepted trade-offs, rejected options, and open decisions.
-8. [Implementation plan](docs/IMPLEMENTATION_PLAN.md) — phase-based split for two asynchronous owners, subagent lanes, handoffs, and gates.
+8. [Implementation plan](docs/IMPLEMENTATION_PLAN.md) — the single sequential `S001`–`S103` execution queue and gates.
 9. [Progress](docs/PROGRESS.md) — live phase-gate checklist and evidence links.
 10. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
 
-Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot be traded away, Architecture owns **how**, Contracts own boundary shapes, and the Implementation Plan owns **sequence, responsibility, and handoffs**. Executable schemas/tests become canonical for exact fields once implemented. Progress and the runbook never create new requirements.
+Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot be traded away, Architecture owns **how**, Contracts own boundary shapes, and the Implementation Plan owns the exact implementation sequence and gates. Executable schemas/tests become canonical for exact fields once implemented. Progress and the runbook never create new requirements.
 
 ## Planned stack
 
@@ -142,11 +142,8 @@ Current OpenAI documentation lists GPT-5.6 Sol as supporting the Responses API a
 
 ## First contributor actions
 
-1. Provision the selected Vercel and Supabase projects and add their secrets outside Git.
-2. Complete the G0 database migration and secret-scan evidence.
-3. Finish and freeze the golden contract and requirement-traceability fixtures.
-4. Create isolated Kaustubh Upadhya/Ayush Jha worktrees before further branches diverge.
-5. Close the non-effecting MCP → backend → PostgreSQL → dashboard Gate G1.
-6. Begin G2 provider/model risk retirement only after G0/G1 evidence is green.
+1. Start at `S007` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): provision the selected Supabase project.
+2. Continue in numeric order; do not skip a red gate.
+3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 
 Do not begin Calendar, Gmail, Causal Revert, or animation work until the vertical-slice gate is green.
