@@ -12,7 +12,7 @@ The strict `traceability.v1` catalog contains exactly the 52 canonical requireme
 {"status":"ok","version":"traceability.v1","total":52,"covered":3,"partial":15,"planned":34}
 ```
 
-`covered` and `partial` records reference existing code, test, fixture, and evidence paths. `planned` records have empty implementation/evidence arrays and an owning implementation-plan task, so future work is not represented as completed. The current snapshot has 3 covered, 15 partial, and 34 planned entries.
+`covered` and `partial` records reference existing code, test, fixture, and evidence paths. Fixture IDs resolve through a closed registry and every registry source path is checked. Absolute, UNC, drive-qualified, traversal, duplicate, missing, and unknown-fixture references fail closed. `planned` records have empty implementation/evidence arrays and an owning implementation-plan task, so future work is not represented as completed. The current snapshot has 3 covered, 15 partial, and 34 planned entries.
 
 ## Commands
 

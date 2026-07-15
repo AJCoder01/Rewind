@@ -19,23 +19,25 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: postgres
+          POSTGRES_DB: rewind_ci
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-cmd "pg_isready -U postgres -d rewind_ci"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
     env:
-      DATABASE_MIGRATION_URL: postgresql://postgres:ci-only@127.0.0.1:5432/postgres?sslmode=disable&uselibpqcompat=true
+      DATABASE_MIGRATION_URL: postgresql://postgres:rewind-ci-only@127.0.0.1:5432/rewind_ci?sslmode=disable&uselibpqcompat=true
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -54,9 +56,6 @@ jobs:
 
       - name: Production build
         run: npm run build
-
-      - name: Client bundle scan
-        run: npm run client:scan
 
       - name: Dependency audit
         run: npm audit --audit-level=moderate

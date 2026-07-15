@@ -57,7 +57,7 @@ export const ErrorCodeSchema = z.enum([
   "internal_error",
 ]);
 
-export const PlanPointerSchema = z
+export const InitialPlanPointerSchema = z
   .object({
     planId: Id,
     kind: z.literal("initial"),
@@ -65,6 +65,17 @@ export const PlanPointerSchema = z
     digest: Sha256DigestSchema,
   })
   .strict();
+
+export const RecoveryPlanPointerSchema = z
+  .object({
+    planId: Id,
+    kind: z.literal("recovery"),
+    version: z.literal(1),
+    digest: Sha256DigestSchema,
+  })
+  .strict();
+
+export const PlanPointerSchema = z.union([InitialPlanPointerSchema, RecoveryPlanPointerSchema]);
 
 export const CandidateSchema = z
   .object({
@@ -106,22 +117,37 @@ const CalendarPreconditionsSchema = z
   })
   .strict();
 
+const CalendarTargetSchema = z.object({ calendarId: Id, providerEventId: Id }).strict();
+
+const CalendarDesiredSchema = z
+  .object({
+    start: ZonedDateTimeSchema,
+    end: ZonedDateTimeSchema,
+    durationMinutes: z.literal(30),
+    sendUpdates: z.literal("none"),
+  })
+  .strict();
+
 const CalendarMoveActionSchema = z
   .object({
     actionKey: z.literal("initial.calendar.move"),
     type: z.literal("calendar.move"),
     dependsOnAssumptionIds: z.array(z.literal("assumption_acme_region")).length(1),
     externalEffect: z.literal(true),
-    target: z.object({ calendarId: Id, providerEventId: Id }).strict(),
+    target: CalendarTargetSchema,
     preconditions: CalendarPreconditionsSchema,
-    desired: z
-      .object({
-        start: ZonedDateTimeSchema,
-        end: ZonedDateTimeSchema,
-        durationMinutes: z.literal(30),
-        sendUpdates: z.literal("none"),
-      })
-      .strict(),
+    desired: CalendarDesiredSchema,
+  })
+  .strict();
+
+const ApprovedMailSchema = z
+  .object({
+    senderGoogleSub: Id,
+    to: z.array(z.string().email()).min(1).max(20),
+    subject: z.string().min(1).max(200),
+    bodyText: z.string().min(1).max(5000),
+    bodyHash: Sha256DigestSchema,
+    runId: Id,
   })
   .strict();
 
@@ -131,16 +157,7 @@ const MailNotificationActionSchema = z
     type: z.literal("mail.notify"),
     dependsOnAssumptionIds: z.array(z.literal("assumption_acme_region")).length(1),
     externalEffect: z.literal(true),
-    desired: z
-      .object({
-        senderGoogleSub: Id,
-        to: z.array(z.string().email()).min(1).max(20),
-        subject: z.string().min(1).max(200),
-        bodyText: z.string().min(1).max(5000),
-        bodyHash: Sha256DigestSchema,
-        runId: Id,
-      })
-      .strict(),
+    desired: ApprovedMailSchema,
     requiresSucceededActionKey: z.literal("initial.calendar.move"),
   })
   .strict();
@@ -184,7 +201,7 @@ export const InitialActionSchema = z.discriminatedUnion("type", [
 
 export const InitialPlanViewSchema = z
   .object({
-    pointer: PlanPointerSchema,
+    pointer: InitialPlanPointerSchema,
     selectedCandidate: CandidateSchema,
     alternatives: z.array(CandidateSchema).length(1),
     assumptions: z.array(AssumptionSchema).length(1),
@@ -299,6 +316,133 @@ export const InitialPlanPayloadSchema = InitialPlanPayloadCoreSchema.extend({
     }
   });
 
+const RecoveryCorrectedAssumptionSchema = z
+  .object({
+    assumptionId: z.literal("assumption_acme_region"),
+    fromCandidateId: Id,
+    toCandidateId: Id,
+  })
+  .strict()
+  .refine((value) => value.fromCandidateId !== value.toCandidateId, "Recovery target must differ from the invalidated candidate");
+
+const RecoveryDecisionSchema = z
+  .object({
+    executedActionId: Id,
+    outcome: z.enum(["restore", "correct", "preserve"]),
+    explanation: z.string().min(1).max(500),
+  })
+  .strict();
+
+const RecoveryCalendarRestoreActionSchema = z
+  .object({
+    actionKey: z.literal("recovery.calendar.restore_uk"),
+    type: z.literal("calendar.restore"),
+    dependsOnAssumptionIds: z.array(z.literal("assumption_acme_region")).length(1),
+    externalEffect: z.literal(true),
+    target: CalendarTargetSchema,
+    preconditions: CalendarPreconditionsSchema,
+    desired: CalendarDesiredSchema,
+  })
+  .strict();
+
+const RecoveryCalendarMoveActionSchema = z
+  .object({
+    actionKey: z.literal("recovery.calendar.move_us"),
+    type: z.literal("calendar.move"),
+    dependsOnAssumptionIds: z.array(z.literal("assumption_acme_region")).length(1),
+    externalEffect: z.literal(true),
+    target: CalendarTargetSchema,
+    preconditions: CalendarPreconditionsSchema,
+    desired: CalendarDesiredSchema,
+  })
+  .strict();
+
+const RecoveryMailCorrectionActionSchema = z
+  .object({
+    actionKey: z.literal("recovery.mail.correct_uk"),
+    type: z.literal("mail.correct"),
+    dependsOnAssumptionIds: z.array(z.literal("assumption_acme_region")).length(1),
+    externalEffect: z.literal(true),
+    desired: ApprovedMailSchema,
+    correctsActionExecutionId: Id,
+    requiresSucceededActionKey: z.literal("recovery.calendar.restore_uk"),
+  })
+  .strict();
+
+const RecoveryMailNotificationActionSchema = z
+  .object({
+    actionKey: z.literal("recovery.mail.notify_us"),
+    type: z.literal("mail.notify"),
+    dependsOnAssumptionIds: z.array(z.literal("assumption_acme_region")).length(1),
+    externalEffect: z.literal(true),
+    desired: ApprovedMailSchema,
+    requiresSucceededActionKey: z.literal("recovery.calendar.move_us"),
+  })
+  .strict();
+
+export const RecoveryPlanViewSchema = z
+  .object({
+    pointer: RecoveryPlanPointerSchema,
+    correctedAssumption: RecoveryCorrectedAssumptionSchema,
+    decisions: z.array(RecoveryDecisionSchema).length(3),
+    actions: z.tuple([
+      RecoveryCalendarRestoreActionSchema,
+      RecoveryCalendarMoveActionSchema,
+      RecoveryMailCorrectionActionSchema,
+      RecoveryMailNotificationActionSchema,
+    ]),
+  })
+  .strict();
+
+const RecoveryPreconditionsSchema = z
+  .object({
+    ukCurrentMustEqualInitialAfterState: CalendarPreconditionsSchema,
+    usCurrentMustEqualRecoveryPreview: CalendarPreconditionsSchema,
+    originalUkMailReceiptId: Id,
+    exactOriginalUkRecipientSetDigest: Sha256DigestSchema,
+    exactUsRecipientSetDigest: Sha256DigestSchema,
+    allCalendarPreflightsBeforeFirstWrite: z.literal(true),
+  })
+  .strict();
+
+export const RecoveryPlanPayloadCoreSchema = z
+  .object({
+    schemaVersion: z.literal("recovery-plan.v1"),
+    taskId: Id,
+    planId: Id,
+    version: z.literal(1),
+    correctedAssumption: RecoveryCorrectedAssumptionSchema,
+    decisions: z.array(RecoveryDecisionSchema).length(3),
+    actions: z.tuple([
+      RecoveryCalendarRestoreActionSchema,
+      RecoveryCalendarMoveActionSchema,
+      RecoveryMailCorrectionActionSchema,
+      RecoveryMailNotificationActionSchema,
+    ]),
+    preservedActionIds: z.tuple([Id]),
+    executionOrder: z.tuple([
+      z.literal("recovery.calendar.restore_uk"),
+      z.literal("recovery.calendar.move_us"),
+      z.literal("recovery.mail.correct_uk"),
+      z.literal("recovery.mail.notify_us"),
+    ]),
+    preconditions: RecoveryPreconditionsSchema,
+    modelMetadata: ModelMetadataSchema,
+  })
+  .strict();
+
+export const RecoveryPlanPayloadSchema = RecoveryPlanPayloadCoreSchema.extend({ digest: Sha256DigestSchema })
+  .strict()
+  .superRefine((value, context) => {
+    const actionKeys = value.actions.map((action) => action.actionKey);
+    if (JSON.stringify(actionKeys) !== JSON.stringify(value.executionOrder)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["executionOrder"], message: "Recovery action order must match the immutable execution order" });
+    }
+    if (value.actions[1].target.providerEventId === value.actions[0].target.providerEventId) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["actions"], message: "Recovery restore and corrected move must target different controlled events" });
+    }
+  });
+
 export const TimelineItemSchema = z
   .object({
     eventId: Id,
@@ -316,32 +460,60 @@ export const ClarificationSchema = z
   })
   .strict();
 
+export const AttentionReasonSchema = z
+  .object({
+    stage: z.enum(["initial", "recovery", "reset"]),
+    kind: z.enum(["retryable_failure", "delivery_uncertain", "provider_conflict", "validation_failure", "permanent_failure", "partial_reset"]),
+    actionKey: z.string().min(1).max(200).optional(),
+  })
+  .strict();
+
+const ActivePlanViewSchema = z.union([InitialPlanViewSchema, RecoveryPlanViewSchema]);
+const initialPlanStatuses = new Set(["preview_ready", "executing", "completed", "correction_pending"]);
+const recoveryPlanStatuses = new Set(["recovery_ready", "recovering", "recovered"]);
+const noPlanStatuses = new Set(["analyzing", "cancelled", "failed"]);
+
 export const WorldPrViewSchema = z
   .object({
     worldPrId: Id,
-    runId: Id,
+    runId: Id.optional(),
     request: z.string().min(1).max(2000),
     status: TaskStatusSchema,
-    activePlan: InitialPlanViewSchema.optional(),
+    activePlan: ActivePlanViewSchema.optional(),
     clarification: ClarificationSchema.optional(),
+    attention: AttentionReasonSchema.optional(),
     timeline: z.array(TimelineItemSchema),
     createdAt: Rfc3339,
     updatedAt: Rfc3339,
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.status === "preview_ready" && (!value.activePlan || value.clarification)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, message: "preview_ready requires exactly one active plan" });
+    const planKind = value.activePlan?.pointer.kind;
+    if (initialPlanStatuses.has(value.status) && (!value.runId || planKind !== "initial" || value.clarification)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "Initial-plan lifecycle states require a run ID and exactly one initial plan" });
     }
-    if (value.status === "clarification_required" && (!value.clarification || value.activePlan)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, message: "clarification_required requires a clarification and no active plan" });
+    if (recoveryPlanStatuses.has(value.status) && (!value.runId || planKind !== "recovery" || value.clarification)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "Recovery lifecycle states require a run ID and exactly one recovery plan" });
     }
-    if (value.activePlan) {
-      const selectedId = value.activePlan.selectedCandidate.candidateId;
-      if (value.activePlan.assumptions[0].resolvedCandidateId !== selectedId) {
+    if (value.status === "clarification_required" && (!value.clarification || value.activePlan || value.runId)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "clarification_required requires clarification-only intake with no run or plan" });
+    }
+    if (noPlanStatuses.has(value.status) && (value.activePlan || value.clarification)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "This lifecycle state must not expose an active plan or clarification" });
+    }
+    if (value.status === "attention_required" && !value.attention) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["attention"], message: "attention_required requires an attention reason" });
+    }
+    if (value.status !== "attention_required" && value.attention) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["attention"], message: "Only attention_required may carry an attention reason" });
+    }
+    const activePlan = value.activePlan;
+    if (activePlan && isInitialPlanView(activePlan)) {
+      const selectedId = activePlan.selectedCandidate.candidateId;
+      if (activePlan.assumptions[0].resolvedCandidateId !== selectedId) {
         context.addIssue({ code: z.ZodIssueCode.custom, path: ["activePlan", "assumptions", 0, "resolvedCandidateId"], message: "Active-plan assumption must resolve to the selected candidate" });
       }
-      if (value.activePlan.alternatives[0].candidateId === selectedId) {
+      if (activePlan.alternatives[0].candidateId === selectedId) {
         context.addIssue({ code: z.ZodIssueCode.custom, path: ["activePlan", "alternatives", 0], message: "Selected and alternative candidates must be distinct" });
       }
     }
@@ -351,15 +523,26 @@ export const CreateWorldPrRequestSchema = z
   .object({ request: z.string().trim().min(1).max(2000) })
   .strict();
 
-export const CreateWorldPrResponseSchema = z
-  .object({
-    worldPrId: Id,
-    status: z.literal("preview_ready"),
-    reviewUrl: z.string().url(),
-    requestId: Id,
-    replayPending: z.literal(true).optional(),
-  })
-  .strict();
+export const CreateWorldPrResponseSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      worldPrId: Id,
+      status: z.literal("preview_ready"),
+      reviewUrl: z.string().url(),
+      requestId: Id,
+      replayPending: z.literal(true).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      worldPrId: Id,
+      status: z.literal("clarification_required"),
+      reviewUrl: z.string().url(),
+      clarification: ClarificationSchema,
+      requestId: Id,
+    })
+    .strict(),
+]);
 
 export const ApiErrorResponseSchema = z
   .object({
@@ -381,7 +564,14 @@ export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
 export type InitialPlanView = z.infer<typeof InitialPlanViewSchema>;
 export type InitialPlanPayloadCore = z.infer<typeof InitialPlanPayloadCoreSchema>;
 export type InitialPlanPayload = z.infer<typeof InitialPlanPayloadSchema>;
+export type RecoveryPlanView = z.infer<typeof RecoveryPlanViewSchema>;
+export type RecoveryPlanPayloadCore = z.infer<typeof RecoveryPlanPayloadCoreSchema>;
+export type RecoveryPlanPayload = z.infer<typeof RecoveryPlanPayloadSchema>;
 export type WorldPrView = z.infer<typeof WorldPrViewSchema>;
 export type CreateWorldPrRequest = z.infer<typeof CreateWorldPrRequestSchema>;
 export type CreateWorldPrResponse = z.infer<typeof CreateWorldPrResponseSchema>;
 export type TimelineItem = z.infer<typeof TimelineItemSchema>;
+
+export function isInitialPlanView(plan: InitialPlanView | RecoveryPlanView): plan is InitialPlanView {
+  return plan.pointer.kind === "initial";
+}

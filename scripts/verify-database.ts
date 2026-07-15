@@ -7,8 +7,8 @@ import { loadPrivateLocalEnvironment, requireDatabaseUrl } from "@/lib/db/config
 import { runtimePrivilegesMatch } from "@/lib/db/privileges";
 import { evaluateDatabaseReadiness } from "@/lib/db/readiness";
 import {
-  FOUNDATION_MIGRATION_CHECKSUM,
   FOUNDATION_MIGRATION_ID,
+  isKnownFoundationMigrationChecksum,
   REWIND_COLUMN_SIGNATURES,
   REWIND_CONSTRAINTS,
   REWIND_DATABASE_TABLES,
@@ -275,7 +275,7 @@ async function verifyMigrationLedger(client: PoolClient): Promise<boolean> {
   const rows = (await client.query<{ migration_id: string; checksum: string }>(
     "SELECT migration_id, checksum FROM rewind_schema_migrations ORDER BY migration_id",
   )).rows;
-  return rows.length === 1 && rows[0].migration_id === FOUNDATION_MIGRATION_ID && rows[0].checksum === FOUNDATION_MIGRATION_CHECKSUM;
+  return rows.length === 1 && rows[0].migration_id === FOUNDATION_MIGRATION_ID && isKnownFoundationMigrationChecksum(rows[0].checksum);
 }
 
 async function verifyConstraintBehavior(client: PoolClient): Promise<boolean> {

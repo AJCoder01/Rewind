@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import { PostgresWorldPrStore } from "@/lib/db/postgres-store";
+import { isInitialPlanView } from "@/lib/contracts/v1";
 import { sha256Digest } from "@/lib/domain/digest";
 import { buildFixtureWorldPrRecord } from "@/lib/domain/fixture-world-pr";
 import { SUPPORTED_SCENARIO_REQUEST } from "@/lib/domain/scenario";
@@ -121,6 +122,7 @@ describe("PostgresWorldPrStore", () => {
     const clarification = structuredClone(stored.view);
     clarification.status = "clarification_required";
     delete clarification.activePlan;
+    delete clarification.runId;
     clarification.clarification = {
       question: "Which Acme region did you intend?",
       candidates: [
@@ -141,7 +143,7 @@ describe("PostgresWorldPrStore", () => {
   it("rejects a human-visible read model that disagrees with its immutable payload", async () => {
     const stored = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
     const tamperedView = structuredClone(stored.view);
-    if (!tamperedView.activePlan) throw new Error("Fixture must contain an active plan");
+    if (!tamperedView.activePlan || !isInitialPlanView(tamperedView.activePlan)) throw new Error("Fixture must contain an initial plan");
     tamperedView.activePlan.selectedCandidate.label = "Acme US renewal";
     const poolQuery = vi.fn(async (sql: string) => {
       if (sql === "SELECT read_model FROM tasks WHERE id = $1") return { rowCount: 1, rows: [{ read_model: tamperedView }] };

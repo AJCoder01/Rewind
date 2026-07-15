@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CreateWorldPrRequestSchema, InitialPlanPayloadSchema, WorldPrViewSchema } from "@/lib/contracts/v1";
+import { CreateWorldPrRequestSchema, CreateWorldPrResponseSchema, InitialPlanPayloadSchema, WorldPrViewSchema } from "@/lib/contracts/v1";
 import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import { buildFixtureWorldPr, buildFixtureWorldPrRecord } from "@/lib/domain/fixture-world-pr";
 
@@ -24,6 +24,43 @@ describe("contracts.v1", () => {
     const fixture = buildFixtureWorldPr("fixture request");
     const invalid = { ...fixture, activePlan: undefined };
     expect(WorldPrViewSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it("keeps clarification intake lock-free and accepts its explicit create response branch", () => {
+    const preview = buildFixtureWorldPr("fixture request");
+    const clarification = {
+      ...preview,
+      runId: undefined,
+      status: "clarification_required" as const,
+      activePlan: undefined,
+      clarification: {
+        question: "Which controlled candidate did you mean?",
+        candidates: [
+          { candidateId: "cal_event_acme_uk", label: "Acme UK renewal" },
+          { candidateId: "cal_event_acme_us", label: "Acme US renewal" },
+        ],
+      },
+    };
+    expect(WorldPrViewSchema.safeParse(clarification).success).toBe(true);
+    expect(CreateWorldPrResponseSchema.safeParse({
+      worldPrId: "wpr_clarify_s016",
+      status: "clarification_required",
+      reviewUrl: "https://rewind.example/pr/wpr_clarify_s016",
+      clarification: {
+        question: "Which controlled candidate did you mean?",
+        candidates: [
+          { candidateId: "cal_event_acme_uk", label: "Acme UK renewal" },
+          { candidateId: "cal_event_acme_us", label: "Acme US renewal" },
+        ],
+      },
+      requestId: "req_clarify_s016",
+    }).success).toBe(true);
+  });
+
+  it("rejects an initial plan in recovery lifecycle states", () => {
+    const preview = buildFixtureWorldPr("fixture request");
+    expect(WorldPrViewSchema.safeParse({ ...preview, status: "recovery_ready" }).success).toBe(false);
+    expect(WorldPrViewSchema.safeParse({ ...preview, status: "cancelled" }).success).toBe(false);
   });
 
   it("binds the plan digest to the complete canonical payload", () => {

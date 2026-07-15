@@ -75,11 +75,11 @@ export default function HomePage() {
           <button className="primary-button" data-testid="create-world-pr" type="submit" disabled={submitting}>{submitting ? "Preparing…" : "Create World PR"}</button>
         </form>
         {message ? <div className="notice" role="alert">{message}</div> : null}
-        <div className="status-row" data-testid="fixture-status" aria-label="Current slice status">
+        <section className="status-row" data-testid="fixture-status" aria-label="Current slice status">
           <span className="status-pill">No external effects in this slice</span>
           <span className="status-pill">Two controlled candidates</span>
           <span className="status-pill">Exact plan digest</span>
-        </div>
+        </section>
       </div>
     </main>
   );

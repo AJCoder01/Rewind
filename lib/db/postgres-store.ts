@@ -2,6 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { Pool, type PoolClient } from "pg";
 import {
   CreateWorldPrResponseSchema,
+  isInitialPlanView,
   WorldPrViewSchema,
   type CreateWorldPrResponse,
   type InitialPlanPayload,
@@ -168,11 +169,13 @@ export class PostgresWorldPrStore implements WorldPrStore {
 function assertStoredRecordConsistency(record: StoredWorldPrRecord): void {
   const activePlan = record.view.activePlan;
   const payload = record.planPayload;
+  if (!activePlan || !isInitialPlanView(activePlan)) {
+    throw new Error("Stored World PR read model does not match its immutable plan payload.");
+  }
   const selected = payload.candidateSet.find((candidate) => candidate.candidateId === payload.selectedCandidateId);
   const alternativeId = payload.alternativeCandidateIds[0];
   const alternative = payload.candidateSet.find((candidate) => candidate.candidateId === alternativeId);
   if (
-    !activePlan ||
     record.view.worldPrId !== payload.taskId ||
     record.view.request !== payload.request ||
     activePlan.pointer.planId !== payload.planId ||

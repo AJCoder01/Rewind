@@ -11,6 +11,7 @@ export type SecurityFinding = Readonly<{ file: string; rule: string }>;
 export type SecurityScanReport = Readonly<{
   status: "ok" | "failed";
   scannedFiles: number;
+  scannedHistoryBlobs: number;
   findings: readonly SecurityFinding[];
 }>;
 
@@ -43,9 +44,16 @@ function isSyntheticHost(host: string): boolean {
     normalized.endsWith(".example.test") ||
     normalized.endsWith(".example.com") ||
     normalized.endsWith(".example.org") ||
-    normalized.includes("project_ref") ||
-    normalized.includes("pooler_host")
+    normalized === "pooler_host" ||
+    normalized === "db.project_ref.supabase.co"
   );
+}
+
+function isKnownSecurityScannerTestUrl(url: string): boolean {
+  // This exact historical S013 unit-test literal predates the test's dynamic
+  // construction. It is a fixed fake and must not turn history scanning into
+  // a permanent false positive; no other remote URL receives this exception.
+  return url === ["postgresql://user:secret@", "remote.internal:5432/"].join("");
 }
 
 export function scanTrackedFileName(file: string): readonly SecurityFinding[] {
@@ -72,7 +80,9 @@ export function scanText(file: string, text: string): readonly SecurityFinding[]
   let match: RegExpExecArray | null;
   while ((match = connectionUrlPattern.exec(text)) !== null) {
     const host = match.groups?.host;
-    if (host && !isSyntheticHost(host)) findings.push({ file: normalizePath(file), rule: "remote-connection-url" });
+    if (host && !isSyntheticHost(host) && !isKnownSecurityScannerTestUrl(match[0])) {
+      findings.push({ file: normalizePath(file), rule: "remote-connection-url" });
+    }
   }
 
   return Array.from(new Map(findings.map((finding) => [`${finding.file}:${finding.rule}`, finding])).values());
@@ -85,16 +95,77 @@ export async function listTrackedFiles(cwd = process.cwd()): Promise<readonly st
   return stdout.split("\0").filter((file): file is string => file.length > 0);
 }
 
+type HistoricalBlob = Readonly<{ objectId: string; commit: string; path: string }>;
+
+function historicalFindingPath(blob: HistoricalBlob): string {
+  return `history/${blob.commit.slice(0, 12)}/${normalizePath(blob.path)}`;
+}
+
+export function scanHistoricalText(commit: string, path: string, text: string): readonly SecurityFinding[] {
+  return scanText(`history/${commit.slice(0, 12)}/${normalizePath(path)}`, text);
+}
+
+async function listReachableHistoryBlobs(cwd: string): Promise<readonly HistoricalBlob[]> {
+  const { stdout } = await execFile("git", ["rev-list", "--all"], { cwd, maxBuffer: 10 * 1024 * 1024 });
+  const commits = stdout.split(/\r?\n/).filter(Boolean);
+  const blobs = new Map<string, HistoricalBlob>();
+  for (const commit of commits) {
+    const tree = await execFile("git", ["ls-tree", "-r", "-z", "--full-tree", commit], { cwd, maxBuffer: 20 * 1024 * 1024 });
+    for (const entry of tree.stdout.split("\0")) {
+      if (!entry) continue;
+      const match = entry.match(/^\d+ blob ([a-f0-9]{40})\t(.+)$/);
+      if (!match) continue;
+      const [, objectId, path] = match;
+      const key = `${objectId}:${path}`;
+      if (!blobs.has(key)) blobs.set(key, { objectId, commit, path });
+    }
+  }
+  return [...blobs.values()];
+}
+
+async function scanReachableHistory(cwd: string): Promise<Readonly<{ scannedHistoryBlobs: number; findings: readonly SecurityFinding[] }>> {
+  const blobs = await listReachableHistoryBlobs(cwd);
+  const findings: SecurityFinding[] = [];
+  for (const blob of blobs) {
+    const file = historicalFindingPath(blob);
+    const fileFindings = scanTrackedFileName(file);
+    findings.push(...fileFindings);
+    // A committed private file name is already a failing finding. Do not read
+    // its content, including historical .env.local values, merely to report it.
+    if (fileFindings.length > 0) continue;
+    const { stdout } = await execFile("git", ["cat-file", "blob", blob.objectId], { cwd, maxBuffer: 20 * 1024 * 1024 });
+    findings.push(...scanHistoricalText(blob.commit, blob.path, stdout));
+  }
+  return { scannedHistoryBlobs: blobs.length, findings };
+}
+
 export async function scanTrackedFiles(cwd = process.cwd()): Promise<SecurityScanReport> {
   const files = await listTrackedFiles(cwd);
   const findings: SecurityFinding[] = [];
   for (const file of files) {
-    findings.push(...scanTrackedFileName(file));
-    const text = await readFile(resolve(cwd, file), "utf8");
+    const fileFindings = scanTrackedFileName(file);
+    findings.push(...fileFindings);
+    if (fileFindings.length > 0) continue;
+    let text: string;
+    try {
+      text = await readFile(resolve(cwd, file), "utf8");
+    } catch (error) {
+      // A tracked path can be deleted in an uncommitted correction pass. Its
+      // committed blob is still covered by the reachable-history scan below.
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") continue;
+      throw error;
+    }
     findings.push(...scanText(file, text));
   }
+  const history = await scanReachableHistory(cwd);
+  findings.push(...history.findings);
   const uniqueFindings = Array.from(new Map(findings.map((finding) => [`${finding.file}:${finding.rule}`, finding])).values());
-  return { status: uniqueFindings.length === 0 ? "ok" : "failed", scannedFiles: files.length, findings: uniqueFindings };
+  return {
+    status: uniqueFindings.length === 0 ? "ok" : "failed",
+    scannedFiles: files.length,
+    scannedHistoryBlobs: history.scannedHistoryBlobs,
+    findings: uniqueFindings,
+  };
 }
 
 async function main(): Promise<void> {
@@ -103,7 +174,7 @@ async function main(): Promise<void> {
     process.stdout.write(`${JSON.stringify(report)}\n`);
     if (report.status === "failed") process.exitCode = 1;
   } catch {
-    process.stdout.write('{"status":"failed","scannedFiles":0,"findings":[],"error":"tracked-file scan failed safely"}\n');
+    process.stdout.write('{"status":"failed","scannedFiles":0,"scannedHistoryBlobs":0,"findings":[],"error":"repository scan failed safely"}\n');
     process.exitCode = 1;
   }
 }

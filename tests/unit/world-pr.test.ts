@@ -20,6 +20,7 @@ describe("fixture-backed World PR service", () => {
     const replay = await createWorldPr({ actorId: "test:operator", source: "dashboard", idempotencyKey: "idempotency-key-0001", request: { request } });
     expect(first.response.worldPrId).toBe(replay.response.worldPrId);
     expect(replay.replay).toBe(true);
+    if (replay.response.status !== "preview_ready") throw new Error("Fixture service must return preview_ready.");
     expect(replay.response.replayPending).toBeUndefined();
     expect(first.view.activePlan?.actions).toHaveLength(3);
     expect(first.view.activePlan?.pointer.digest).toMatch(/^sha256:/);

@@ -32,4 +32,20 @@ describe("controlled content inventory", () => {
     expect(brief.provenance.sourceDigest).toBe(sha256Text(PARENT_ACCOUNT_NOTES_FIXTURE));
     expect(brief.provenance.validatorVersion).toBe(ACCOUNT_BRIEF_VALIDATOR_VERSION);
   });
+
+  it("rejects every closed selected-event, region, attendee, date/time, and provider leakage dimension", () => {
+    const leaks = [
+      ["candidate ID", "Selected cal_event_acme_uk."],
+      ["candidate title", "Selected Acme US renewal."],
+      ["provider event ID", "Source fixture-event-uk."],
+      ["attendee alias", "Send to uk-ops@example.test."],
+      ["region", "The UK account."],
+      ["meeting date", "Meeting date: August 20, 2026."],
+      ["meeting time", "Meeting time: 15:00 ET."],
+      ["provider detail", "Calendar zone: America/New_York."],
+    ] as const;
+    for (const [dimension, content] of leaks) {
+      expect(() => assertAccountBriefIndependent(content)).toThrow(`forbidden scenario dimension: ${dimension}`);
+    }
+  });
 });

@@ -6,16 +6,31 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const port = "3100";
 const baseUrl = `http://127.0.0.1:${port}`;
 
+// This is a complete, explicitly fixture-only server environment. Do not
+// inherit process.env: in particular, the smoke must not receive deployment
+// credentials or let Next load .env.local in development mode.
+export const FIXTURE_E2E_SERVER_ENVIRONMENT = {
+  NODE_ENV: "test",
+  APP_BASE_URL: baseUrl,
+  REWIND_STORAGE_MODE: "memory_fixture",
+  REWIND_SESSION_SECRET: "playwright-session-secret-000000000001",
+  REWIND_DASHBOARD_PASSCODE: "playwright-demo-passcode",
+  MCP_BACKEND_TOKEN: "playwright-mcp-token-000000000000001",
+  OPENAI_API_KEY: "fixture-openai-key-not-used-by-e2e",
+  OPENAI_MODEL: "fixture-model-v1",
+  GOOGLE_CLIENT_ID: "fixture-client.apps.googleusercontent.com",
+  GOOGLE_CLIENT_SECRET: "fixture-google-client-secret-000001",
+  GOOGLE_REDIRECT_URI: `${baseUrl}/api/v1/oauth/google/callback`,
+  REWIND_TOKEN_ENCRYPTION_KEY: "playwright-token-encryption-key-000001",
+  REWIND_GOOGLE_EXPECTED_EMAIL: "fixture-team@example.test",
+  REWIND_RECIPIENT_ALLOWLIST: JSON.stringify({ UK: ["uk-ops@example.test"], US: ["us-ops@example.test"] }),
+  REWIND_DEMO_DATE: "2026-08-20",
+} as const;
+
 function spawnServer(): ChildProcess {
   return spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", port], {
     cwd: root,
-    env: {
-      ...process.env,
-      REWIND_STORAGE_MODE: "memory_fixture",
-      REWIND_DASHBOARD_PASSCODE: "playwright-demo-passcode",
-      REWIND_SESSION_SECRET: "playwright-session-secret",
-      APP_BASE_URL: baseUrl,
-    },
+    env: FIXTURE_E2E_SERVER_ENVIRONMENT,
     stdio: "inherit",
     windowsHide: true,
   });
@@ -66,15 +81,21 @@ async function main(): Promise<void> {
     await page.keyboard.press("Tab");
     await expect(page.getByTestId("create-world-pr")).toBeFocused();
     await expect(page.getByTestId("create-world-pr")).toHaveCSS("outline-style", "solid");
+    await expect(page.getByTestId("create-world-pr")).toHaveCSS("outline-color", "rgb(0, 0, 0)");
+    await expect(page.getByTestId("create-world-pr")).toHaveCSS("outline-width", "3px");
     if (!(await page.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches))) {
       throw new Error("Reduced-motion media emulation was not observed by the page.");
     }
     await page.getByRole("button", { name: "Create World PR" }).click();
     await page.waitForURL((url) => url.pathname === "/login");
     await page.getByTestId("login-screen").waitFor({ state: "visible" });
+    await page.getByLabel("Demo passcode").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("login-submit")).toBeFocused();
+    await expect(page.getByTestId("login-submit")).toHaveCSS("outline-color", "rgb(0, 0, 0)");
     await page.getByLabel("Demo passcode").fill("wrong-playwright-passcode");
     await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByText("Sign-in failed. Configure the demo operator passcode for this environment.").waitFor({ state: "visible" });
+    await page.getByRole("alert").getByText("Sign-in failed. Configure the demo operator passcode for this environment.").waitFor({ state: "visible" });
     await page.getByLabel("Demo passcode").fill("playwright-demo-passcode");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.waitForURL((url) => url.pathname === "/");
@@ -102,6 +123,7 @@ async function main(): Promise<void> {
     await page.context().clearCookies();
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.getByText("Your review session has expired. Sign in again.", { exact: false }).waitFor({ state: "visible" });
+    await page.getByRole("alert").filter({ hasText: "Your review session has expired." }).waitFor({ state: "visible" });
     await page.getByRole("link", { name: "Sign in" }).click();
     await page.waitForURL((url) => url.pathname === "/login" && url.searchParams.get("next") === new URL(reviewUrl).pathname);
     await page.getByLabel("Demo passcode").fill("playwright-demo-passcode");

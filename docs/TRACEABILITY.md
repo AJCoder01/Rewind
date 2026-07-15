@@ -8,4 +8,4 @@ Each record names its owning implementation-plan tasks, code paths, tests, fixtu
 - `partial`: the fixture foundation proves only the stated slice and the note names the remaining risk;
 - `planned`: no implementation evidence is claimed; the owning task remains the source of future work.
 
-Run `npm run traceability:check` to parse the catalog, reject duplicate/incomplete IDs, and verify every referenced repository path. Planned entries intentionally have empty code/test/fixture/evidence arrays so the checker cannot convert roadmap intent into false completion.
+Fixture IDs resolve through the closed registry at `tests/fixtures/traceability/fixture-registry.ts`; every referenced fixture source path must exist. Run `npm run traceability:check` to parse the catalog, reject duplicate/incomplete IDs, unknown fixture IDs, absolute/traversal paths, and missing repository paths. Planned entries intentionally have empty code/test/fixture/evidence arrays so the checker cannot convert roadmap intent into false completion.

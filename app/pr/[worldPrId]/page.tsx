@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { WorldPrViewSchema, type InitialPlanView, type WorldPrView } from "@/lib/contracts/v1";
+import { isInitialPlanView, WorldPrViewSchema, type InitialPlanView, type WorldPrView } from "@/lib/contracts/v1";
 
 type PlannedAction = InitialPlanView["actions"][number];
 
@@ -108,7 +108,11 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
 
   if (message) return <main className="shell" data-testid="review-screen"><div className="content"><div className="notice" role="alert">{message}{loginRequired ? <> <Link href={`/login?next=${encodeURIComponent(`/pr/${worldPrId}`)}`}>Sign in</Link></> : null}</div></div></main>;
   if (!view || !view.activePlan) return <main className="shell" data-testid="review-screen"><div className="content"><p className="muted" aria-live="polite">Loading the immutable review record…</p></div></main>;
-  const plan = view.activePlan;
+  const activePlan = view.activePlan;
+  if (!isInitialPlanView(activePlan)) {
+    return <main className="shell" data-testid="review-screen"><div className="content"><div className="notice" role="status">This non-initial review state is not available in the current fixture UI. No external action was attempted.</div></div></main>;
+  }
+  const plan = activePlan;
   const assumption = plan.assumptions[0];
 
   return (

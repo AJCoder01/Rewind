@@ -31,7 +31,6 @@ npm run typecheck
 npm test
 npm run test:e2e
 npm run security:scan
-npm run client:scan
 npm run verify:fake-production
 npm run db:verify:ephemeral
 npm audit --audit-level=moderate

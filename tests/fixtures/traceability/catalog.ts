@@ -1,4 +1,5 @@
 import { RequirementTraceSchema, type RequirementTrace } from "./schema";
+import type { TraceabilityFixtureId } from "./fixture-registry";
 
 export const TRACEABILITY_CATALOG_VERSION = "traceability.v1";
 
@@ -7,9 +8,9 @@ const foundationEvidence = [
   "artifacts/test-runs/2026-07-15-codebase-cleanup-audit.md",
 ];
 const fixtureEvidence = [...foundationEvidence, "artifacts/test-runs/2026-07-15-s014-content-ui.md"];
-const initialFixtures = ["fixture-initial.v1", "controlled-content.v1", "artifact-independence.v1"];
+const initialFixtures: TraceabilityFixtureId[] = ["fixture-initial.v1", "controlled-content.v1", "artifact-independence.v1"];
 const intakeCode = ["app/page.tsx", "app/api/v1/world-prs/route.ts", "lib/services/world-pr.ts", "mcp/server.ts"];
-const intakeTests = ["tests/unit/world-pr.test.ts", "tests/e2e/world-pr.spec.ts"];
+const intakeTests = ["tests/unit/world-pr.test.ts", "scripts/test-e2e.ts"];
 
 function current(
   entry: Omit<RequirementTrace, "status" | "note"> & { status?: "covered" | "partial"; note: string },
@@ -54,18 +55,18 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   planned("FR-05", "FR", "Pre-lock active-rule evaluation", ["S077", "S078"], "The typed rule and clarification-only read model are future work."),
   current({
     id: "FR-06", kind: "FR", title: "Deterministic UK ranking with US alternative", planTasks: ["S006", "S023", "S047"],
-    codePaths: ["lib/domain/fixture-world-pr.ts", "app/pr/[worldPrId]/page.tsx"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/e2e/world-pr.spec.ts"],
+    codePaths: ["lib/domain/fixture-world-pr.ts", "app/pr/[worldPrId]/page.tsx"], testPaths: ["tests/unit/contracts-v1.test.ts", "scripts/test-e2e.ts"],
     fixtureIds: initialFixtures, evidencePaths: fixtureEvidence, status: "partial",
     note: "The complete fixture ranking is visible; provider-grounded ranking remains planned.",
   }),
   current({
     id: "FR-07", kind: "FR", title: "World PR assumption and action preview", planTasks: ["S006", "S050"],
-    codePaths: ["lib/domain/fixture-world-pr.ts", "app/pr/[worldPrId]/page.tsx"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/e2e/world-pr.spec.ts"],
+    codePaths: ["lib/domain/fixture-world-pr.ts", "app/pr/[worldPrId]/page.tsx"], testPaths: ["tests/unit/contracts-v1.test.ts", "scripts/test-e2e.ts"],
     fixtureIds: initialFixtures, evidencePaths: fixtureEvidence, note: "The non-effecting preview contains the request, assumption, evidence, actions, dependencies, and digest.",
   }),
   current({
     id: "FR-08", kind: "FR", title: "Exact time, recipient, and content preview", planTasks: ["S006", "S050"],
-    codePaths: ["lib/domain/fixture-world-pr.ts", "app/pr/[worldPrId]/page.tsx"], testPaths: ["tests/unit/controlled-content.test.ts", "tests/e2e/world-pr.spec.ts"],
+    codePaths: ["lib/domain/fixture-world-pr.ts", "app/pr/[worldPrId]/page.tsx"], testPaths: ["tests/unit/controlled-content.test.ts", "scripts/test-e2e.ts"],
     fixtureIds: initialFixtures, evidencePaths: fixtureEvidence, note: "Fixture exact times, zone, duration, synthetic recipient, mail, and brief provenance are rendered.",
   }),
   planned("FR-09", "FR", "Cancel and return controls", ["S026", "S051"], "No mutation/cancel route exists in the current slice."),
@@ -102,12 +103,12 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   planned("SAFE-02", "SAFE", "Exact recovery correction/intended mail disclosure", ["S064", "S066"], "Recovery mail preview is future work."),
   current({
     id: "SAFE-03", kind: "SAFE", title: "MCP cannot approve or execute", planTasks: ["S006", "S025"],
-    codePaths: ["mcp/server.ts", "app/api/v1/world-prs/route.ts"], testPaths: ["tests/e2e/world-pr.spec.ts"], fixtureIds: ["fixture-initial.v1"], evidencePaths: foundationEvidence, status: "partial",
+    codePaths: ["mcp/server.ts", "app/api/v1/world-prs/route.ts"], testPaths: ["scripts/test-e2e.ts"], fixtureIds: ["fixture-initial.v1"], evidencePaths: foundationEvidence, status: "partial",
     note: "The only exposed MCP tool creates a review; optional status and later product boundaries remain planned.",
   }),
   current({
     id: "SAFE-04", kind: "SAFE", title: "Authenticated dashboard and MCP boundaries", planTasks: ["S006", "S022"],
-    codePaths: ["lib/auth/session.ts", "app/api/v1/auth/session/route.ts", "app/api/v1/world-prs/route.ts"], testPaths: ["tests/unit/auth.test.ts", "tests/e2e/world-pr.spec.ts"], fixtureIds: ["fixture-initial.v1"], evidencePaths: foundationEvidence,
+    codePaths: ["lib/auth/session.ts", "app/api/v1/auth/session/route.ts", "app/api/v1/world-prs/route.ts"], testPaths: ["tests/unit/auth.test.ts", "scripts/test-e2e.ts"], fixtureIds: ["fixture-initial.v1"], evidencePaths: foundationEvidence,
     note: "Dashboard sessions, origin checks, and scoped bearer authentication are covered for the fixture slice.",
   }),
   planned("SAFE-05", "SAFE", "Controlled account/calendar/recipient boundary", ["S010", "S032", "S035", "S037"], "Live identity, event ownership, and allowlist enforcement are provider-gate work."),
@@ -149,7 +150,7 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   }),
   current({
     id: "NFR-07", kind: "NFR", title: "Five-second recovery comprehension", planTasks: ["S065", "S072", "S090"],
-    codePaths: ["docs/CONTROLLED_CONTENT_UI_INVENTORY.md"], testPaths: ["tests/e2e/world-pr.spec.ts"], fixtureIds: ["controlled-content.v1"], evidencePaths: ["artifacts/test-runs/2026-07-15-s014-content-ui.md"], status: "partial",
+    codePaths: ["docs/CONTROLLED_CONTENT_UI_INVENTORY.md"], testPaths: ["scripts/test-e2e.ts"], fixtureIds: ["controlled-content.v1"], evidencePaths: ["artifacts/test-runs/2026-07-15-s014-content-ui.md"], status: "partial",
     note: "The inventory freezes the future comprehension target; the recovery screen and timed review are not implemented.",
   }),
   current({

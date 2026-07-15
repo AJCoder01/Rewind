@@ -1,9 +1,19 @@
 import { z } from "zod";
+import { TraceabilityFixtureIdSchema } from "@/tests/fixtures/traceability/fixture-registry";
 
 export const RequirementIdSchema = z.string().regex(/^(?:FR|SAFE|NFR)-\d{2}$/);
 export const RequirementKindSchema = z.enum(["FR", "SAFE", "NFR"]);
 export const RequirementCoverageSchema = z.enum(["covered", "partial", "planned"]);
-const PathSchema = z.string().min(1).refine((value) => !value.includes(".."), "trace paths must stay inside the repository");
+const PathSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (value) =>
+      !value.includes("\0") &&
+      !/^(?:[a-z]:[\\/]|[\\/]{1,2})/i.test(value) &&
+      !value.split(/[\\/]+/).includes(".."),
+    "trace paths must be repository-relative",
+  );
 const TaskSchema = z.string().regex(/^S\d{3}$/);
 
 export const RequirementTraceSchema = z
@@ -15,7 +25,7 @@ export const RequirementTraceSchema = z
     planTasks: z.array(TaskSchema).min(1),
     codePaths: z.array(PathSchema),
     testPaths: z.array(PathSchema),
-    fixtureIds: z.array(z.string().min(1).max(120)),
+    fixtureIds: z.array(TraceabilityFixtureIdSchema),
     evidencePaths: z.array(PathSchema),
     note: z.string().min(1).max(500),
   })

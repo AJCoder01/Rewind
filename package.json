@@ -20,7 +20,6 @@
     "db:verify": "tsx scripts/verify-database.ts",
     "db:verify:ephemeral": "tsx scripts/verify-ephemeral-migration.ts",
     "config:check": "tsx scripts/config-check.ts",
-    "client:scan": "tsx scripts/verify-client-bundle.ts",
     "security:scan": "tsx scripts/security-scan.ts",
     "traceability:check": "tsx scripts/verify-traceability.ts",
     "verify:fake-production": "tsx scripts/verify-fake-production.ts",

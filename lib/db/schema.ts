@@ -1,8 +1,18 @@
 export const FOUNDATION_MIGRATION_ID = "0001_phase0_foundation";
 
 // Updated only when the immutable migration bytes change. The migration runner
-// verifies this value before connecting, and readiness verifies the stored value.
-export const FOUNDATION_MIGRATION_CHECKSUM = "sha256:f167612e48aa7f124e4bb23c564b3156bf2106e333c92e3c0c8e956c5363273a";
+// canonicalizes source line endings before hashing, so this is stable on
+// Windows and Linux checkouts.
+export const FOUNDATION_MIGRATION_CHECKSUM = "sha256:466833a9cb1c02b577672a2bbcc532655e288d2c2a895a6d9f38f79b3daaa99d";
+
+// S008 may have recorded the Windows CRLF byte hash before checksum
+// canonicalization. It is accepted only for this already-reviewed migration;
+// no ledger value is rewritten and every unknown checksum still fails closed.
+export const FOUNDATION_MIGRATION_LEGACY_CRLF_CHECKSUM = "sha256:f167612e48aa7f124e4bb23c564b3156bf2106e333c92e3c0c8e956c5363273a";
+
+export function isKnownFoundationMigrationChecksum(checksum: string): boolean {
+  return checksum === FOUNDATION_MIGRATION_CHECKSUM || checksum === FOUNDATION_MIGRATION_LEGACY_CRLF_CHECKSUM;
+}
 
 export const MIGRATION_LEDGER_TABLE = "rewind_schema_migrations";
 

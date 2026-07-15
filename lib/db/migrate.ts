@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { assertDatabaseCatalog } from "@/lib/db/catalog";
-import { FOUNDATION_MIGRATION_CHECKSUM, FOUNDATION_MIGRATION_ID } from "@/lib/db/schema";
+import {
+  FOUNDATION_MIGRATION_CHECKSUM,
+  FOUNDATION_MIGRATION_ID,
+  isKnownFoundationMigrationChecksum,
+} from "@/lib/db/schema";
 
 const migrationLockName = "rewind:schema-migrations";
 
@@ -16,7 +20,8 @@ const createLedgerSql = `
 `;
 
 export function migrationChecksum(sql: string): string {
-  return `sha256:${createHash("sha256").update(sql, "utf8").digest("hex")}`;
+  const canonicalSql = sql.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+  return `sha256:${createHash("sha256").update(canonicalSql, "utf8").digest("hex")}`;
 }
 
 export async function applyFoundationMigration(pool: Pool, sql: string): Promise<"applied" | "already_applied"> {
@@ -42,7 +47,7 @@ export async function applyFoundationMigration(pool: Pool, sql: string): Promise
       [FOUNDATION_MIGRATION_ID],
     );
     if (existing.rowCount) {
-      if (existing.rows[0].checksum !== checksum) {
+      if (!isKnownFoundationMigrationChecksum(existing.rows[0].checksum)) {
         throw new Error("The applied foundation migration checksum differs from the reviewed migration; refusing to continue.");
       }
       await assertDatabaseCatalog((text, values) => client.query(text, values ? [...values] : undefined));

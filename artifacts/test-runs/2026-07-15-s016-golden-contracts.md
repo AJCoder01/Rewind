@@ -6,7 +6,7 @@ Scope: deterministic contract fixtures and local regression checks only. No prov
 
 ## Result
 
-`golden-contracts.v1` now covers every current task status, every canonical API error code, normal/replay success responses, and fixture-only rule/reset review shapes. All values use synthetic IDs, fixed timestamps, the controlled account-brief fixture, and the existing fake-provider boundary.
+`golden-contracts.v1` now covers every current task status, every canonical API error code, normal/replay/clarification success responses, strict initial and recovery read-model shapes, and fixture-only rule/reset review shapes. Clarification has no run/plan, recovery states use recovery plans, and terminal no-plan states do not reuse an initial plan. Initial/recovery/reset/rule digests are recomputed from canonical payloads and verified against their read-model pointers. All values use synthetic IDs, fixed timestamps, the controlled account-brief fixture, and the existing fake-provider boundary.
 
 ## Commands
 

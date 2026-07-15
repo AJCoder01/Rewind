@@ -1,17 +1,37 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ParsedRequirementTraceability, TRACEABILITY_CATALOG_VERSION } from "@/tests/fixtures/traceability/catalog";
+import { TRACEABILITY_FIXTURE_REGISTRY } from "@/tests/fixtures/traceability/fixture-registry";
 import { RequirementTraceSchema } from "@/tests/fixtures/traceability/schema";
 
-export function verifyTraceability(root = process.cwd()): { total: number; covered: number; partial: number; planned: number } {
-  const entries = ParsedRequirementTraceability.map((entry) => RequirementTraceSchema.parse(entry));
+function resolveRepositoryPath(root: string, path: string): string {
+  const resolved = resolve(root, path);
+  const relativePath = relative(root, resolved);
+  if (relativePath === "" || relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
+    throw new Error(`Trace path escapes the repository: ${path}`);
+  }
+  return resolved;
+}
+
+export function verifyTraceability(
+  catalog = ParsedRequirementTraceability,
+  root = process.cwd(),
+): { total: number; covered: number; partial: number; planned: number } {
+  const entries = catalog.map((entry) => RequirementTraceSchema.parse(entry));
   const ids = new Set<string>();
   for (const entry of entries) {
     if (ids.has(entry.id)) throw new Error(`Duplicate requirement trace: ${entry.id}`);
     ids.add(entry.id);
     for (const path of [...entry.codePaths, ...entry.testPaths, ...entry.evidencePaths]) {
-      if (!existsSync(resolve(root, path))) throw new Error(`Missing trace path for ${entry.id}: ${path}`);
+      if (!existsSync(resolveRepositoryPath(root, path))) throw new Error(`Missing trace path for ${entry.id}: ${path}`);
+    }
+    for (const fixtureId of entry.fixtureIds) {
+      const fixture = TRACEABILITY_FIXTURE_REGISTRY[fixtureId];
+      if (!fixture) throw new Error(`Unknown trace fixture for ${entry.id}: ${fixtureId}`);
+      for (const path of fixture.sourcePaths) {
+        if (!existsSync(resolveRepositoryPath(root, path))) throw new Error(`Missing fixture source for ${entry.id}: ${fixtureId}`);
+      }
     }
   }
   const expected = [
