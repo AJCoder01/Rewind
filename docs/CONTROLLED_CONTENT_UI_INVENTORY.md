@@ -1,6 +1,6 @@
 # Controlled content and UI inventory
 
-Status: frozen for S014, version `controlled-content.v1`, 2026-07-15.
+Status: frozen for S014 and validated for S017, version `controlled-content.v1`, 2026-07-15.
 
 This inventory freezes the synthetic content and the non-effecting review surface. It does not enable Calendar, Gmail, OpenAI, approval, recovery, rule, or reset behavior.
 
@@ -81,6 +81,10 @@ Future recovery/rule/reset components remain scenario-specific under `components
 - Keyboard focus is visible with a non-color outline and follows DOM order.
 - `prefers-reduced-motion: reduce` disables transitions/animations and leaves a readable static layout.
 - The current fixture review uses no required animation; future causal animation must have a static reduced-motion equivalent.
+
+## S017 validation
+
+The selectors above are implemented in the current composer, login, and preview-ready review screens. The executable unit contract checks their presence, semantic status/error labels, focus outline, and reduced-motion CSS. The fixture E2E smoke additionally exercises keyboard focus, reduced-motion emulation, selector reachability, and horizontal-overflow-free 390×844 rendering. No future execution, recovery, rule, or reset surface is implied.
 
 ## Sanitized evidence format
 

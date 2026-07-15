@@ -35,6 +35,7 @@ textarea, input { width: 100%; border: 1px solid #c9d4cd; border-radius: 10px; p
 textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
 textarea:disabled, input:disabled { cursor: wait; opacity: .72; }
 textarea:focus, input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(44,107,79,.13); }
+textarea:focus-visible, input:focus-visible { outline: 3px solid #c69338; outline-offset: 3px; }
 .primary-button { min-height: 50px; border: 0; border-radius: 10px; padding: 0 19px; background: var(--green); color: white; font-weight: 800; }
 .primary-button:hover { background: #23583f; }
 .primary-button:focus-visible, .secondary-button:focus-visible, a:focus-visible { outline: 3px solid #c69338; outline-offset: 3px; }
@@ -74,7 +75,7 @@ textarea:focus, input:focus { border-color: var(--green); box-shadow: 0 0 0 3px 
 .action-details dt { color: var(--muted); font-size: .72rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .action-details dd { margin: 4px 0 0; overflow-wrap: anywhere; line-height: 1.45; }
 .digest { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .78rem; color: var(--muted); }
-.timeline { display: grid; gap: 15px; }
+.timeline { display: grid; gap: 15px; list-style: none; margin: 0; padding: 0; }
 .timeline-item { display: grid; grid-template-columns: 10px 1fr; gap: 12px; align-items: start; }
 .timeline-dot { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--green); }
 .timeline-label { font-weight: 700; }

@@ -154,8 +154,8 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   }),
   current({
     id: "NFR-08", kind: "NFR", title: "Accessible reduced-motion demo", planTasks: ["S014", "S017", "S090"],
-    codePaths: ["app/globals.css", "docs/CONTROLLED_CONTENT_UI_INVENTORY.md"], testPaths: ["tests/e2e/world-pr.spec.ts"], fixtureIds: ["controlled-content.v1"], evidencePaths: ["artifacts/test-runs/2026-07-15-s014-content-ui.md"], status: "partial",
-    note: "Focus/reduced-motion requirements are frozen; executable accessibility assertions are S017.",
+    codePaths: ["app/globals.css", "app/page.tsx", "app/login/page.tsx", "app/pr/[worldPrId]/page.tsx", "docs/CONTROLLED_CONTENT_UI_INVENTORY.md"], testPaths: ["tests/unit/accessibility-contract.test.ts", "scripts/test-e2e.ts"], fixtureIds: ["controlled-content.v1"], evidencePaths: ["artifacts/test-runs/2026-07-15-s014-content-ui.md", "artifacts/test-runs/2026-07-15-s017-accessibility.md"], status: "partial",
+    note: "Stable selectors, semantic labels, focus, reduced-motion, and responsive assertions cover the current fixture screens; future surfaces remain planned.",
   }),
   planned("NFR-09", "NFR", "Reset returns baselines and retains mail", ["S080", "S082", "S085", "S093"], "Reset is future work."),
   current({

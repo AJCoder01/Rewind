@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const port = "3100";
@@ -55,11 +55,23 @@ async function main(): Promise<void> {
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     page.setDefaultTimeout(15_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1_500);
+    await page.getByTestId("composer-screen").waitFor({ state: "visible" });
+    await page.getByTestId("fixture-status").waitFor({ state: "visible" });
     await page.getByRole("heading", { name: "Make the reasoning behind an action visible." }).waitFor({ state: "visible" });
+    await page.getByTestId("composer-request").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("create-world-pr")).toBeFocused();
+    await expect(page.getByTestId("create-world-pr")).toHaveCSS("outline-style", "solid");
+    if (!(await page.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches))) {
+      throw new Error("Reduced-motion media emulation was not observed by the page.");
+    }
     await page.getByRole("button", { name: "Create World PR" }).click();
     await page.waitForURL((url) => url.pathname === "/login");
+    await page.getByTestId("login-screen").waitFor({ state: "visible" });
     await page.getByLabel("Demo passcode").fill("wrong-playwright-passcode");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByText("Sign-in failed. Configure the demo operator passcode for this environment.").waitFor({ state: "visible" });
@@ -67,9 +79,19 @@ async function main(): Promise<void> {
     await page.getByRole("button", { name: "Continue" }).click();
     await page.waitForURL((url) => url.pathname === "/");
     await page.waitForTimeout(1_000);
+    await page.getByTestId("composer-screen").waitFor({ state: "visible" });
     await page.getByRole("button", { name: "Create World PR" }).click();
     await page.waitForURL((url) => url.pathname.startsWith("/pr/wpr_"));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByTestId("review-screen").waitFor({ state: "visible" });
     await page.getByRole("heading", { name: "Acme UK" }).waitFor({ state: "visible" });
+    await page.getByTestId("assumption-panel").waitFor({ state: "visible" });
+    await page.getByTestId("planned-actions").waitFor({ state: "visible" });
+    await page.getByTestId("review-timeline").waitFor({ state: "visible" });
+    await page.getByTestId("fixture-mode-notice").waitFor({ state: "visible" });
+    if (!(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth))) {
+      throw new Error("Responsive review viewport has horizontal overflow.");
+    }
     await page.getByText("Review proposed workspace changes").waitFor({ state: "visible" });
     await page.getByText("uk-ops@example.test", { exact: false }).waitFor({ state: "visible" });
     await page.getByText("America/New_York", { exact: true }).waitFor({ state: "visible" });

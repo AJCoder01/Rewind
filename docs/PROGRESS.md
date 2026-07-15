@@ -1,11 +1,11 @@
 # Rewind MVP progress
 
-Current status: master-plan tasks `S001`–`S016` are complete; the first unfinished task is `S017` (accessibility and testability validation), and Gate G0 remains open.
+Current status: master-plan tasks `S001`–`S017` are complete; the first unfinished task is `S018` (clean-checkout G0 evidence), and Gate G0 remains open.
 
 | Field | Value |
 |---|---|
 | Status | Live checklist |
-| Current phase | G0 foundation; restart at `S017` |
+| Current phase | G0 foundation; restart at `S018` |
 | Last updated | 2026-07-15 |
 | Implementation update | One sequential `S001`–`S103` plan replaces the prior person-specific workstreams; no live provider integration is enabled. |
 
@@ -121,7 +121,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 
 | Gate | Sequential scope | Status | Evidence |
 |---|---|---|---|
-| G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | In progress | `S001`–`S016` complete; start `S017`; accessibility and clean-checkout evidence remain |
+| G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | In progress | `S001`–`S017` complete; start `S018`; clean-checkout evidence remains |
 | G1 | `S019`–`S030`: non-effecting MCP → API → PostgreSQL → dashboard | In progress behind G0 | Fixture create/review path and browser smoke pass; durable deployed/replay/error coverage remains |
 | G2 | `S031`–`S045`: OAuth, Calendar/Gmail/artifact/model primitives and live spikes | Not started | TBD |
 | G3 | `S046`–`S059`: initial World PR, approval, execution, receipts | Not started | TBD |
@@ -143,7 +143,8 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 - [x] `S014`: controlled content/UI inventory and `controlled-content.v1` source/output fixture frozen. Evidence: [sanitized S014 evidence](../artifacts/test-runs/2026-07-15-s014-content-ui.md).
 - [x] `S015`: executable `traceability.v1` catalog covers all 52 FR/SAFE/NFR IDs with strict path and status validation. Evidence: [sanitized S015 evidence](../artifacts/test-runs/2026-07-15-s015-traceability.md).
 - [x] `S016`: `golden-contracts.v1` freezes task states, success/error envelopes, and fixture-only rule/reset shapes. Evidence: [sanitized S016 evidence](../artifacts/test-runs/2026-07-15-s016-golden-contracts.md).
-- [ ] `S017`–`S018`: accessibility review and clean-checkout G0 evidence.
+- [x] `S017`: accessibility/testability selectors and executable keyboard, focus, reduced-motion, responsive, and honest-label checks added. Evidence: [sanitized S017 evidence](../artifacts/test-runs/2026-07-15-s017-accessibility.md).
+- [ ] `S018`: clean-checkout G0 evidence.
 
 ## Current blockers
 
@@ -152,7 +153,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 | OAuth token and live provider ownership are not configured | Calendar/Gmail risk cannot be retired | Complete S031–S043 in G2 | Open |
 | Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Direct smoke runner tears down cleanly; retain conventional spec for CI migration | Resolved |
 
-Supabase is provisioned, the frozen schema is applied, and S009 Vercel health/readiness and cookie checks pass. Google Cloud and OpenAI access prerequisites are configured without live product effects. S012 private environment validation, S013 CI/security checks, S014 controlled content/UI freeze, S015 executable traceability, and S016 golden contract fixtures also passed. Next: execute S017–S018 to close G0.
+Supabase is provisioned, the frozen schema is applied, and S009 Vercel health/readiness and cookie checks pass. Google Cloud and OpenAI access prerequisites are configured without live product effects. S012 private environment validation, S013 CI/security checks, S014 controlled content/UI freeze, S015 executable traceability, S016 golden contract fixtures, and S017 accessibility/testability validation also passed. Next: prepare and execute the human-only portions of S018 to close G0.
 
 ## Verification evidence log
 
@@ -180,6 +181,7 @@ Add entries only after work is actually complete:
 | 2026-07-15 | S014 controlled content and UI inventory | [Sanitized S014 evidence](../artifacts/test-runs/2026-07-15-s014-content-ui.md): `controlled-content.v1` source/output fixture, copy/state inventory, viewports, reduced-motion baseline, selectors, and evidence policy | Passed; S015 is next | Codex |
 | 2026-07-15 | S015 executable requirement traceability | [Sanitized S015 evidence](../artifacts/test-runs/2026-07-15-s015-traceability.md): strict `traceability.v1` catalog, all 52 IDs, path validation, and honest 3/15/34 coverage counts | Passed; S016 is next | Codex |
 | 2026-07-15 | S016 golden contract fixtures | [Sanitized S016 evidence](../artifacts/test-runs/2026-07-15-s016-golden-contracts.md): `golden-contracts.v1` task states, success/error envelopes, strict rule/reset fixtures, and no external effects | Passed; S017 is next | Codex |
+| 2026-07-15 | S017 accessibility and testability validation | [Sanitized S017 evidence](../artifacts/test-runs/2026-07-15-s017-accessibility.md): stable selectors, semantic labels, keyboard focus, reduced-motion emulation, responsive viewport, and honest fixture notice | Passed; S018 is next | Codex |
 | 2026-07-15 | Full codebase cleanup and regression audit | [Sanitized audit evidence](../artifacts/test-runs/2026-07-15-codebase-cleanup-audit.md): complete file-purpose inventory, clean install, lint, strict/unused type checks, 28 tests, production build, browser and actual MCP smokes, dependency/secret/link/client-bundle checks, and read-only S007 regression | Passed at the time; no redundant tracked file found and S008 was next then | Codex |
 
 ## MVP definition of done
