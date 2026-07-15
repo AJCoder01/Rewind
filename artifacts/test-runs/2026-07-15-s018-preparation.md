@@ -12,7 +12,7 @@ Safe local verification of the preparation passed:
 - `npm.cmd run client:scan` — passed (26 generated files, zero findings).
 - `npm.cmd test` — passed (22 files, 107 tests).
 - `npm.cmd run lint` and `npm.cmd run typecheck` — passed.
-- `npm.cmd run security:scan` — passed (122 tracked files, zero findings).
+- `npm.cmd run security:scan` — passed (126 tracked files, zero findings).
 - `npm.cmd run traceability:check` — passed (52 requirements).
 - `git diff --check` — passed.
 
