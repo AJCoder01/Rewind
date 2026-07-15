@@ -32,10 +32,10 @@ Do not enable additional provider APIs for this task.
 
 Open **Google Auth platform → Branding** (Google may label this **OAuth consent screen**):
 
-1. Choose **External** for the audience.
-2. Keep publishing status **Testing**.
-3. Enter the team-controlled demo app name, support email, and developer contact email.
-4. Add exactly one dedicated demo Google identity under **Audience → Test users**.
+1. Enter the team-controlled demo app name, support email, and developer contact email.
+2. Open **Google Auth platform → Audience**.
+3. Choose **External** and keep publishing status **Testing**.
+4. Add exactly one dedicated demo Google identity under **Test users**.
 5. Do not add unrelated accounts.
 
 Testing mode is intentional. Google testing refresh grants expire after a short period, so the demo identity must be reauthorized within 24 hours of the final recording. S010 does not perform that grant.
