@@ -158,7 +158,7 @@ The first command applies the frozen migration atomically and is safe to repeat 
 
 ## First contributor actions
 
-1. Start at `S009` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): provision and verify the Vercel deployment prerequisites.
+1. Start at `S018` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): close G0 with clean-checkout evidence and the remaining human-only environment checks.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 
