@@ -1,11 +1,11 @@
 # Rewind MVP progress
 
-Current status: master-plan tasks `S001`–`S029` are complete; the first unfinished task is `S030` (close G1). The deployed non-effecting MCP → API → PostgreSQL → dashboard proof passed without provider calls or external effects, and the v1 interface packet is frozen. Gate G0 is closed while Gate G1 remains in progress.
+Current status: master-plan tasks `S001`–`S030` are complete; the first unfinished task is `S031` (implement the OAuth transaction flow). The deployed non-effecting MCP → API → PostgreSQL → dashboard proof passed without provider calls or external effects, the v1 interface packet is frozen, and G1 is closed. Gate G0 and G1 are complete; G2 is now in progress.
 
 | Field | Value |
 |---|---|
 | Status | Live checklist |
-| Current phase | G1 non-effecting vertical slice; restart at `S030` |
+| Current phase | G2 OAuth/provider/model risk retirement; restart at `S031` |
 | Last updated | 2026-07-16 |
 | Implementation update | One sequential `S001`–`S103` plan replaces the prior person-specific workstreams; no live provider integration is enabled. |
 
@@ -38,7 +38,7 @@ Do not infer implementation progress from completed documentation.
 
 - [x] `create_world_pr` exists as the sole required MCP tool. Evidence: `mcp/server.ts` exposes only this tool and never approves or executes.
 - [x] Dashboard composer and MCP use the same authenticated backend application service. Evidence: MCP is a thin bearer-authenticated HTTP client for `POST /api/v1/world-prs`; the route invokes `lib/services/world-pr.ts`.
-- [x] Identical, conflicting, in-progress, and failed idempotency replay; planning leases; rule-first clarification without a plan/action/lock; and effect-bearing scenario serialization are covered in the fixture/PostgreSQL repositories. Durable deployed proof remains S028–S030.
+- [x] Identical, conflicting, in-progress, and failed idempotency replay; planning leases; rule-first clarification without a plan/action/lock; and effect-bearing scenario serialization are covered in the fixture/PostgreSQL repositories. Durable deployed proof and G1 closure are recorded in S028–S030.
 - [x] Backend persists a versioned World PR and returns a non-secret review URL. Evidence: fixture create/read smoke returned 201/200 and an immutable plan digest.
 - [x] Authenticated dashboard loads the World PR. Evidence: `npm run test:e2e` exercised login, creation, and review rendering in fixture mode and exited successfully.
 - [ ] Exactly two tagged Calendar candidates are fetched from the controlled calendar.
@@ -122,8 +122,8 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 | Gate | Sequential scope | Status | Evidence |
 |---|---|---|---|
 | G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | Complete | [S018 G0 report](../artifacts/test-runs/2026-07-15-s018-g0.md); hosted Node 24 CI and ephemeral migration replay passed |
-| G1 | `S019`–`S030`: non-effecting MCP → API → PostgreSQL → dashboard | In progress | S019–S029 complete with [deployed S028 proof](../artifacts/test-runs/2026-07-16-s028-deployed.md) and [S029 interface freeze](../artifacts/test-runs/2026-07-16-s029-interface-freeze.md); S030 is next |
-| G2 | `S031`–`S045`: OAuth, Calendar/Gmail/artifact/model primitives and live spikes | Not started | TBD |
+| G1 | `S019`–`S030`: non-effecting MCP → API → PostgreSQL → dashboard | Complete | [S030 G1 closure report](../artifacts/test-runs/2026-07-16-s030-g1-close.md); S001–S030 complete in sequence |
+| G2 | `S031`–`S045`: OAuth, Calendar/Gmail/artifact/model primitives and live spikes | In progress | S031 is next; no provider implementation has started |
 | G3 | `S046`–`S059`: initial World PR, approval, execution, receipts | Not started | TBD |
 | G4 | `S060`–`S074`: late context, Causal Revert, recovery execution/evals | Not started | TBD |
 | G5 | `S075`–`S086`: prevention rule, clarification proof, approved reset | Not started | TBD |
@@ -149,6 +149,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 
 - [x] `S028` deployed proof: Production used `NODE_ENV=production` and `REWIND_STORAGE_MODE=postgres`; health/readiness passed; the operator authenticated, created and read the exact non-effecting contract review through MCP and the dashboard, and cancelled it without provider calls or external effects. Evidence: [sanitized deployed proof](../artifacts/test-runs/2026-07-16-s028-deployed.md) and the operator-supplied review/cancel screenshots.
 - [x] `S029` interface freeze: `g1-interface.v1` freezes the v1 schemas, migration checksum/catalog, golden HTTP/read-model fixtures, complete error/status matrix, fixture versions, implemented routes, and local/deployed create/read evidence. Evidence: [S029 freeze report](../artifacts/test-runs/2026-07-16-s029-interface-freeze.md) and [G1 interface packet](G1_INTERFACE_PACKET.md). S030 G1 closure remains pending.
+- [x] `S030` G1 closure: audited replay/auth/browser evidence, deployed screenshots and readiness, fake-mode proof, command outputs, known risks, and requirement links. Evidence: [S030 closure report](../artifacts/test-runs/2026-07-16-s030-g1-close.md). G1 is closed; S031 is next.
 
 - [x] G1 adversarial review correction pass: repaired MCP/dashboard controlled-workspace access, PostgreSQL lease/replay and cancellation honesty, production auth/error mapping, strict lifecycle metadata, UI-state honesty, and documentation drift. Evidence: [sanitized adversarial review](../artifacts/test-runs/2026-07-15-g1-adversarial-review.md). Requirement links: FR-01, FR-02, FR-03, FR-07, FR-09, SAFE-03, SAFE-04, SAFE-08, NFR-02, NFR-06, NFR-07, NFR-08, NFR-10. Versions: `v1`, `initial-plan.v1`, `golden-contracts.v1`, `traceability.v1`, `fixture-initial.v1`, `prevention-rule.v1`, `reset-plan.v1`. Local verification passed; deployed proof, fresh disposable migration replay, and recovery evaluation remain unverified for the recorded reasons.
 
@@ -156,11 +157,11 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 
 | Blocker | Impact | Next action | Status |
 |---|---|---|---|
-| G1 closure is still pending | G2 provider work must not start until the complete G1 command/evidence/requirement audit is recorded | Complete S030 using the frozen packet and deployed proof; do not enable providers before the gate closes | Open |
+| OAuth token and live provider ownership are not configured | Calendar/Gmail/model risk cannot be retired | Complete S031–S043 in G2 under the human-only live-effect rules | Open |
 | OAuth token and live provider ownership are not configured | Calendar/Gmail risk cannot be retired | Complete S031–S043 in G2 | Open |
 | Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Direct smoke runner tears down cleanly; retain conventional spec for CI migration | Resolved |
 
-Supabase is provisioned, the frozen schema is applied, and S009 Vercel health/readiness and cookie checks pass. Google Cloud and OpenAI access prerequisites are configured without live product effects. S012 private environment validation and S013–S018 local and hosted verification passed, including the disposable PostgreSQL migration replay. S019–S029 pass in their documented scopes; next is S030 G1 closure. Provider work remains gated behind G1 and G2.
+Supabase is provisioned, the frozen schema is applied, and S009 Vercel health/readiness and cookie checks pass. Google Cloud and OpenAI access prerequisites are configured without live product effects. S012 private environment validation and S013–S018 local and hosted verification passed, including the disposable PostgreSQL migration replay. S019–S030 pass in their documented scopes; G1 is closed and S031 OAuth work is next. Provider work remains gated behind G2.
 
 ## Verification evidence log
 
@@ -196,6 +197,7 @@ Add entries only after work is actually complete:
 | 2026-07-16 | S028 production boundary and local preflight | [Sanitized S028 preparation report](../artifacts/test-runs/2026-07-16-s028-preparation.md): production PostgreSQL repository boundary, non-effecting UI label, Node 24 clean install, 152 unit tests, build, browser smoke, lint/typecheck, security, fake-production, and traceability checks | Local packet passed; deployed MCP/session proof remains human-only and unperformed; no external effect occurred | Codex |
 | 2026-07-16 | S028 deployed non-effecting proof | [Sanitized S028 deployed report](../artifacts/test-runs/2026-07-16-s028-deployed.md): Production health/readiness, operator environment confirmation, authenticated MCP create, PostgreSQL-backed dashboard read, non-effecting review, and cancellation | Passed; no Calendar/Gmail/OpenAI calls or external effects; S029 is next | User + Codex |
 | 2026-07-16 | S029 G1 interface freeze | [S029 freeze report](../artifacts/test-runs/2026-07-16-s029-interface-freeze.md): executable `g1-interface.v1` manifest, 25-code error matrix, lifecycle/action statuses, migration/catalog, fixture versions, evidence paths, and all regression/build/browser/security checks | Passed; S030 G1 closure is next; no provider or external-effect work started | Codex |
+| 2026-07-16 | S030 G1 closure | [S030 closure report](../artifacts/test-runs/2026-07-16-s030-g1-close.md): acceptance audit, command/evidence index, deployed proof, replay/auth results, fake-mode proof, known risks, and requirement links | Passed; G1 closed; S031 OAuth transaction flow is next; no provider or external-effect work started | Codex |
 
 ## MVP definition of done
 

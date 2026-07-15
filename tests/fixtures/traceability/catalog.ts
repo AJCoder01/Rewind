@@ -8,7 +8,13 @@ const foundationEvidence = [
   "artifacts/test-runs/2026-07-15-codebase-cleanup-audit.md",
 ];
 const fixtureEvidence = [...foundationEvidence, "artifacts/test-runs/2026-07-15-s014-content-ui.md"];
-const g1Evidence = [...fixtureEvidence, "artifacts/test-runs/2026-07-15-s019-s027-g1.md"];
+const g1Evidence = [
+  ...fixtureEvidence,
+  "artifacts/test-runs/2026-07-15-s019-s027-g1.md",
+  "artifacts/test-runs/2026-07-16-s028-deployed.md",
+  "artifacts/test-runs/2026-07-16-s029-interface-freeze.md",
+  "artifacts/test-runs/2026-07-16-s030-g1-close.md",
+];
 const initialFixtures: TraceabilityFixtureId[] = ["fixture-initial.v1", "controlled-content.v1", "artifact-independence.v1"];
 const intakeCode = ["app/page.tsx", "app/api/v1/world-prs/route.ts", "lib/services/world-pr.ts", "mcp/server.ts"];
 const intakeTests = ["tests/unit/world-pr.test.ts", "tests/unit/g1-routes-auth.test.ts", "tests/unit/g1-mcp.test.ts", "scripts/test-e2e.ts"];

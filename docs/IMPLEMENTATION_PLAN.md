@@ -4,8 +4,8 @@
 |---|---|
 | Status | Active canonical execution queue |
 | Execution model | One sequential task at a time |
-| Current gate | G1 — non-effecting MCP → API → PostgreSQL → dashboard |
-| Current restart point | `S030` — close G1 |
+| Current gate | G2 — OAuth, provider, and model risk retirement |
+| Current restart point | `S031` — implement the OAuth transaction flow |
 | Last updated | 2026-07-16 |
 
 This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
@@ -71,14 +71,14 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 - [x] **S027 — Complete G1 automated tests.** Cover identical/conflicting/concurrent/failed replay, rule clarification without lock, scenario busy, unsupported request, unauthorized create/read, expired session, CSRF, malformed read models, duplicate click, refresh, keyboard flow, and reduced motion. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
 - [x] **S028 — Prove the deployed non-effecting slice.** Run MCP → authenticated API → Supabase → authenticated dashboard on the deployed environment using the real PostgreSQL repository, with Calendar/Gmail/model providers visibly disabled from live claims. Evidence: [sanitized deployed proof](../artifacts/test-runs/2026-07-16-s028-deployed.md).
 - [x] **S029 — Freeze the G1 interface packet.** Freeze schemas, migrations, golden HTTP/read-model fixtures, error matrix, fixture versions, and the create/read browser evidence before provider work. Evidence: [S029 interface freeze report](../artifacts/test-runs/2026-07-16-s029-interface-freeze.md) and [G1 interface packet](G1_INTERFACE_PACKET.md).
-- [ ] **S030 — Close G1.** Record all G1 command outputs, deployed screenshots, replay/auth results, fake-mode proof, known risks, and requirement links.
+- [x] **S030 — Close G1.** Record all G1 command outputs, deployed screenshots, replay/auth results, fake-mode proof, known risks, and requirement links. Evidence: [S030 G1 closure report](../artifacts/test-runs/2026-07-16-s030-g1-close.md).
 
 #### Gate G1 acceptance
 
-- [ ] Identical create returns the same resource; conflicting reuse fails; concurrent create never starts a second saga.
-- [ ] Clarification can exist without a plan/action/lock; effect-bearing competition returns `scenario_busy`.
-- [ ] Authenticated MCP and dashboard share one service and durable PostgreSQL state.
-- [ ] Mandatory browser E2E passes with a complete plan and no live provider/model call.
+- [x] Identical create returns the same resource; conflicting reuse fails; concurrent create never starts a second saga. Evidence: S019–S027 tests and S030 closure audit.
+- [x] Clarification can exist without a plan/action/lock; effect-bearing competition returns `scenario_busy`. Evidence: S019–S027 tests and S030 closure audit.
+- [x] Authenticated MCP and dashboard share one service and durable PostgreSQL state. Evidence: S028 deployed proof and S030 closure audit.
+- [x] Mandatory browser E2E passes with a complete plan and no live provider/model call. Evidence: S029 verification and S030 closure audit.
 
 ### G2 — OAuth, provider, and model risk retirement
 
