@@ -18,7 +18,7 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-15 |
 
-The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, and a reviewable World PR. No Calendar, Gmail, OpenAI, or external-effect path is enabled yet. Verified locally: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, and `npm run test:e2e`.
+The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. No Calendar, Gmail, OpenAI, or external-effect path is enabled yet. Verified with Node 24: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm run db:migrate`, and `npm run db:verify`.
 
 The implemented first slice is:
 
@@ -141,9 +141,20 @@ Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot
 
 Current OpenAI documentation lists GPT-5.6 Sol as supporting the Responses API and Structured Outputs. The model name remains configuration, not a hard-coded product invariant. See [OpenAI models](https://developers.openai.com/api/docs/models), [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), and [text generation guidance](https://developers.openai.com/api/docs/guides/text?api-mode=responses).
 
+## PostgreSQL foundation
+
+After configuring the two private database URLs described in the [S007 Supabase guide](docs/S007_SUPABASE_GUIDE.md), run:
+
+```text
+npm run db:migrate
+npm run db:verify
+```
+
+The first command applies the frozen migration atomically and is safe to repeat only while its reviewed checksum remains unchanged. The second command performs read-only catalog/privilege checks plus constraint probes inside a transaction that always rolls back. `GET /api/health` is process liveness; `GET /api/ready` returns a sanitized `200` only when the restricted TLS runtime connection and exact foundation schema are ready.
+
 ## First contributor actions
 
-1. Start at `S008` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): apply and independently verify the real migration using the provisioned Supabase project.
+1. Start at `S009` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): provision and verify the Vercel deployment prerequisites.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 

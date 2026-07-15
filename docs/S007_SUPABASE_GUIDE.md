@@ -113,6 +113,11 @@ alter default privileges for role postgres in schema public
   revoke all privileges on functions
   from anon, authenticated, service_role, public;
 
+-- PostgreSQL retains a global PUBLIC EXECUTE default for functions unless
+-- this owner-level (no IN SCHEMA) revoke is also applied.
+alter default privileges for role postgres
+  revoke execute on functions from public;
+
 -- Migrations run as postgres; future Rewind objects receive only runtime DML
 -- privileges. The runtime role receives no schema-creation or admin rights.
 alter default privileges for role postgres in schema public
@@ -171,7 +176,7 @@ order by defaclobjtype;
    - `can_create_in_public = false`
 5. In the default privileges result, confirm:
    - `S` (sequences) contains `postgres=rwU/postgres` and `rewind_app=rU/postgres`; `anon`, `authenticated`, and `service_role` are absent.
-   - `f` (functions) contains only `postgres=X/postgres`.
+   - `f` (functions) contains only `postgres=X/postgres` in both global and `public` scopes; there is no `PUBLIC=X` row.
    - `r` (tables) contains the owner entry for `postgres` and `rewind_app=arwd/postgres`; `anon`, `authenticated`, and `service_role` are absent.
 
 If API roles still appear with residual letters such as `w`, `D`, `x`, `t`, or `m`, run this corrective block and then repeat the verification query:
@@ -186,6 +191,8 @@ alter default privileges for role postgres in schema public
 alter default privileges for role postgres in schema public
   revoke all privileges on functions
   from anon, authenticated, service_role, public;
+alter default privileges for role postgres
+  revoke execute on functions from public;
 
 alter default privileges for role postgres in schema public
   grant select, insert, update, delete on tables to rewind_app;

@@ -7,7 +7,7 @@
 | Planner quality gate | At least 24/25 correction paraphrases; target 25/25 |
 | Negative safety gate | 100%; zero unsafe adapter calls |
 | Live rehearsal gate | 5 consecutive complete runs |
-| Last updated | 2026-07-14 |
+| Last updated | 2026-07-15 |
 
 The purpose of testing is to prove the narrow product claim and its safety boundary, not maximize generic coverage.
 
@@ -30,6 +30,8 @@ npm run lint
 npm run typecheck
 npm test
 npm run test:e2e
+npm run db:migrate
+npm run db:verify
 npm run test:integration:live
 npm run eval:recovery
 npm run seed:demo
@@ -40,6 +42,16 @@ npm run reset:demo
 Live tests require explicit environment gating, controlled accounts, and a confirmation such as `LIVE_INTEGRATION_TESTS=1` so ordinary CI cannot send mail.
 
 ## 3. Phase-gated must-pass risks
+
+### Gate G0 — PostgreSQL foundation
+
+1. `npm run db:migrate` applies the frozen migration atomically through the migration-owner connection and a second run succeeds without executing the migration again.
+2. The live catalog contains exactly the technical migration ledger plus the ten application tables, with the expected columns, owners, sequence, and all 26 named constraints (11 primary keys, 7 foreign keys, 6 checks, and 2 non-primary unique constraints).
+3. Every foreign key is validated, non-deferrable, and uses restrictive `NO ACTION` behavior.
+4. Rolled-back runtime probes prove `(plan_id, action_key)` and `(actor_id, endpoint, key)` uniqueness, representative check constraints, and the scenario-lock foreign key by SQLSTATE and exact constraint name; no probe row remains.
+5. The runtime connection authenticates only as restricted `rewind_app` over TLS, has the exact required table/sequence privileges, and cannot create in `public`.
+6. `PUBLIC`, `anon`, `authenticated`, and `service_role` have no effective table or sequence privileges, including through default ACLs.
+7. A plaintext non-local runtime connection is rejected, `/api/health` remains liveness-only, and `/api/ready` returns sanitized `200`/`503` results based on the live database state.
 
 ### Gate G1 — Non-effecting vertical slice
 

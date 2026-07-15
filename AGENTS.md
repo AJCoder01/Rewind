@@ -99,6 +99,8 @@ npm run lint
 npm run typecheck
 npm test
 npm run test:e2e
+npm run db:migrate
+npm run db:verify
 npm run eval:recovery
 npm run seed:demo
 npm run preflight:demo

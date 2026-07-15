@@ -5,7 +5,7 @@
 | Status | Active canonical execution queue |
 | Execution model | One sequential task at a time |
 | Current gate | G0 — foundation |
-| Current restart point | `S008` — apply and verify the real migration |
+| Current restart point | `S009` — provision and verify Vercel |
 | Last updated | 2026-07-15 |
 
 This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
@@ -39,7 +39,7 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 - [x] **S005 — Establish durable storage foundations.** Add the initial PostgreSQL migration for tasks, plans, approvals, action executions, artifacts, rules, idempotency, scenario locks, demo event versions, and audit events; add a fail-closed migration runner.
 - [x] **S006 — Prove the local fixture slice.** Implement signed dashboard sessions, same-origin mutation checks, scoped MCP authentication, `create_world_pr`, create/read routes, a complete fixture-backed plan, a review page, unit tests, production build, and the critical fixture browser smoke.
 - [x] **S007 — Provision Supabase PostgreSQL.** Follow [the manual S007 guide](S007_SUPABASE_GUIDE.md): create the selected Mumbai (`ap-south-1`) project, enable account MFA and PostgreSQL SSL enforcement, disable the unused Data API, create a non-admin `rewind_app` runtime role, store its transaction-pool URL and a separate `postgres` direct/session migration URL outside Git, and record only redacted evidence. Evidence: [sanitized S007 report](../artifacts/test-runs/2026-07-15-s007-supabase.md).
-- [ ] **S008 — Apply and verify the real migration.** Run `npm run db:migrate`, prove repeatability, inspect every table/check/foreign-key/unique constraint, test `(plan_id, action_key)` and idempotency uniqueness, verify runtime grants/API-role exclusion/TLS connection behavior, and add a database readiness check.
+- [x] **S008 — Apply and verify the real migration.** Run `npm run db:migrate`, prove repeatability, inspect every table/check/foreign-key/unique constraint, test `(plan_id, action_key)` and idempotency uniqueness, verify runtime grants/API-role exclusion/TLS connection behavior, and add a database readiness check. Evidence: [sanitized S008 report](../artifacts/test-runs/2026-07-15-s008-migration.md).
 - [ ] **S009 — Provision and verify Vercel.** Connect the GitHub repository, use Node 24 and Fluid Compute in Mumbai (`bom1`), configure private environment variables, deploy over TLS, and prove health/readiness, secure cookies, base URL, MCP base URL, and review URL behavior.
 - [ ] **S010 — Prepare Google Cloud access without live effects.** Create the project, enable Calendar/Gmail APIs, configure External/Testing audience and the exact test identity, register exact local/deployed redirects, request only OIDC + `calendar.events.owned` + `gmail.send`, and store no credential in Git.
 - [ ] **S011 — Prepare OpenAI project access.** Create/confirm the API project, keep the key in local/deployment secrets, verify the configured model is available, and defer product model calls until G2 strict-schema tests exist.

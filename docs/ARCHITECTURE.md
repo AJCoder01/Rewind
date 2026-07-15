@@ -6,7 +6,7 @@
 | Scope | Single-tenant, single-scenario hackathon MVP |
 | Runtime | One TypeScript application plus a thin MCP process |
 | Database | PostgreSQL from the foundation phase |
-| Last updated | 2026-07-14 |
+| Last updated | 2026-07-15 |
 
 This document owns how the PRD is implemented. It does not broaden product scope. Exact interface fields live in `CONTRACTS.md`; safety invariants in `SAFETY.md` override convenience.
 
@@ -263,6 +263,7 @@ Use normalized lifecycle records and JSONB for immutable plan payloads and typed
 
 | Table | Important fields | Invariants |
 |---|---|---|
+| `rewind_schema_migrations` | `migration_id`, `checksum`, `applied_at` | Technical ledger owned by `postgres`; one immutable checksum per migration ID; runtime role has read-only access |
 | `tasks` | `id`, `run_id`, `request`, `status`, `attention_reason`, `planning_lease_until`, timestamps | UUID/opaque ID; clarification-only records may have no run/lock; no mutable plan payload |
 | `scenario_locks` | `scenario_key`, `task_id`, `acquired_at`, `lease_until`, `execution_started_at` | One row for `acme-demo`; a planning lease is reclaimable only after proving no approval/action exists; effectful locks remain through successful reset |
 | `plans` | `id`, `task_id`, `kind`, `version`, `schema_version`, `prompt_version`, `model`, `payload`, `digest`, `created_at` | Immutable; unique task/kind/version; digest over canonical payload |
@@ -273,6 +274,12 @@ Use normalized lifecycle records and JSONB for immutable plan payloads and typed
 | `idempotency_records` | `actor_id`, `endpoint`, `key`, `body_hash`, `status`, `resource_id`, `response`, timestamps | Atomic claim; one logical submission; `in_progress | completed | failed` |
 | `demo_event_state` | stable semantic baseline, `expected_etag`, `expected_updated_at`, last receipt | Baseline excludes mutable provider versions; expected version rolls after every verified write/reset |
 | `audit_events` | `task_id`, `event_type`, redacted metadata, timestamp | Append-only product timeline; no secrets/PII bodies |
+
+The foundation migration is applied through one migration-owner connection in a single transaction. The runner sets a deterministic `public, pg_catalog` search path, bounded lock/statement timeouts, and a transaction-scoped advisory lock before validating the ledger and executing SQL. It records the SHA-256 checksum only after the complete catalog matches the frozen expectation. A repeat run accepts only the same migration ID and checksum and revalidates the catalog; a checksum conflict, partial schema, or catalog drift fails closed. Once recorded, migration bytes are immutable and later changes use a new numbered migration.
+
+The application runtime connects only as `rewind_app` over TLS. That role has `SELECT`, `INSERT`, `UPDATE`, and `DELETE` on the ten application tables, `SELECT` on the migration ledger, and `SELECT`/`USAGE` on the audit sequence. `PUBLIC` and the unused Supabase API roles have no effective table or sequence access. These foundation grants do not by themselves enforce every later domain immutability rule; application services and the later persistence gate must still enforce plan, approval, and audit semantics.
+
+`GET /api/health` proves only that the process can answer HTTP. `GET /api/ready` additionally proves the restricted runtime connection, TLS, recorded migration checksum, and exact table/constraint catalog. Readiness failures are sanitized and return `503`; provider details remain server-side.
 
 ### Plan digest
 
