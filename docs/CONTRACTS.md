@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Design contract; implement as Zod schemas and contract tests |
+| Status | Implemented v1 boundary contract; Zod schemas and contract tests are canonical for exact fields |
 | API version | `v1` |
 | Scope | Controlled Acme Calendar + Gmail scenario |
 | Last updated | 2026-07-15 |
@@ -18,6 +18,7 @@ This document owns boundary intent. Once implemented, versioned Zod schemas, mig
 - Event-local times also include an IANA time-zone identifier.
 - All mutating HTTP requests require `Idempotency-Key`.
 - MCP authentication uses a server-side bearer secret. Dashboard mutations use an authenticated session plus CSRF protection.
+- Dashboard mutation requests must carry the `rewind_session` cookie, matching `rewind_csrf` cookie and `x-rewind-csrf` header, and an allowed same-origin `Origin`; the CSRF token is not an authorization credential.
 - Unknown object properties are rejected at security-sensitive boundaries.
 - Every response includes or is associated with a `requestId` for support logs.
 
@@ -163,6 +164,7 @@ type CreateWorldPrResponse = {
   requestId: string;
   replayPending?: true;
 } & (
+  | { status: "analyzing"; clarification?: never }
   | { status: "preview_ready"; clarification?: never }
   | { status: "clarification_required"; clarification: ClarificationView }
 );
@@ -206,6 +208,8 @@ If an active rule matches during normal task creation, return `201` with the nor
 Persist this clarification-only intake and candidate snapshot, but no initial plan/action/lock. This is a normal product state, not an API error. A competing request returns `scenario_busy` only after it passes rule precheck and attempts effect-bearing planning.
 
 Relevant errors: `invalid_request`, `unsupported_request`, `idempotency_conflict`, `scenario_busy`, `unauthorized`.
+
+If an identical request arrives while the first planning claim is still active, the server returns the same resource ID with `status: "analyzing"` and `replayPending: true`. It does not wait inside the request or start a second planning saga. A safely failed claim replays its redacted terminal error; a conflicting body still returns `idempotency_conflict`.
 
 ### 3.3 Read World PR
 
@@ -273,7 +277,13 @@ type PreventionRuleView = Omit<PreventionRuleV1, "rationale"> & {
 
 This read model redacts raw OAuth/provider/model payloads and displays recipient aliases or controlled addresses only to the authenticated operator.
 
-### 3.4 Approve initial plan
+### 3.4 Safe World PR status
+
+`GET /api/v1/world-prs/:worldPrId/status`
+
+This scoped read endpoint is used by MCP and other non-dashboard callers that need progress without plan details. It returns `McpWorldPrStatus`: the opaque World PR ID, lifecycle status, non-secret review URL, and only safe clarification/attention metadata. It never returns active plans, recipients, provider IDs, snapshots, prompts, or complete message bodies. Dashboard reads may use the full section 3.3 view after session authorization.
+
+### 3.5 Approve initial plan
 
 `POST /api/v1/world-prs/:worldPrId/approvals/initial`
 
@@ -301,9 +311,9 @@ Success `200` after all approved initial actions succeed:
 
 The handler transaction verifies session, CSRF, task state, current plan ID/digest, provider preview version, and absence of an existing different approval. It stores approval and claims/creates action ledger rows before dispatch. A partial/conflict/uncertain outcome returns the durable `attention_required` read model rather than a success claim; the action ledger remains resumable where safe.
 
-If provider state differs before any action row starts, return `409 plan_stale`, mark the plan superseded, execute nothing, and direct the user to section 3.10.1. Never mutate an approved plan in place.
+If provider state differs before any action row starts, return `409 plan_stale`, mark the plan superseded, execute nothing, and direct the user to section 3.11.1. Never mutate an approved plan in place.
 
-### 3.5 Resume known-safe work
+### 3.6 Resume known-safe work
 
 `POST /api/v1/world-prs/:worldPrId/resume`
 
@@ -320,7 +330,7 @@ Resume never approves a plan and never retries `delivery_uncertain`, `conflict`,
 
 Success and attention responses use `TaskMutationResponse`. Relevant errors: `invalid_task_state`, `plan_digest_mismatch`, `action_not_retryable`, `provider_conflict`.
 
-### 3.6 Submit late context
+### 3.7 Submit late context
 
 `POST /api/v1/world-prs/:worldPrId/context`
 
@@ -344,17 +354,17 @@ interface SubmitContextRequest {
 
 The request performs recovery planning synchronously; reads may observe `correction_pending` while it is active. Success `200` returns `recovery_ready` with the immutable recovery-plan ID/digest. A model/validator technical failure returns the durable attention state. If the submitted context does not identify one explicit known target, return `422 clarification_required`, keep the task `completed`, and provide safe inline guidance; do not infer US from “wrong region.”
 
-To revise context, cancel the unexecuted recovery attempt through section 3.13, then submit a new request with a new idempotency key. The replacement plan gets a higher version and the prior plan remains immutable/superseded.
+To revise context, cancel the unexecuted recovery attempt through section 3.14, then submit a new request with a new idempotency key. The replacement plan gets a higher version and the prior plan remains immutable/superseded.
 
-### 3.7 Approve recovery plan
+### 3.8 Approve recovery plan
 
 `POST /api/v1/world-prs/:worldPrId/approvals/recovery`
 
 Request and response use the same plan ID/digest pattern as initial approval. The approved payload includes every exact Calendar target/time/precondition and every exact mail recipient/body. The request runs the persisted recovery saga synchronously and returns `recovered` only after every approved action succeeds; otherwise it returns the durable `attention_required` read model. No fire-and-forget work continues after the response.
 
-If either Calendar version drifts before the first recovery action, return `409 plan_stale`, supersede the plan, execute nothing, and use section 3.10.2. After an action starts, never replan over the partial ledger.
+If either Calendar version drifts before the first recovery action, return `409 plan_stale`, supersede the plan, execute nothing, and use section 3.11.2. After an action starts, never replan over the partial ledger.
 
-### 3.8 Activate prevention rule
+### 3.9 Activate prevention rule
 
 `POST /api/v1/world-prs/:worldPrId/rules/:ruleId/activate`
 
@@ -371,7 +381,7 @@ This is separate from recovery approval. It can transition only the fixed rule f
 
 Success `200` returns `TaskMutationResponse` plus `rule: PreventionRuleView`. Relevant errors: `invalid_task_state`, `plan_digest_mismatch`, `forbidden`.
 
-### 3.9 Resolve clarification
+### 3.10 Resolve clarification
 
 `POST /api/v1/world-prs/:worldPrId/clarification`
 
@@ -387,15 +397,15 @@ Only IDs from the task's current candidate set are accepted. The server then cre
 
 Resolution first tries to acquire the effect-bearing scenario lock. If another run still owns it, return `409 scenario_busy` and keep the clarification record intact. Success `200` returns `preview_ready` with `activePlan`; unknown/stale IDs return `422 unknown_entity`/`candidate_set_invalid` and create no plan.
 
-### 3.10 Refresh or supersede an unexecuted plan
+### 3.11 Refresh or supersede an unexecuted plan
 
-#### 3.10.1 Refresh initial preview
+#### 3.11.1 Refresh initial preview
 
 `POST /api/v1/world-prs/:worldPrId/plans/initial/refresh`
 
 Allowed only when no initial action has started. It refetches candidates/provider versions, reruns initial planning and artifact validation, stores `version + 1`, marks the old plan superseded, and returns `preview_ready` with a new `PlanPointer`. Any old approval is invalid. If an action row/approval has begun execution, return `409 invalid_task_state`.
 
-#### 3.10.2 Refresh recovery preview
+#### 3.11.2 Refresh recovery preview
 
 `POST /api/v1/world-prs/:worldPrId/plans/recovery/refresh`
 
@@ -403,7 +413,7 @@ Allowed only from an unexecuted `recovery_ready`/validation-attention state. It 
 
 Both endpoints return `TaskMutationResponse`; relevant errors are `invalid_task_state`, `provider_conflict`, `model_output_invalid`, and `candidate_set_invalid`.
 
-### 3.11 Prepare and approve reset
+### 3.12 Prepare and approve reset
 
 #### Prepare
 
@@ -441,23 +451,23 @@ Complete success `200`:
 }
 ```
 
-### 3.12 Cancel before initial execution
+### 3.13 Cancel before initial execution
 
 `POST /api/v1/world-prs/:worldPrId/cancel`
 
 Allowed only from `preview_ready` or `clarification_required`. It marks the intake `cancelled` and archives any unexecuted plan. It releases the scenario lock only when that task owns it; a clarification-only intake owns none. It never runs an adapter. Success uses `TaskMutationResponse`.
 
-### 3.13 Cancel or dismiss recovery
+### 3.14 Cancel or dismiss recovery
 
 `POST /api/v1/world-prs/:worldPrId/recovery/cancel`
 
 Allowed from `correction_pending`, `recovery_ready`, or `attention_required.validation_failure` only when no recovery action row has started. It archives/supersedes the unapproved recovery/context attempt and returns the task to `completed`; all initial external effects remain. It does not release the scenario lock because reset is still required. Success uses `TaskMutationResponse`.
 
-### 3.14 Try an active guardrail
+### 3.15 Try an active guardrail
 
 There is no proof-only rule endpoint. The dashboard panel and MCP both use normal section 3.2 intake. A match returns the standard persisted `clarification_required` resource/read model and candidate payload before lock acquisition. The demo leaves that intake unresolved; it therefore has no plan, action, approval, or external effect.
 
-### 3.15 Mutation response and error matrix
+### 3.16 Mutation response and error matrix
 
 Every success/attention response includes `requestId`; task mutations use `TaskMutationResponse` unless a richer shape is shown above. A durable attention outcome is HTTP `200` because the request was recorded and needs operator action; request/precondition conflicts use `409`; validation/clarification uses `422`; auth uses `401/403`.
 
@@ -521,8 +531,7 @@ Output:
 {
   "worldPrId": "wpr_01...",
   "status": "preview_ready",
-  "reviewUrl": "https://rewind.example/pr/wpr_01...",
-  "attention": null
+  "reviewUrl": "https://rewind.example/pr/wpr_01..."
 }
 ```
 

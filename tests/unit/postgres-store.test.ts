@@ -89,6 +89,38 @@ describe("PostgresWorldPrStore", () => {
     expect(connect).not.toHaveBeenCalled();
   });
 
+  it("returns the current analyzing state for an in-progress identical replay without waiting or starting a second transaction", async () => {
+    const stored = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
+    const bodyHash = sha256Digest({ request: SUPPORTED_SCENARIO_REQUEST });
+    const poolQuery = vi.fn(async (sql: string) => {
+      if (sql.includes("RETURNING key")) return { rowCount: 0, rows: [] };
+      if (sql.includes("FROM idempotency_records")) {
+        return { rowCount: 1, rows: [{ body_hash: bodyHash, response: null, resource_id: stored.view.worldPrId, status: "in_progress" }] };
+      }
+      if (sql.includes("JOIN plans")) return { rowCount: 0, rows: [] };
+      if (sql === "SELECT read_model FROM tasks WHERE id = $1") return { rowCount: 0, rows: [] };
+      throw new Error(`Unexpected SQL in in-progress replay test: ${sql}`);
+    });
+    const connect = vi.fn();
+    const store = new PostgresWorldPrStore({ query: poolQuery, connect } as unknown as Pool);
+
+    const replay = await store.createInitial({
+      actorId: "test:operator",
+      endpoint: "POST /api/v1/world-prs",
+      idempotencyKey: "idempotency-key-in-progress",
+      bodyHash,
+      request: SUPPORTED_SCENARIO_REQUEST,
+      requestId: "req_in_progress",
+      reviewUrl: "http://localhost:3000/pr/{worldPrId}",
+    });
+
+    expect(replay.replay).toBe(true);
+    expect(replay.response).toMatchObject({ status: "analyzing", replayPending: true });
+    expect(replay.response.worldPrId).toBe(stored.view.worldPrId);
+    expect(replay.view.worldPrId).toBe(stored.view.worldPrId);
+    expect(connect).not.toHaveBeenCalled();
+  });
+
   it("marks a claimed idempotency record failed when client acquisition fails", async () => {
     const calls: QueryCall[] = [];
     const poolQuery = vi.fn(async (sql: string, params: readonly unknown[] = []) => {
@@ -112,7 +144,7 @@ describe("PostgresWorldPrStore", () => {
         requestId: "req_connectfail",
         reviewUrl: "http://localhost:3000/pr/{worldPrId}",
       }),
-    ).rejects.toThrow("database connection unavailable");
+    ).rejects.toThrow("The request could not be recorded safely");
 
     expect(calls.some(({ sql }) => sql.includes("SET status = 'failed'"))).toBe(true);
   });

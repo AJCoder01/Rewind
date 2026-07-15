@@ -1,11 +1,11 @@
 # Rewind MVP progress
 
-Current status: master-plan tasks `S001`–`S018` are complete; the first unfinished task is `S019` (complete lifecycle and error contracts), and Gate G0 is closed.
+Current status: master-plan tasks `S001`–`S027` are complete; the first unfinished task is `S028` (prove the deployed non-effecting slice), and Gate G0 is closed while Gate G1 remains in progress.
 
 | Field | Value |
 |---|---|
 | Status | Live checklist |
-| Current phase | G1 non-effecting vertical slice; restart at `S019` |
+| Current phase | G1 non-effecting vertical slice; restart at `S028` |
 | Last updated | 2026-07-15 |
 | Implementation update | One sequential `S001`–`S103` plan replaces the prior person-specific workstreams; no live provider integration is enabled. |
 
@@ -38,7 +38,7 @@ Do not infer implementation progress from completed documentation.
 
 - [x] `create_world_pr` exists as the sole required MCP tool. Evidence: `mcp/server.ts` exposes only this tool and never approves or executes.
 - [x] Dashboard composer and MCP use the same authenticated backend application service. Evidence: MCP is a thin bearer-authenticated HTTP client for `POST /api/v1/world-prs`; the route invokes `lib/services/world-pr.ts`.
-- [~] Completed replay, failed-claim reconciliation, plan-less clarification reads, and the one effect-bearing-scenario lock are covered in the fixture/PostgreSQL repositories. In-progress replay/lease recovery and rule-matched clarification remain explicitly deferred to `S021`.
+- [x] Identical, conflicting, in-progress, and failed idempotency replay; planning leases; rule-first clarification without a plan/action/lock; and effect-bearing scenario serialization are covered in the fixture/PostgreSQL repositories. Durable deployed proof remains S028–S030.
 - [x] Backend persists a versioned World PR and returns a non-secret review URL. Evidence: fixture create/read smoke returned 201/200 and an immutable plan digest.
 - [x] Authenticated dashboard loads the World PR. Evidence: `npm run test:e2e` exercised login, creation, and review rendering in fixture mode and exited successfully.
 - [ ] Exactly two tagged Calendar candidates are fetched from the controlled calendar.
@@ -48,7 +48,7 @@ Do not infer implementation progress from completed documentation.
 - [x] Fixture World PR previews exact controlled Gmail recipients, subject, and body.
 - [x] Fixture World PR previews exact account-brief content/hash/source provenance and the semantic validator version.
 - [x] Fixture dependency edges and external-effect labels are visible.
-- [ ] Cancel/back controls work.
+- [x] Cancel/back controls work for unexecuted preview and clarification states; execution cancellation remains deferred with approval/execution work.
 
 ### Approval and initial execution
 
@@ -122,7 +122,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 | Gate | Sequential scope | Status | Evidence |
 |---|---|---|---|
 | G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | Complete | [S018 G0 report](../artifacts/test-runs/2026-07-15-s018-g0.md); hosted Node 24 CI and ephemeral migration replay passed |
-| G1 | `S019`–`S030`: non-effecting MCP → API → PostgreSQL → dashboard | In progress | S019–S027 remain partial; deployed proof starts at S028 |
+| G1 | `S019`–`S030`: non-effecting MCP → API → PostgreSQL → dashboard | In progress | S019–S027 complete with [sanitized G1 evidence](../artifacts/test-runs/2026-07-15-s019-s027-g1.md); deployed proof starts at S028 |
 | G2 | `S031`–`S045`: OAuth, Calendar/Gmail/artifact/model primitives and live spikes | Not started | TBD |
 | G3 | `S046`–`S059`: initial World PR, approval, execution, receipts | Not started | TBD |
 | G4 | `S060`–`S074`: late context, Causal Revert, recovery execution/evals | Not started | TBD |
@@ -145,15 +145,17 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 - [x] `S016`: `golden-contracts.v1` freezes lifecycle-aware task states, initial/recovery/clarification envelopes, canonical digests, and fixture-only rule/reset shapes. Evidence: [sanitized S016 evidence](../artifacts/test-runs/2026-07-15-s016-golden-contracts.md) and [independent correction pass](../artifacts/test-runs/2026-07-15-s013-s017-correction-pass.md).
 - [x] `S017`: accessibility/testability selectors and executable keyboard, contrast-verified focus, reduced-motion, responsive, hermetic-fixture, and honest-label checks added. Evidence: [sanitized S017 evidence](../artifacts/test-runs/2026-07-15-s017-accessibility.md) and [independent correction pass](../artifacts/test-runs/2026-07-15-s013-s017-correction-pass.md).
 - [x] `S018`: clean-checkout G0 evidence. Evidence: [sanitized S018 G0 report](../artifacts/test-runs/2026-07-15-s018-g0.md).
+- [x] `S019`–`S027`: completed the strict G1 contracts, transactional PostgreSQL repository path, intake serialization and leases, auth/CSRF/resource boundaries, fixture isolation, thin create/read/status/cancel routes, scoped MCP create/status tools, non-effecting review UI, and automated regression/E2E coverage. Evidence: [sanitized S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md). Schema/fixture versions: `v1`, `initial-plan.v1`, `golden-contracts.v1`, `traceability.v1`, `fixture-initial.v1`, `prevention-rule.v1`, `reset-plan.v1`.
 
 ## Current blockers
 
 | Blocker | Impact | Next action | Status |
 |---|---|---|---|
+| Deployed G1 proof still requires the configured Vercel/Supabase environment and an operator session | Local fixture evidence cannot prove deployed MCP → API → PostgreSQL → dashboard behavior | Run the human-only S028 guide without enabling providers or external effects | Open |
 | OAuth token and live provider ownership are not configured | Calendar/Gmail risk cannot be retired | Complete S031–S043 in G2 | Open |
 | Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Direct smoke runner tears down cleanly; retain conventional spec for CI migration | Resolved |
 
-Supabase is provisioned, the frozen schema is applied, and S009 Vercel health/readiness and cookie checks pass. Google Cloud and OpenAI access prerequisites are configured without live product effects. S012 private environment validation and S013–S018 local and hosted verification passed, including the disposable PostgreSQL migration replay. Next: begin S019; provider work remains gated behind G1 and G2.
+Supabase is provisioned, the frozen schema is applied, and S009 Vercel health/readiness and cookie checks pass. Google Cloud and OpenAI access prerequisites are configured without live product effects. S012 private environment validation and S013–S018 local and hosted verification passed, including the disposable PostgreSQL migration replay. S019–S027 pass locally in deterministic fixture mode; next is S028 deployed proof. Provider work remains gated behind G1 and G2.
 
 ## Verification evidence log
 
@@ -184,6 +186,7 @@ Add entries only after work is actually complete:
 | 2026-07-15 | S017 accessibility and testability validation | [Sanitized S017 evidence](../artifacts/test-runs/2026-07-15-s017-accessibility.md): stable selectors, semantic labels, keyboard focus, reduced-motion emulation, responsive viewport, and honest fixture notice | Passed; S018 is next | Codex |
 | 2026-07-15 | S018 clean-checkout G0 gate | [Sanitized S018 evidence](../artifacts/test-runs/2026-07-15-s018-g0.md): Node 24 local suite, private migration/readiness verification, hosted Rewind CI run #15, disposable PostgreSQL apply/replay, secret scan, and fixture browser smoke | Passed; S019 is next | Codex + GitHub Actions |
 | 2026-07-15 | Full codebase cleanup and regression audit | [Sanitized audit evidence](../artifacts/test-runs/2026-07-15-codebase-cleanup-audit.md): complete file-purpose inventory, clean install, lint, strict/unused type checks, 28 tests, production build, browser and actual MCP smokes, dependency/secret/link/client-bundle checks, and read-only S007 regression | Passed at the time; no redundant tracked file found and S008 was next then | Codex |
+| 2026-07-15 | S019–S027 G1 implementation packet | [Sanitized S019–S027 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md): strict contracts, repository/intake/auth/route/MCP/UI implementation, 27 test files/142 tests, production build, browser flow, audit, security scan, fake-production guard, and traceability validation | Passed locally in fixture mode; S028 deployed proof is next | Codex |
 
 ## MVP definition of done
 

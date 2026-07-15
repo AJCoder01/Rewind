@@ -219,3 +219,53 @@ export function buildFixtureWorldPrRecord(request: string, now = new Date()): Fi
 export function buildFixtureWorldPr(request: string, now = new Date()): WorldPrView {
   return buildFixtureWorldPrRecord(request, now).view;
 }
+
+export function buildFixtureAnalyzingView(base: WorldPrView, now = new Date()): WorldPrView {
+  const occurredAt = now.toISOString();
+  const view = structuredClone(base) as Record<string, unknown>;
+  delete view.runId;
+  delete view.activePlan;
+  delete view.clarification;
+  delete view.attention;
+  delete view.ruleProposal;
+  view.status = "analyzing";
+  view.timeline = [
+    {
+      eventId: createOpaqueId("evt_"),
+      type: "task.analyzing",
+      occurredAt,
+      label: "Review request is being analyzed",
+      status: "analyzing",
+    },
+  ];
+  view.updatedAt = occurredAt;
+  return WorldPrViewSchema.parse(view);
+}
+
+export function buildFixtureClarificationView(base: WorldPrView, now = new Date()): WorldPrView {
+  const occurredAt = now.toISOString();
+  const view = structuredClone(base) as Record<string, unknown>;
+  delete view.runId;
+  delete view.activePlan;
+  delete view.attention;
+  delete view.ruleProposal;
+  view.status = "clarification_required";
+  view.clarification = {
+    question: "I found Acme UK and Acme US. Which one did you mean?",
+    candidates: [
+      { candidateId: "cal_event_acme_uk", label: "Acme UK renewal" },
+      { candidateId: "cal_event_acme_us", label: "Acme US renewal" },
+    ],
+  };
+  view.timeline = [
+    {
+      eventId: createOpaqueId("evt_"),
+      type: "task.clarification_required",
+      occurredAt,
+      label: "Clarification is required before planning",
+      status: "clarification_required",
+    },
+  ];
+  view.updatedAt = occurredAt;
+  return WorldPrViewSchema.parse(view);
+}

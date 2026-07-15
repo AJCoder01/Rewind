@@ -4,7 +4,7 @@
 |---|---|
 | Status | Active |
 | Format | Lightweight ADRs |
-| Last updated | 2026-07-14 |
+| Last updated | 2026-07-15 |
 
 This file records why a decision was made and which choices remain open. Accepted behavior must also appear in the canonical PRD, Safety, Architecture, or Contracts document; this log alone does not define runtime behavior.
 
@@ -41,6 +41,7 @@ This file records why a decision was made and which choices remain open. Accepte
 | ADR-020 | Keep deterministic fallback off during recorded proof | Accepted |
 | ADR-021 | Make Playwright/live/eval gates mandatory | Accepted |
 | ADR-022 | Use npm scripts in the single root package | Accepted |
+| ADR-023 | Use same-origin plus double-submit CSRF for dashboard mutations | Accepted |
 
 ## Accepted decisions
 
@@ -219,6 +220,14 @@ This file records why a decision was made and which choices remain open. Accepte
 **Why:** npm is universally available with Node and avoids adding package-manager/workspace decisions to a one-package hackathon build.
 
 **Consequence:** README/AGENTS commands remain planned until the package is scaffolded and each script has been run successfully.
+
+### ADR-023 — Use same-origin plus double-submit CSRF for dashboard mutations
+
+**Decision:** Cookie-authenticated dashboard mutations require an allowed same-origin `Origin`/`Referer` and a matching non-HttpOnly CSRF cookie/header pair. Scoped MCP bearer requests are authorized separately and do not use the browser CSRF channel.
+
+**Why:** The single-tenant dashboard needs a browser mutation boundary without adding a server-side session store. Origin validation and a double-submit token prevent cross-site cookie-authenticated POSTs while keeping MCP authorization explicit.
+
+**Consequence:** The session route sets a readable CSRF cookie, browser clients send `x-rewind-csrf`, and production still fails closed when the signed-session/auth configuration is missing. The token is never accepted as an authorization credential by itself.
 
 ## Rejected alternatives
 

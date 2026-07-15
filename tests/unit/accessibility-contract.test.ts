@@ -24,7 +24,7 @@ describe("S017 accessibility and testability contract", () => {
     const review = read("app/pr/[worldPrId]/page.tsx");
     for (const selector of ["composer-screen", "composer-request", "create-world-pr", "fixture-status"]) expect(composer).toContain(`data-testid=\"${selector}\"`);
     for (const selector of ["login-screen", "dashboard-passcode", "login-submit"]) expect(login).toContain(`data-testid=\"${selector}\"`);
-    for (const selector of ["review-screen", "assumption-panel", "planned-actions", "review-timeline", "fixture-mode-notice"]) expect(review).toContain(`data-testid=\"${selector}\"`);
+    for (const selector of ["review-screen", "assumption-panel", "planned-actions", "review-timeline", "fixture-mode-notice", "clarification-panel"]) expect(review).toContain(`data-testid=\"${selector}\"`);
   });
 
   it("keeps semantic status/error labels, visible focus, and reduced-motion rules", () => {
@@ -36,6 +36,7 @@ describe("S017 accessibility and testability contract", () => {
     expect(login).toContain('role="alert"');
     expect(review).toContain('aria-live="polite"');
     expect(review).toContain('role="status"');
+    expect(review).toContain('aria-live="polite"');
     expect(styles).toContain("textarea:focus-visible, input:focus-visible");
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(styles).toContain("animation-duration: .01ms");
