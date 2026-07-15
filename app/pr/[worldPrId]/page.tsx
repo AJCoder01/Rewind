@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { WorldPrViewSchema, type InitialPlanView, type WorldPrView } from "@/lib/contracts/v1";
+import { isInitialPlanView, WorldPrViewSchema, type InitialPlanView, type WorldPrView } from "@/lib/contracts/v1";
 
 type PlannedAction = InitialPlanView["actions"][number];
 
@@ -106,13 +106,17 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
     return () => controller.abort();
   }, [worldPrId]);
 
-  if (message) return <main className="shell"><div className="content"><div className="notice" role="alert">{message}{loginRequired ? <> <Link href={`/login?next=${encodeURIComponent(`/pr/${worldPrId}`)}`}>Sign in</Link></> : null}</div></div></main>;
-  if (!view || !view.activePlan) return <main className="shell"><div className="content"><p className="muted" aria-live="polite">Loading the immutable review record…</p></div></main>;
-  const plan = view.activePlan;
+  if (message) return <main className="shell" data-testid="review-screen"><div className="content"><div className="notice" role="alert">{message}{loginRequired ? <> <Link href={`/login?next=${encodeURIComponent(`/pr/${worldPrId}`)}`}>Sign in</Link></> : null}</div></div></main>;
+  if (!view || !view.activePlan) return <main className="shell" data-testid="review-screen"><div className="content"><p className="muted" aria-live="polite">Loading the immutable review record…</p></div></main>;
+  const activePlan = view.activePlan;
+  if (!isInitialPlanView(activePlan)) {
+    return <main className="shell" data-testid="review-screen"><div className="content"><div className="notice" role="status">This non-initial review state is not available in the current fixture UI. No external action was attempted.</div></div></main>;
+  }
+  const plan = activePlan;
   const assumption = plan.assumptions[0];
 
   return (
-    <main className="shell">
+    <main className="shell" data-testid="review-screen">
       <header className="topbar">
         <Link href="/" className="wordmark">rewind</Link>
         <div className="topbar-note">World PR · {view.status}</div>
@@ -128,21 +132,21 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
         </div>
         <div className="review-grid">
           <section className="panel panel-wide"><div className="panel-inner"><h2>Request</h2><p>{view.request}</p></div></section>
-          <section className="panel">
+          <section className="panel" data-testid="candidate-panel">
             <div className="panel-inner">
               <h2>Candidate resolution</h2>
               <div className="candidate-row"><div><div className="candidate-label">{plan.selectedCandidate.label}</div><div className="candidate-meta">Nearest upcoming tagged candidate on the configured demo date.</div></div><span className="tag">Selected</span></div>
               <div className="candidate-row"><div><div className="candidate-label">{plan.alternatives[0].label}</div><div className="candidate-meta">Visible later alternative; not selected by the fixture rank.</div></div><span className="tag alt">Alternative</span></div>
             </div>
           </section>
-          <section className="panel">
+          <section className="panel" data-testid="assumption-panel">
             <div className="panel-inner">
               <h2>Recorded assumption</h2>
               <div className="assumption"><strong>{assumption.statement}</strong><p>This is the decision the later recovery flow will be able to revisit. Recorded confidence: {Math.round(assumption.confidence * 100)}%.</p></div>
               <ul className="evidence">{assumption.evidence.map((item) => <li key={item}>{item}</li>)}</ul>
             </div>
           </section>
-          <section className="panel panel-wide">
+          <section className="panel panel-wide" data-testid="planned-actions">
             <div className="panel-inner">
               <h2>Planned actions</h2>
               <div className="action-list">
@@ -156,9 +160,9 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
             </div>
           </section>
           <section className="panel"><div className="panel-inner"><h2>Plan identity</h2><p className="muted">Immutable version {plan.pointer.version}</p><p className="digest">{plan.pointer.digest}</p></div></section>
-          <section className="panel"><div className="panel-inner"><h2>Timeline</h2><div className="timeline">{view.timeline.map((item) => <div className="timeline-item" key={item.eventId}><span className="timeline-dot" aria-hidden="true" /><div><div className="timeline-label">{item.label}</div><div className="timeline-time">{formatTime(item.occurredAt)}</div></div></div>)}</div></div></section>
+          <section className="panel"><div className="panel-inner"><h2>Timeline</h2><ol className="timeline" data-testid="review-timeline">{view.timeline.map((item) => <li className="timeline-item" key={item.eventId}><span className="timeline-dot" aria-hidden="true" /><div><div className="timeline-label">{item.label}</div><div className="timeline-time">{formatTime(item.occurredAt)}</div></div></li>)}</ol></div></section>
         </div>
-        <div className="notice">This first slice is fixture-backed and does not approve or execute Calendar, Gmail, or artifact effects. External integrations remain disabled until their safety gates pass.</div>
+        <div className="notice" data-testid="fixture-mode-notice" role="status">This first slice is fixture-backed and does not approve or execute Calendar, Gmail, or artifact effects. External integrations remain disabled until their safety gates pass.</div>
       </div>
     </main>
   );

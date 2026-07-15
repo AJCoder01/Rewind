@@ -33,17 +33,17 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="shell">
+    <main className="shell" data-testid="login-screen">
       <div className="login-card">
         <p className="eyebrow">Authenticated operator</p>
         <h1>Sign in to review.</h1>
         <p className="muted">The review URL is not a capability. A session is required before the plan can be read.</p>
-        <form onSubmit={submit}>
+        <form onSubmit={submit} data-testid="login-form">
           <div className="field">
             <label htmlFor="passcode">Demo passcode</label>
-            <input id="passcode" type="password" value={passcode} onChange={(event) => setPasscode(event.target.value)} autoComplete="current-password" disabled={submitting} required />
+            <input data-testid="dashboard-passcode" id="passcode" type="password" value={passcode} onChange={(event) => setPasscode(event.target.value)} autoComplete="current-password" disabled={submitting} required />
           </div>
-          <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Signing in…" : "Continue"}</button>
+          <button className="primary-button" data-testid="login-submit" type="submit" disabled={submitting}>{submitting ? "Signing in…" : "Continue"}</button>
         </form>
         {message ? <div className="notice" role="alert">{message}</div> : null}
       </div>

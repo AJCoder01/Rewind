@@ -30,6 +30,10 @@ npm run lint
 npm run typecheck
 npm test
 npm run test:e2e
+npm run security:scan
+npm run verify:fake-production
+npm run db:verify:ephemeral
+npm audit --audit-level=moderate
 npm run db:migrate
 npm run db:verify
 npm run test:integration:live

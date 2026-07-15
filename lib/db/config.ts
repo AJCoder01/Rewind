@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { loadEnvFile } from "node:process";
 
 export type DatabaseUrlVariable = "DATABASE_URL" | "DATABASE_MIGRATION_URL";
-type StringEnvironment = Readonly<Record<string, string | undefined>>;
+export type StringEnvironment = Readonly<Record<string, string | undefined>>;
 
 const localHostnames = new Set(["localhost", "127.0.0.1", "::1"]);
 const acceptedTlsModes = new Set(["require", "verify-ca", "verify-full"]);

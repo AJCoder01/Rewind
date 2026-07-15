@@ -4,8 +4,8 @@ import { databaseCatalogMatches, type DatabaseQuery } from "@/lib/db/catalog";
 import { requireDatabaseUrl } from "@/lib/db/config";
 import { runtimePrivilegesMatch } from "@/lib/db/privileges";
 import {
-  FOUNDATION_MIGRATION_CHECKSUM,
   FOUNDATION_MIGRATION_ID,
+  isKnownFoundationMigrationChecksum,
   FOUNDATION_TABLES,
 } from "@/lib/db/schema";
 
@@ -84,7 +84,8 @@ export async function evaluateDatabaseReadiness(query: DatabaseQuery): Promise<D
         !row.rolreplication &&
         !row.rolbypassrls &&
         row.rolconnlimit === 10 &&
-        row.checksum === FOUNDATION_MIGRATION_CHECKSUM &&
+        typeof row.checksum === "string" &&
+        isKnownFoundationMigrationChecksum(row.checksum) &&
         JSON.stringify(actualTables) === JSON.stringify(expectedTables),
   );
   const catalogReady = identityReady ? await databaseCatalogMatches(query) : false;

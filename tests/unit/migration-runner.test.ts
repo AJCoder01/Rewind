@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { applyFoundationMigration } from "@/lib/db/migrate";
 import {
   FOUNDATION_MIGRATION_CHECKSUM,
+  FOUNDATION_MIGRATION_LEGACY_CRLF_CHECKSUM,
   REWIND_COLUMN_SIGNATURES,
   REWIND_CONSTRAINTS,
   REWIND_DATABASE_TABLES,
@@ -93,6 +94,14 @@ describe("foundation migration runner", () => {
     expect(fake.calls.filter((text) => text === sql)).toHaveLength(0);
     expect(fake.calls.some((text) => text.includes("FROM pg_constraint con"))).toBe(true);
     expect(fake.calls.at(-1)).toBe("COMMIT");
+  });
+
+  it("accepts only the known legacy CRLF checksum for an existing foundation ledger row", async () => {
+    const sql = await migrationSql();
+    const fake = fakePool(sql, { storedChecksum: FOUNDATION_MIGRATION_LEGACY_CRLF_CHECKSUM });
+
+    await expect(applyFoundationMigration(fake.pool, sql)).resolves.toBe("already_applied");
+    expect(fake.calls.filter((text) => text === sql)).toHaveLength(0);
   });
 
   it("refuses modified migration bytes before acquiring a database client", async () => {

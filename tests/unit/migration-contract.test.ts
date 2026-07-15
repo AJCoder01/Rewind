@@ -16,6 +16,15 @@ describe("foundation migration contract", () => {
     expect(migrationChecksum(await migrationSql())).toBe(FOUNDATION_MIGRATION_CHECKSUM);
   });
 
+  it("canonicalizes source line endings without accepting modified migration content", async () => {
+    const sql = await migrationSql();
+    const lf = sql.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+    const crlf = lf.replaceAll("\n", "\r\n");
+    expect(migrationChecksum(lf)).toBe(FOUNDATION_MIGRATION_CHECKSUM);
+    expect(migrationChecksum(crlf)).toBe(FOUNDATION_MIGRATION_CHECKSUM);
+    expect(migrationChecksum(`${lf}\n-- modified`)).not.toBe(FOUNDATION_MIGRATION_CHECKSUM);
+  });
+
   it("creates every canonical application table strictly instead of masking partial schemas", async () => {
     const sql = await migrationSql();
     for (const table of FOUNDATION_TABLES) {
