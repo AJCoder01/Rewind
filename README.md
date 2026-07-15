@@ -18,7 +18,7 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-15 |
 
-The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. No Calendar, Gmail, OpenAI, or external-effect path is enabled yet. Verified with Node 24: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm run db:migrate`, and `npm run db:verify`.
+The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. No Calendar, Gmail, OpenAI, or external-effect path is enabled yet. S013 adds locked CI coverage, tracked-file secret scanning, dependency auditing, production fake-mode rejection, and an isolated ephemeral-migration replay job. Verified locally with Node 24: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm audit --audit-level=moderate`, `npm run security:scan`, and `npm run verify:fake-production`.
 
 The implemented first slice is:
 
