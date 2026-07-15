@@ -73,4 +73,4 @@ S028 deployed G1 proof — YYYY-MM-DD
 - Remaining risk: S029/S030 freeze and G1 closure remain pending
 ```
 
-This checkpoint does not close S029 or S030 and does not advance G2. Only the human operator may fill the evidence fields that require the deployed environment/session.
+This checkpoint does not close S030 or advance G2. After the operator proof passes, run the machine-checked [G1 interface packet](G1_INTERFACE_PACKET.md) for S029, then record the complete G1 closure in S030. Only the human operator may fill the evidence fields that require the deployed environment/session.

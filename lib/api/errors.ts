@@ -18,7 +18,7 @@ export function statusForCode(code: ErrorCode): number {
   if (code === "forbidden") return 403;
   if (code === "invalid_request" || code === "unsupported_request") return 422;
   if (code === "idempotency_conflict" || code === "scenario_busy") return 409;
-  if (code === "task_not_found") return 404;
+  if (code === "task_not_found" || code === "plan_not_found") return 404;
   if (code === "invalid_task_state" || code === "plan_digest_mismatch" || code === "plan_stale" || code === "provider_conflict" || code === "reset_conflict") return 409;
   if (code === "clarification_required" || code === "candidate_set_invalid" || code === "model_output_invalid" || code === "unknown_entity" || code === "unknown_action" || code === "unknown_template" || code === "recipient_not_allowed") return 422;
   if (code === "approval_required" || code === "action_not_retryable") return 409;

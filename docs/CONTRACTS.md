@@ -473,6 +473,8 @@ There is no proof-only rule endpoint. The dashboard panel and MCP both use norma
 
 Every success/attention response includes `requestId`; task mutations use `TaskMutationResponse` unless a richer shape is shown above. A durable attention outcome is HTTP `200` because the request was recorded and needs operator action; request/precondition conflicts use `409`; validation/clarification uses `422`; auth uses `401/403`.
 
+The complete G1 v1 error-code-to-HTTP mapping, implemented route inventory, frozen fixture versions, migration/catalog identity, and create/read evidence are recorded in the [G1 interface packet](G1_INTERFACE_PACKET.md). Its executable manifest is authoritative for this pre-provider freeze.
+
 | Endpoint | Success state | Principal typed errors |
 |---|---|---|
 | Create | `201 preview_ready` or `clarification_required`; replay `200` | `unsupported_request`, `idempotency_conflict`, `scenario_busy`, `candidate_set_invalid` |
