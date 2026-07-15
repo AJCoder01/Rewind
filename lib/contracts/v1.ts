@@ -608,8 +608,8 @@ export const WorldPrViewSchema = z
     if (value.status === "clarification_required" && (!value.clarification || value.activePlan || value.runId)) {
       context.addIssue({ code: z.ZodIssueCode.custom, message: "clarification_required requires clarification-only intake with no run or plan" });
     }
-    if (noPlanStatuses.has(value.status) && (value.activePlan || value.clarification)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, message: "This lifecycle state must not expose an active plan or clarification" });
+    if (noPlanStatuses.has(value.status) && (value.runId || value.activePlan || value.clarification)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "This lifecycle state must not expose a run, active plan, or clarification" });
     }
     if (value.status === "attention_required" && !value.attention) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["attention"], message: "attention_required requires an attention reason" });
@@ -696,7 +696,21 @@ export const McpWorldPrStatusSchema = z
     attention: AttentionReasonSchema.optional(),
     replayPending: z.literal(true).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.status === "clarification_required" && !value.clarification) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["clarification"], message: "Clarification status must include the safe candidate prompt" });
+    }
+    if (value.status !== "clarification_required" && value.clarification) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["clarification"], message: "Only clarification status may expose candidate choices" });
+    }
+    if (value.status === "attention_required" && !value.attention) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["attention"], message: "Attention status must include a safe attention reason" });
+    }
+    if (value.status !== "attention_required" && value.attention) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["attention"], message: "Only attention status may expose an attention reason" });
+    }
+  });
 
 export const IdempotencyFailureSchema = z
   .object({

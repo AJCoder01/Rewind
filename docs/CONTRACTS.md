@@ -18,7 +18,7 @@ This document owns boundary intent. Once implemented, versioned Zod schemas, mig
 - Event-local times also include an IANA time-zone identifier.
 - All mutating HTTP requests require `Idempotency-Key`.
 - MCP authentication uses a server-side bearer secret. Dashboard mutations use an authenticated session plus CSRF protection.
-- Dashboard mutation requests must carry the `rewind_session` cookie, matching `rewind_csrf` cookie and `x-rewind-csrf` header, and an allowed same-origin `Origin`; the CSRF token is not an authorization credential.
+- Dashboard mutation requests must carry the `rewind_session` cookie, matching `rewind_csrf` cookie and `x-rewind-csrf` header, and an allowed same-origin `Origin` (or `Referer` only when `Origin` is absent); the CSRF token is not an authorization credential. A supplied `Origin` always takes precedence over `Referer`.
 - Unknown object properties are rejected at security-sensitive boundaries.
 - Every response includes or is associated with a `requestId` for support logs.
 
@@ -276,6 +276,8 @@ type PreventionRuleView = Omit<PreventionRuleV1, "rationale"> & {
 ```
 
 This read model redacts raw OAuth/provider/model payloads and displays recipient aliases or controlled addresses only to the authenticated operator.
+
+The scoped MCP token and the single authenticated demo operator belong to the same controlled workspace for this MVP. Therefore a World PR created through `create_world_pr` is readable by the authenticated dashboard operator at its review URL. Any other actor scope is rejected; the review URL remains non-authorizing.
 
 ### 3.4 Safe World PR status
 

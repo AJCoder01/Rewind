@@ -45,7 +45,7 @@ The source and output contain no region, event, attendee, or meeting-time facts.
 | Assumption | “Acme refers to Acme UK.” with evidence and recorded confidence |
 | Candidate selection | UK is “Selected”; US is “Alternative” |
 | External-effect labels | Calendar/mail actions say “External effect”; brief says “Recorded artifact” |
-| Fixture honesty | “This first slice is fixture-backed and does not approve or execute Calendar, Gmail, or artifact effects.” |
+| Fixture honesty | “Fixture mode: this G1 slice does not approve or execute Calendar, Gmail, or artifact effects. External integrations remain disabled until their safety gates pass.” |
 | Safe errors | Explain that no external action was attempted when the request cannot be safely recorded or loaded |
 | Session expiry | Explain that the review session expired and offer “Sign in” |
 | Status | Every status has text; color and decorative dots are supplementary only |
@@ -59,8 +59,10 @@ The source and output contain no region, event, attendee, or meeting-time facts.
 | Loading review | `/pr/:worldPrId`, `app/pr/[worldPrId]/page.tsx` | `main`, polite live loading message | None |
 | Expired/failed review | `/pr/:worldPrId` | alert message and sign-in link when appropriate | None |
 | Preview-ready review | `/pr/:worldPrId` | request, candidate pair, assumption/evidence, exact action cards, plan digest, timeline, fixture notice | None; fixture only |
+| Clarification review | `/pr/:worldPrId` | clarification question, two candidate choices, timeline, cancel/back controls, fixture notice | None; no plan/action/lock |
+| Cancelled/attention review | `/pr/:worldPrId` | clear terminal/attention heading, text status, safe return path, fixture notice where applicable | None |
 
-The future execution, recovery, rule, clarification, and reset states are reserved in the product contract but are not represented by this S014 UI slice.
+The future execution, recovery, rule-activation, and reset states are reserved in the product contract but are not represented by this S014 UI slice.
 
 ## Component boundaries and selectors
 
@@ -84,7 +86,7 @@ Future recovery/rule/reset components remain scenario-specific under `components
 
 ## S017 validation
 
-The selectors above are implemented in the current composer, login, and preview-ready review screens. The executable unit contract checks their presence, semantic status/error labels, focus outline, and reduced-motion CSS. The fixture E2E smoke additionally exercises keyboard focus, reduced-motion emulation, selector reachability, and horizontal-overflow-free 390×844 rendering. No future execution, recovery, rule, or reset surface is implied.
+The selectors above are implemented in the current composer, login, and review screens. The executable unit contract checks their presence, semantic status/error labels, focus outline, and reduced-motion CSS. The fixture E2E smoke additionally exercises keyboard focus, reduced-motion emulation, selector reachability, safe cancellation, and horizontal-overflow-free 390×844 rendering. No future execution, recovery, rule, or reset surface is implied.
 
 ## Sanitized evidence format
 

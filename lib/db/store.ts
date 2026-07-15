@@ -83,3 +83,16 @@ export function requestBodyHash(request: string): string {
 export function cancelBodyHash(worldPrId: string): string {
   return sha256Digest({ worldPrId });
 }
+
+/**
+ * The controlled MVP has one workspace, reached through two distinct
+ * principals: the authenticated dashboard operator and the scoped MCP
+ * backend token. A World PR created through MCP must be reviewable by that
+ * operator, while arbitrary actor identifiers remain isolated in tests and
+ * future multi-workspace work.
+ */
+export function sharesWorldPrScope(ownerActorId: string, requestingActorId: string): boolean {
+  if (ownerActorId === requestingActorId) return true;
+  const controlledWorkspaceActors = new Set(["demo-operator", "mcp:scoped-token"]);
+  return controlledWorkspaceActors.has(ownerActorId) && controlledWorkspaceActors.has(requestingActorId);
+}

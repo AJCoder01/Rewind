@@ -5,8 +5,7 @@ import {
   WorldPrViewSchema,
   type WorldPrView,
 } from "@/lib/contracts/v1";
-import { buildFixtureAnalyzingView, buildFixtureClarificationView, buildFixtureWorldPrRecord } from "@/lib/domain/fixture-world-pr";
-import { createOpaqueId } from "@/lib/domain/ids";
+import { buildFixtureAnalyzingView, buildFixtureClarificationView, buildFixtureWorldPrRecord, buildPlanningLeaseExpiredView } from "@/lib/domain/fixture-world-pr";
 import {
   FakeProviderConfigurationError,
   StoreError,
@@ -15,6 +14,7 @@ import {
   type CreateWorldPrStoreInput,
   type CreateWorldPrStoreResult,
   type WorldPrStore,
+  sharesWorldPrScope,
 } from "@/lib/db/store";
 
 type IdempotencyRecord =
@@ -202,30 +202,14 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
     this.scenarioLock = undefined;
     const expired = this.byWorldPrId.get(lock.worldPrId);
     if (expired && (expired.status === "analyzing" || expired.status === "preview_ready")) {
-      const failed = structuredClone(expired) as Record<string, unknown>;
-      delete failed.runId;
-      delete failed.activePlan;
-      delete failed.clarification;
-      failed.status = "failed";
-      failed.timeline = [
-        ...expired.timeline,
-        {
-          eventId: createOpaqueId("evt_"),
-          type: "planning.lease_expired",
-          occurredAt: new Date().toISOString(),
-          label: "Planning lease expired before approval; no external action was attempted",
-          status: "failed",
-        },
-      ];
-      failed.updatedAt = new Date().toISOString();
-      this.byWorldPrId.set(lock.worldPrId, WorldPrViewSchema.parse(failed));
+      this.byWorldPrId.set(lock.worldPrId, buildPlanningLeaseExpiredView(expired));
     }
   }
 
   private assertScope(worldPrId: string, actorId?: string): void {
     if (!actorId) return;
     const owner = this.byOwner.get(worldPrId);
-    if (owner && owner !== actorId) throw new StoreError("forbidden", "This World PR is outside the authenticated workspace scope.");
+    if (owner && !sharesWorldPrScope(owner, actorId)) throw new StoreError("forbidden", "This World PR is outside the authenticated workspace scope.");
   }
 }
 

@@ -11,7 +11,12 @@ import {
   type WorldPrView,
 } from "@/lib/contracts/v1";
 import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
-import { buildFixtureAnalyzingView, buildFixtureClarificationView, buildFixtureWorldPrRecord } from "@/lib/domain/fixture-world-pr";
+import {
+  buildFixtureAnalyzingView,
+  buildFixtureClarificationView,
+  buildFixtureWorldPrRecord,
+  buildPlanningLeaseExpiredView,
+} from "@/lib/domain/fixture-world-pr";
 import { canonicalJson } from "@/lib/domain/digest";
 import {
   FakeProviderConfigurationError,
@@ -21,6 +26,7 @@ import {
   type CreateWorldPrStoreInput,
   type CreateWorldPrStoreResult,
   type WorldPrStore,
+  sharesWorldPrScope,
 } from "@/lib/db/store";
 
 interface StoredWorldPrRecord {
@@ -95,23 +101,7 @@ export class PostgresWorldPrStore implements WorldPrStore {
         return { kind: "create", view: clarificationView, response: clarificationResponse, replay: false };
       }
 
-      await client.query(
-        `DELETE FROM scenario_locks AS locks
-         WHERE locks.scenario_key = 'acme-demo'
-           AND locks.lease_until IS NOT NULL
-           AND locks.lease_until <= now()
-           AND locks.execution_started_at IS NULL
-           AND NOT EXISTS (
-             SELECT 1 FROM approvals
-             JOIN plans ON plans.id = approvals.plan_id
-             WHERE plans.task_id = locks.task_id
-           )
-           AND NOT EXISTS (
-             SELECT 1 FROM action_executions
-             JOIN plans ON plans.id = action_executions.plan_id
-             WHERE plans.task_id = locks.task_id
-           )`,
-      );
+      await this.expireReclaimablePlanningLeases(client, input.actorId);
       const scenarioLock = await client.query(
         `INSERT INTO scenario_locks (scenario_key, task_id, acquired_at, lease_until)
          VALUES ('acme-demo', $1, now(), now() + interval '10 minutes')
@@ -246,11 +236,14 @@ export class PostgresWorldPrStore implements WorldPrStore {
       return { kind: "create", view, response, replay: true };
     }
     if (!existing.resource_id || !existing.response) throw new StoreError("internal_error", "The idempotency record has no durable resource response.");
-    const storedResponse = CreateWorldPrResponseSchema.parse(existing.response);
-    const record = await this.readRecord(existing.resource_id, 1);
-    if (record) return { kind: "create", ...record, response: storedResponse, replay: true };
     const view = await this.readTaskView(existing.resource_id);
     if (!view) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+    const storedResponse = CreateWorldPrResponseSchema.parse(existing.response);
+    if (!view.activePlan || !isInitialPlanView(view.activePlan)) {
+      return { kind: "create", view, response: storedResponse, replay: true };
+    }
+    const record = await this.readRecord(existing.resource_id, view.activePlan.pointer.version);
+    if (record) return { kind: "create", ...record, response: storedResponse, replay: true };
     return { kind: "create", view, response: storedResponse, replay: true };
   }
 
@@ -258,9 +251,18 @@ export class PostgresWorldPrStore implements WorldPrStore {
     const existing = await this.readIdempotency(input.actorId, input.endpoint, input.idempotencyKey);
     if (!existing || existing.body_hash !== input.bodyHash) throw new StoreError("idempotency_conflict", "This idempotency key was already used for a different request.");
     if (existing.status === "failed") throw readFailedError(existing.response);
-    const response = existing.response ? TaskMutationResponseSchema.parse(existing.response) : TaskMutationResponseSchema.parse({ worldPrId: input.worldPrId, status: "cancelled", requestId: input.requestId });
     const view = await this.get(input.worldPrId, input.actorId);
     if (!view) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+    if (existing.status === "in_progress") {
+      return {
+        kind: "cancel",
+        view,
+        response: mutationResponseForView(view, input.requestId, true),
+        replay: true,
+      };
+    }
+    if (!existing.response) throw new StoreError("internal_error", "The cancellation idempotency record has no durable response.");
+    const response = TaskMutationResponseSchema.parse(existing.response);
     return { kind: "cancel", view, response, replay: true };
   }
 
@@ -298,25 +300,66 @@ export class PostgresWorldPrStore implements WorldPrStore {
   }
 
   private async assertOwner(worldPrId: string, actorId: string): Promise<void> {
-    const result = await this.pool.query<{ owns: boolean }>(
-      `SELECT EXISTS(
-         SELECT 1 FROM idempotency_records
-         WHERE resource_id = $1 AND actor_id = $2 AND endpoint = 'POST /api/v1/world-prs'
-       ) AS owns`,
-      [worldPrId, actorId],
+    const result = await this.pool.query<{ actor_id: string }>(
+      `SELECT actor_id
+       FROM idempotency_records
+       WHERE resource_id = $1 AND endpoint = 'POST /api/v1/world-prs'
+       LIMIT 1`,
+      [worldPrId],
     );
-    if (result.rows[0] && result.rows[0].owns === false) throw new StoreError("forbidden", "This World PR is outside the authenticated workspace scope.");
+    if (!result.rows[0] || !sharesWorldPrScope(result.rows[0].actor_id, actorId)) {
+      throw new StoreError("forbidden", "This World PR is outside the authenticated workspace scope.");
+    }
   }
 
   private async assertOwnerWithClient(client: PoolClient, worldPrId: string, actorId: string): Promise<void> {
-    const result = await client.query<{ owns: boolean }>(
-      `SELECT EXISTS(
-         SELECT 1 FROM idempotency_records
-         WHERE resource_id = $1 AND actor_id = $2 AND endpoint = 'POST /api/v1/world-prs'
-       ) AS owns`,
-      [worldPrId, actorId],
+    const result = await client.query<{ actor_id: string }>(
+      `SELECT actor_id
+       FROM idempotency_records
+       WHERE resource_id = $1 AND endpoint = 'POST /api/v1/world-prs'
+       LIMIT 1`,
+      [worldPrId],
     );
-    if (result.rows[0] && result.rows[0].owns === false) throw new StoreError("forbidden", "This World PR is outside the authenticated workspace scope.");
+    if (!result.rows[0] || !sharesWorldPrScope(result.rows[0].actor_id, actorId)) {
+      throw new StoreError("forbidden", "This World PR is outside the authenticated workspace scope.");
+    }
+  }
+
+  private async expireReclaimablePlanningLeases(client: PoolClient, actorId: string): Promise<void> {
+    const expired = await client.query<{ task_id: string }>(
+      `DELETE FROM scenario_locks AS locks
+       WHERE locks.scenario_key = 'acme-demo'
+         AND locks.lease_until IS NOT NULL
+         AND locks.lease_until <= now()
+         AND locks.execution_started_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM approvals
+           JOIN plans ON plans.id = approvals.plan_id
+           WHERE plans.task_id = locks.task_id
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM action_executions
+           JOIN plans ON plans.id = action_executions.plan_id
+           WHERE plans.task_id = locks.task_id
+         )
+       RETURNING locks.task_id`,
+    );
+    for (const lock of expired.rows) {
+      const task = await client.query<{ read_model: unknown }>("SELECT read_model FROM tasks WHERE id = $1 FOR UPDATE", [lock.task_id]);
+      if (!task.rowCount) throw new StoreError("internal_error", "An expired scenario lock has no task record.");
+      const current = WorldPrViewSchema.parse(task.rows[0].read_model);
+      if (current.status !== "analyzing" && current.status !== "preview_ready") {
+        throw new StoreError("internal_error", "An expired scenario lock is not attached to a reclaimable planning state.");
+      }
+      const failed = buildPlanningLeaseExpiredView(current);
+      await client.query(
+        `UPDATE tasks
+         SET status = 'failed', run_id = NULL, planning_lease_until = NULL, read_model = $2::jsonb, updated_at = now()
+         WHERE id = $1`,
+        [lock.task_id, JSON.stringify(failed)],
+      );
+      await this.insertAudit(client, lock.task_id, "planning.lease_expired", actorId);
+    }
   }
 
   private async insertAudit(client: PoolClient, taskId: string, eventType: string, actorId: string): Promise<void> {
@@ -384,6 +427,17 @@ function worldPrResponse(view: WorldPrView, input: CreateWorldPrStoreInput): Cre
     status: "preview_ready",
     reviewUrl: input.reviewUrl.replace("{worldPrId}", view.worldPrId),
     requestId: input.requestId,
+  });
+}
+
+function mutationResponseForView(view: WorldPrView, requestId: string, replayPending = false): TaskMutationResponse {
+  return TaskMutationResponseSchema.parse({
+    worldPrId: view.worldPrId,
+    status: view.status,
+    ...(view.activePlan ? { activePlan: view.activePlan.pointer } : {}),
+    ...(view.attention ? { attention: view.attention } : {}),
+    ...(replayPending ? { replayPending: true as const } : {}),
+    requestId,
   });
 }
 

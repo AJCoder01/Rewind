@@ -59,4 +59,20 @@ describe("S019 strict G1 lifecycle and boundary contracts", () => {
     expect(status).not.toHaveProperty("activePlan");
     expect(status).not.toHaveProperty("recipients");
   });
+
+  it("rejects impossible terminal run state and unsafe MCP status metadata", () => {
+    const impossibleFailed = { ...GOLDEN_PREVIEW_VIEW, status: "failed" };
+    expect(WorldPrViewSchema.safeParse(impossibleFailed).success).toBe(false);
+    expect(McpWorldPrStatusSchema.safeParse({
+      worldPrId: GOLDEN_PREVIEW_VIEW.worldPrId,
+      status: "clarification_required",
+      reviewUrl: "https://rewind.example/pr/wpr_golden_s016",
+    }).success).toBe(false);
+    expect(McpWorldPrStatusSchema.safeParse({
+      worldPrId: GOLDEN_PREVIEW_VIEW.worldPrId,
+      status: "preview_ready",
+      reviewUrl: "https://rewind.example/pr/wpr_golden_s016",
+      attention: { stage: "initial", kind: "provider_conflict" },
+    }).success).toBe(false);
+  });
 });

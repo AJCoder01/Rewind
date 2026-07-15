@@ -36,6 +36,10 @@ function actionLabel(action: PlannedAction): string {
   return "Notify allowlisted attendees";
 }
 
+function lifecycleLabel(status: WorldPrView["status"]): string {
+  return status.replaceAll("_", " ");
+}
+
 function ActionDetails({ action }: { action: PlannedAction }) {
   const dependency = action.dependsOnAssumptionIds.length
     ? "Depends on recorded assumption: Acme region"
@@ -177,6 +181,16 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
         setMessage("The service returned an invalid cancellation response.");
         return;
       }
+      if (result.data.worldPrId !== worldPrId) {
+        setMessage("The service returned a cancellation result for a different World PR.");
+        return;
+      }
+      if (result.data.status !== "cancelled") {
+        setMessage(result.data.replayPending
+          ? "Cancellation is still being recorded. Refresh this review to see its durable state."
+          : "Cancellation was not completed. Refresh this review to see its durable state.");
+        return;
+      }
       setCancelled(true);
     } catch {
       setMessage("The cancellation service could not be reached. No external action was attempted.");
@@ -195,7 +209,7 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
   }
 
   if (view.status === "failed") {
-    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Planning stopped</p><h1>This review could not be prepared.</h1><p className="lede">The fixture planning attempt failed safely. No reviewable plan was created and no automatic retry is available from this screen.</p><Link href="/" className="primary-button button-link">Back to composer</Link><FixtureNotice /></div></main>;
+    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Planning stopped</p><h1>This review could not be prepared.</h1><p className="lede">Planning stopped before approval or any external action. No reviewable plan is available and this screen will not retry automatically.</p><Link href="/" className="primary-button button-link">Back to composer</Link><FixtureNotice /></div></main>;
   }
 
   if (view.status === "attention_required") {
@@ -228,6 +242,7 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
   if (!isInitialPlanView(activePlan)) return <main className="shell" data-testid="review-screen"><div className="content"><div className="notice" role="status">This future recovery review is not enabled in the G1 slice. No external action was attempted.</div></div></main>;
   const plan = activePlan;
   const assumption = plan.assumptions[0];
+  const canCancel = view.status === "preview_ready";
 
   return (
     <main className="shell" data-testid="review-screen">
@@ -235,7 +250,7 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
       <div className="content">
         <div className="review-header">
           <div><p className="eyebrow">Review proposed workspace changes</p><h1>{plan.selectedCandidate.label}</h1><p className="lede">The controlled fixture selects the nearest upcoming Acme candidate and keeps the other candidate visible as an alternative.</p></div>
-          <span className="status-pill">Preview ready</span>
+          <span className="status-pill">{lifecycleLabel(view.status)}</span>
         </div>
         <div className="review-grid">
           <section className="panel panel-wide"><div className="panel-inner"><div className="panel-kicker">Request</div><h2>Original request</h2><p>{view.request}</p></div></section>
@@ -245,7 +260,11 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
           <section className="panel"><div className="panel-inner"><div className="panel-kicker">Immutable identity</div><h2>Plan identity</h2><p className="muted">Version {plan.pointer.version}</p><p className="digest">{plan.pointer.digest}</p></div></section>
           <Timeline view={view} />
         </div>
-        <div className="review-actions"><button className="secondary-button" type="button" onClick={() => void cancel()} disabled={canceling}>{canceling ? "Cancelling..." : "Cancel review"}</button><Link href="/" className="secondary-button">Back to composer</Link></div>
+        <div className="review-actions">
+          {canCancel ? <button className="secondary-button" type="button" onClick={() => void cancel()} disabled={canceling}>{canceling ? "Cancelling..." : "Cancel review"}</button> : null}
+          <Link href="/" className="secondary-button">Back to composer</Link>
+        </div>
+        {!canCancel ? <div className="notice" role="status">Current durable state: {lifecycleLabel(view.status)}. This G1 screen will not approve, execute, or cancel a plan from this state.</div> : null}
         {message ? <div className="notice" role="alert">{message}</div> : null}
         <FixtureNotice />
       </div>

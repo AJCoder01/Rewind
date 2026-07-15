@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiError, statusForCode } from "@/lib/api/errors";
+import { apiError, isRetryableErrorCode, statusForCode } from "@/lib/api/errors";
 import { authorizeApiRequest, missingProductionAuthConfiguration } from "@/lib/auth/session";
 import { createWorldPr, ServiceError } from "@/lib/services/world-pr";
 import { createOpaqueId } from "@/lib/domain/ids";
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const result = await createWorldPr({ actorId: authorization.actor.actorId, source: authorization.actor.source, idempotencyKey, request: body, requestId });
     return NextResponse.json(result.response, { status: result.replay ? 200 : 201, headers: { "cache-control": "no-store" } });
   } catch (error) {
-    if (error instanceof ServiceError) return apiError(error.code, error.message, requestId, statusForCode(error.code));
+    if (error instanceof ServiceError) return apiError(error.code, error.message, requestId, statusForCode(error.code), isRetryableErrorCode(error.code));
     if (error instanceof Error && error.name === "StorageNotConfiguredError") return apiError("provider_unavailable", "Persistent storage is not configured; no plan was created.", requestId, 503, true);
     return apiError("internal_error", "The request could not be recorded safely; no external action was attempted.", requestId, 500, true);
   }

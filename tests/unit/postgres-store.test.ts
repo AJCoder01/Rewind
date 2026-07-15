@@ -2,7 +2,7 @@ import type { Pool } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import { PostgresWorldPrStore } from "@/lib/db/postgres-store";
-import { isInitialPlanView } from "@/lib/contracts/v1";
+import { isInitialPlanView, WorldPrViewSchema } from "@/lib/contracts/v1";
 import { sha256Digest } from "@/lib/domain/digest";
 import { buildFixtureWorldPrRecord } from "@/lib/domain/fixture-world-pr";
 import { SUPPORTED_SCENARIO_REQUEST } from "@/lib/domain/scenario";
@@ -65,6 +65,9 @@ describe("PostgresWorldPrStore", () => {
           rowCount: 1,
           rows: [{ body_hash: bodyHash, response: storedResponse, resource_id: stored.view.worldPrId, status: "completed" }],
         };
+      }
+      if (sql === "SELECT read_model FROM tasks WHERE id = $1") {
+        return { rowCount: 1, rows: [{ read_model: stored.view }] };
       }
       if (sql.includes("JOIN plans")) {
         return { rowCount: 1, rows: [{ read_model: stored.view, payload: stored.planPayload }] };
@@ -149,6 +152,47 @@ describe("PostgresWorldPrStore", () => {
     expect(calls.some(({ sql }) => sql.includes("SET status = 'failed'"))).toBe(true);
   });
 
+  it("durably marks an expired reclaimable planning lease failed before admitting the next scenario", async () => {
+    const expired = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
+    const clientCalls: QueryCall[] = [];
+    const client = {
+      query: vi.fn(async (sql: string, params: readonly unknown[] = []) => {
+        clientCalls.push({ sql, params });
+        if (sql.includes("SELECT id FROM prevention_rules")) return { rowCount: 0, rows: [] };
+        if (sql.includes("RETURNING locks.task_id")) return { rowCount: 1, rows: [{ task_id: expired.view.worldPrId }] };
+        if (sql === "SELECT read_model FROM tasks WHERE id = $1 FOR UPDATE") return { rowCount: 1, rows: [{ read_model: expired.view }] };
+        if (sql.includes("RETURNING scenario_key")) return { rowCount: 1, rows: [{ scenario_key: "acme-demo" }] };
+        return { rowCount: 1, rows: [] };
+      }),
+      release: vi.fn(),
+    };
+    const pool = {
+      query: vi.fn(async (sql: string) => sql.includes("RETURNING key")
+        ? { rowCount: 1, rows: [{ key: "idempotency-key-lease-1" }] }
+        : { rowCount: 1, rows: [] }),
+      connect: vi.fn(async () => client),
+    } as unknown as Pool;
+    const store = new PostgresWorldPrStore(pool);
+
+    await expect(store.createInitial({
+      actorId: "demo-operator",
+      endpoint: "POST /api/v1/world-prs",
+      idempotencyKey: "idempotency-key-lease-1",
+      bodyHash: sha256Digest({ request: SUPPORTED_SCENARIO_REQUEST }),
+      request: SUPPORTED_SCENARIO_REQUEST,
+      requestId: "req_lease_reclaim",
+      reviewUrl: "http://localhost:3000/pr/{worldPrId}",
+    })).resolves.toMatchObject({ response: { status: "preview_ready" } });
+
+    const failedUpdate = clientCalls.find(({ sql }) => sql.includes("SET status = 'failed'"));
+    expect(failedUpdate).toBeDefined();
+    const failedView = WorldPrViewSchema.parse(JSON.parse(String(failedUpdate?.params[1])));
+    expect(failedView.status).toBe("failed");
+    expect(failedView.runId).toBeUndefined();
+    expect(failedView.activePlan).toBeUndefined();
+    expect(clientCalls.some(({ params }) => params.includes("planning.lease_expired"))).toBe(true);
+  });
+
   it("reads a persisted clarification that intentionally has no plan", async () => {
     const stored = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
     const clarification = structuredClone(stored.view);
@@ -170,6 +214,81 @@ describe("PostgresWorldPrStore", () => {
 
     await expect(store.get(clarification.worldPrId)).resolves.toEqual(clarification);
     expect(poolQuery).toHaveBeenCalledOnce();
+  });
+
+  it("allows the dashboard operator to read a scoped-MCP World PR but rejects unrelated actors", async () => {
+    const stored = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
+    const poolQuery = vi.fn(async (sql: string) => {
+      if (sql === "SELECT read_model FROM tasks WHERE id = $1") return { rowCount: 1, rows: [{ read_model: stored.view }] };
+      if (sql.includes("SELECT actor_id")) return { rowCount: 1, rows: [{ actor_id: "mcp:scoped-token" }] };
+      if (sql.includes("JOIN plans")) return { rowCount: 1, rows: [{ read_model: stored.view, payload: stored.planPayload }] };
+      throw new Error(`Unexpected SQL in workspace-scope test: ${sql}`);
+    });
+    const store = new PostgresWorldPrStore({ query: poolQuery } as unknown as Pool);
+
+    await expect(store.get(stored.view.worldPrId, "demo-operator")).resolves.toMatchObject({ worldPrId: stored.view.worldPrId });
+    await expect(store.get(stored.view.worldPrId, "test:other")).rejects.toThrow("outside the authenticated workspace scope");
+  });
+
+  it("returns the current durable state instead of crashing when a completed create replay refers to an expired planning lease", async () => {
+    const stored = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
+    const failed = structuredClone(stored.view);
+    failed.status = "failed";
+    delete failed.runId;
+    delete failed.activePlan;
+    const bodyHash = sha256Digest({ request: SUPPORTED_SCENARIO_REQUEST });
+    const storedResponse = {
+      worldPrId: stored.view.worldPrId,
+      status: "preview_ready",
+      reviewUrl: `http://localhost:3000/pr/${stored.view.worldPrId}`,
+      requestId: "req_original1",
+    };
+    const poolQuery = vi.fn(async (sql: string) => {
+      if (sql.includes("RETURNING key")) return { rowCount: 0, rows: [] };
+      if (sql.includes("FROM idempotency_records")) return { rowCount: 1, rows: [{ body_hash: bodyHash, response: storedResponse, resource_id: stored.view.worldPrId, status: "completed" }] };
+      if (sql === "SELECT read_model FROM tasks WHERE id = $1") return { rowCount: 1, rows: [{ read_model: failed }] };
+      throw new Error(`An expired-plan replay must not reload an immutable preview: ${sql}`);
+    });
+    const store = new PostgresWorldPrStore({ query: poolQuery } as unknown as Pool);
+
+    const replay = await store.createInitial({
+      actorId: "test:operator",
+      endpoint: "POST /api/v1/world-prs",
+      idempotencyKey: "idempotency-key-expired-1",
+      bodyHash,
+      request: SUPPORTED_SCENARIO_REQUEST,
+      requestId: "req_replay_expired",
+      reviewUrl: "http://localhost:3000/pr/{worldPrId}",
+    });
+
+    expect(replay.replay).toBe(true);
+    expect(replay.response).toEqual(storedResponse);
+    expect(replay.view.status).toBe("failed");
+  });
+
+  it("reports an in-progress cancellation as pending rather than fabricating a cancelled result", async () => {
+    const stored = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
+    const poolQuery = vi.fn(async (sql: string) => {
+      if (sql.includes("RETURNING key")) return { rowCount: 0, rows: [] };
+      if (sql.includes("SELECT actor_id")) return { rowCount: 1, rows: [{ actor_id: "demo-operator" }] };
+      if (sql.includes("FROM idempotency_records")) return { rowCount: 1, rows: [{ body_hash: "sha256:cancel", response: null, resource_id: stored.view.worldPrId, status: "in_progress" }] };
+      if (sql === "SELECT read_model FROM tasks WHERE id = $1") return { rowCount: 1, rows: [{ read_model: stored.view }] };
+      if (sql.includes("JOIN plans")) return { rowCount: 1, rows: [{ read_model: stored.view, payload: stored.planPayload }] };
+      throw new Error(`Unexpected SQL in cancellation replay test: ${sql}`);
+    });
+    const store = new PostgresWorldPrStore({ query: poolQuery } as unknown as Pool);
+
+    const replay = await store.cancel({
+      actorId: "demo-operator",
+      endpoint: `POST /api/v1/world-prs/${stored.view.worldPrId}/cancel`,
+      idempotencyKey: "idempotency-key-cancel-1",
+      bodyHash: "sha256:cancel",
+      worldPrId: stored.view.worldPrId,
+      requestId: "req_cancel_pending",
+    });
+
+    expect(replay.replay).toBe(true);
+    expect(replay.response).toMatchObject({ worldPrId: stored.view.worldPrId, status: "preview_ready", replayPending: true });
   });
 
   it("rejects a human-visible read model that disagrees with its immutable payload", async () => {

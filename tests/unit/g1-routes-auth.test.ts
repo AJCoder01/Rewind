@@ -14,6 +14,7 @@ const originalEnvironment = {
   REWIND_STORAGE_MODE: process.env.REWIND_STORAGE_MODE,
   REWIND_SESSION_SECRET: process.env.REWIND_SESSION_SECRET,
   MCP_BACKEND_TOKEN: process.env.MCP_BACKEND_TOKEN,
+  REWIND_DASHBOARD_PASSCODE: process.env.REWIND_DASHBOARD_PASSCODE,
 };
 
 function dashboardHeaders(session: string, csrf = "csrf-token-for-tests", idempotencyKey = "idem-route-create-0001"): Record<string, string> {
@@ -126,6 +127,13 @@ describe("S022/S024 authenticated thin route boundaries", () => {
     }), { params: Promise.resolve({ worldPrId: created.worldPrId }) });
     expect(safeStatus.status).toBe(200);
     await expect(safeStatus.json()).resolves.toEqual(expect.objectContaining({ worldPrId: created.worldPrId, status: "preview_ready" }));
+
+    const dashboardSession = createSessionValue("demo-operator");
+    const dashboardReview = await readWorldPrRoute(new NextRequest(`http://localhost:3000/api/v1/world-prs/${created.worldPrId}`, {
+      headers: { cookie: `rewind_session=${dashboardSession}; rewind_csrf=csrf-token-for-tests` },
+    }), { params: Promise.resolve({ worldPrId: created.worldPrId }) });
+    expect(dashboardReview.status).toBe(200);
+    await expect(dashboardReview.json()).resolves.toMatchObject({ worldPrId: created.worldPrId, status: "preview_ready" });
   });
 
   it("rejects an expired dashboard session", async () => {
@@ -134,5 +142,21 @@ describe("S022/S024 authenticated thin route boundaries", () => {
       headers: { cookie: `rewind_session=${expired}; rewind_csrf=csrf-token-for-tests` },
     }), { params: Promise.resolve({ worldPrId: "wpr_expired" }) });
     expect(response.status).toBe(401);
+  });
+
+  it("maps a production fake-provider refusal to the documented retryable 503 response", async () => {
+    const environment = process.env as Record<string, string | undefined>;
+    environment.NODE_ENV = "production";
+    process.env.APP_BASE_URL = "https://rewind.example.test";
+    process.env.REWIND_STORAGE_MODE = "memory_fixture";
+    process.env.REWIND_DASHBOARD_PASSCODE = "route-dashboard-passcode-0001";
+    const session = createSessionValue("demo-operator");
+
+    const response = await readWorldPrRoute(new NextRequest("https://rewind.example.test/api/v1/world-prs/wpr_provider_unavailable", {
+      headers: { cookie: `rewind_session=${session}; rewind_csrf=csrf-token-for-tests` },
+    }), { params: Promise.resolve({ worldPrId: "wpr_provider_unavailable" }) });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "provider_unavailable", retryable: true } });
   });
 });

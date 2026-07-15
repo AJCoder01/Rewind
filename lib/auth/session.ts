@@ -108,7 +108,10 @@ export function safeSecretEqual(provided: string, expected: string): boolean {
 }
 
 export function isSameOrigin(request: NextRequest): boolean {
-  const origin = request.headers.get("origin");
+  // Browsers send Origin on fetch/XHR mutations. Referer is a conservative
+  // fallback for compatible same-origin form/navigation cases; a supplied
+  // Origin always takes precedence and cannot be bypassed by a good Referer.
+  const origin = request.headers.get("origin") ?? request.headers.get("referer");
   if (!origin) return false;
   try {
     const configuredBaseUrl = process.env.APP_BASE_URL;

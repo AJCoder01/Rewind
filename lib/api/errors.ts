@@ -25,3 +25,7 @@ export function statusForCode(code: ErrorCode): number {
   if (code === "provider_unavailable" || code === "delivery_uncertain") return 503;
   return 500;
 }
+
+export function isRetryableErrorCode(code: ErrorCode): boolean {
+  return code === "provider_unavailable" || code === "delivery_uncertain" || code === "internal_error";
+}

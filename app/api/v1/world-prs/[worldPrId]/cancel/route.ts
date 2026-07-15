@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiError, statusForCode } from "@/lib/api/errors";
+import { apiError, isRetryableErrorCode, statusForCode } from "@/lib/api/errors";
 import { authorizeApiRequest, missingProductionAuthConfiguration } from "@/lib/auth/session";
 import { createOpaqueId } from "@/lib/domain/ids";
 import { cancelWorldPr, ServiceError } from "@/lib/services/world-pr";
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ wo
     });
     return NextResponse.json(result.response, { status: 200, headers: { "cache-control": "no-store" } });
   } catch (error) {
-    if (error instanceof ServiceError) return apiError(error.code, error.message, requestId, statusForCode(error.code));
+    if (error instanceof ServiceError) return apiError(error.code, error.message, requestId, statusForCode(error.code), isRetryableErrorCode(error.code));
     return apiError("internal_error", "The cancellation could not be recorded safely; no external action was attempted.", requestId, 500, true);
   }
 }

@@ -269,3 +269,26 @@ export function buildFixtureClarificationView(base: WorldPrView, now = new Date(
   view.updatedAt = occurredAt;
   return WorldPrViewSchema.parse(view);
 }
+
+export function buildPlanningLeaseExpiredView(base: WorldPrView, now = new Date()): WorldPrView {
+  const occurredAt = now.toISOString();
+  const view = structuredClone(base) as Record<string, unknown>;
+  delete view.runId;
+  delete view.activePlan;
+  delete view.clarification;
+  delete view.attention;
+  delete view.ruleProposal;
+  view.status = "failed";
+  view.timeline = [
+    ...base.timeline,
+    {
+      eventId: createOpaqueId("evt_"),
+      type: "planning.lease_expired",
+      occurredAt,
+      label: "Planning lease expired before approval; no external action was attempted",
+      status: "failed",
+    },
+  ];
+  view.updatedAt = occurredAt;
+  return WorldPrViewSchema.parse(view);
+}

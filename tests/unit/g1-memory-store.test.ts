@@ -84,6 +84,14 @@ describe("S021 serialized fixture intake", () => {
     await expect(getWorldPr(created.response.worldPrId, "test:other")).rejects.toMatchObject({ code: "forbidden" });
   });
 
+  it("allows the authenticated dashboard operator to review a World PR created through the scoped MCP workspace", async () => {
+    const created = await createWorldPr({ actorId: "mcp:scoped-token", source: "mcp", idempotencyKey: "idem-mcp-dashboard-1", request: { request } });
+    await expect(getWorldPr(created.response.worldPrId, "demo-operator")).resolves.toMatchObject({
+      worldPrId: created.response.worldPrId,
+      status: "preview_ready",
+    });
+  });
+
   it("refuses the fixture provider boundary in production", () => {
     (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     expect(() => getWorldPrStore()).toThrow(FakeProviderConfigurationError);

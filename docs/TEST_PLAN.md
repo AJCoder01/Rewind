@@ -147,6 +147,8 @@ UI/domain copy:
 
 ### 4.2 G1 implementation evidence
 
+The post-implementation adversarial review repaired MCP/dashboard controlled-workspace access, durable expired-lease terminalization, current-state cancellation replay, production sign-in refusal, canonical unavailable-error mapping, incompatible lifecycle metadata rejection, and UI/documentation state drift. Its local results and explicitly unverified database/deployed/evaluation checks are recorded in [the sanitized adversarial review](../artifacts/test-runs/2026-07-15-g1-adversarial-review.md).
+
 S019–S027 currently have deterministic unit/route/MCP coverage for strict unknown-field rejection, identical/conflicting/in-progress/failed replay, rule-first clarification without a plan/action/lock, planning-lease expiry, scenario-busy serialization, session expiry, CSRF/origin and resource scope, fake-provider production refusal, malformed read models, cancel/back, and the non-effecting browser flow. The sanitized command results and remaining deployed/database risk are recorded in [the S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md). No live provider or external-effect test is claimed here.
 
 ### 4.3 Integration tests with deterministic adapters

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiError } from "@/lib/api/errors";
+import { apiError, isRetryableErrorCode, statusForCode } from "@/lib/api/errors";
 import { authorizeApiRequest, missingProductionAuthConfiguration } from "@/lib/auth/session";
 import { createOpaqueId } from "@/lib/domain/ids";
 import { getWorldPr, getWorldPrStatus, ServiceError } from "@/lib/services/world-pr";
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ wor
     if (!view) return apiError("task_not_found", "That World PR does not exist in the current controlled workspace.", requestId, 404);
     return NextResponse.json(view, { status: 200, headers: { "cache-control": "no-store" } });
   } catch (error) {
-    if (error instanceof ServiceError) return apiError(error.code, error.message, requestId, error.code === "forbidden" ? 403 : error.code === "task_not_found" ? 404 : 500, error.code === "provider_unavailable" || error.code === "internal_error");
+    if (error instanceof ServiceError) return apiError(error.code, error.message, requestId, statusForCode(error.code), isRetryableErrorCode(error.code));
     return apiError("internal_error", "The World PR could not be loaded safely.", requestId, 500, true);
   }
 }

@@ -147,6 +147,8 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 - [x] `S018`: clean-checkout G0 evidence. Evidence: [sanitized S018 G0 report](../artifacts/test-runs/2026-07-15-s018-g0.md).
 - [x] `S019`–`S027`: completed the strict G1 contracts, transactional PostgreSQL repository path, intake serialization and leases, auth/CSRF/resource boundaries, fixture isolation, thin create/read/status/cancel routes, scoped MCP create/status tools, non-effecting review UI, and automated regression/E2E coverage. Evidence: [sanitized S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md). Schema/fixture versions: `v1`, `initial-plan.v1`, `golden-contracts.v1`, `traceability.v1`, `fixture-initial.v1`, `prevention-rule.v1`, `reset-plan.v1`.
 
+- [x] G1 adversarial review correction pass: repaired MCP/dashboard controlled-workspace access, PostgreSQL lease/replay and cancellation honesty, production auth/error mapping, strict lifecycle metadata, UI-state honesty, and documentation drift. Evidence: [sanitized adversarial review](../artifacts/test-runs/2026-07-15-g1-adversarial-review.md). Requirement links: FR-01, FR-02, FR-03, FR-07, FR-09, SAFE-03, SAFE-04, SAFE-08, NFR-02, NFR-06, NFR-07, NFR-08, NFR-10. Versions: `v1`, `initial-plan.v1`, `golden-contracts.v1`, `traceability.v1`, `fixture-initial.v1`, `prevention-rule.v1`, `reset-plan.v1`. Local verification passed; deployed proof, fresh disposable migration replay, and recovery evaluation remain unverified for the recorded reasons.
+
 ## Current blockers
 
 | Blocker | Impact | Next action | Status |
@@ -187,6 +189,7 @@ Add entries only after work is actually complete:
 | 2026-07-15 | S018 clean-checkout G0 gate | [Sanitized S018 evidence](../artifacts/test-runs/2026-07-15-s018-g0.md): Node 24 local suite, private migration/readiness verification, hosted Rewind CI run #15, disposable PostgreSQL apply/replay, secret scan, and fixture browser smoke | Passed; S019 is next | Codex + GitHub Actions |
 | 2026-07-15 | Full codebase cleanup and regression audit | [Sanitized audit evidence](../artifacts/test-runs/2026-07-15-codebase-cleanup-audit.md): complete file-purpose inventory, clean install, lint, strict/unused type checks, 28 tests, production build, browser and actual MCP smokes, dependency/secret/link/client-bundle checks, and read-only S007 regression | Passed at the time; no redundant tracked file found and S008 was next then | Codex |
 | 2026-07-15 | S019–S027 G1 implementation packet | [Sanitized S019–S027 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md): strict contracts, repository/intake/auth/route/MCP/UI implementation, 27 test files/142 tests, production build, browser flow, audit, security scan, fake-production guard, and traceability validation | Passed locally in fixture mode; S028 deployed proof is next | Codex |
+| 2026-07-15 | G1 adversarial review and correction | [Sanitized adversarial review](../artifacts/test-runs/2026-07-15-g1-adversarial-review.md): repaired MCP/dashboard scope, lease/replay/cancel races, auth/error/contract/UI honesty; clean install, 27 files/150 tests, build, browser, audit, security/traceability/fake-production checks | Passed locally in fixture mode; fresh disposable migration and recovery evaluation remain unverified for documented scope reasons | Codex |
 
 ## MVP definition of done
 
