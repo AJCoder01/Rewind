@@ -1,14 +1,15 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import {
   CreateWorldPrResponseSchema,
-  InitialPlanPayloadSchema,
   WorldPrViewSchema,
   type CreateWorldPrResponse,
   type InitialPlanPayload,
   type WorldPrView,
 } from "@/lib/contracts/v1";
+import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import { buildFixtureWorldPrRecord } from "@/lib/domain/fixture-world-pr";
+import { canonicalJson } from "@/lib/domain/digest";
 import type { CreateWorldPrStoreInput, CreateWorldPrStoreResult, WorldPrStore } from "@/lib/db/store";
 
 interface StoredWorldPrRecord {
@@ -39,9 +40,12 @@ export class PostgresWorldPrStore implements WorldPrStore {
     );
     if (!claim.rowCount) return this.replayExisting(input);
 
-    const client = await this.pool.connect();
+    let client: PoolClient | undefined;
+    let transactionStarted = false;
     try {
+      client = await this.pool.connect();
       await client.query("BEGIN");
+      transactionStarted = true;
       await client.query(
         `INSERT INTO tasks
           (id, run_id, request, status, read_model, created_at, updated_at)
@@ -81,26 +85,38 @@ export class PostgresWorldPrStore implements WorldPrStore {
         [input.actorId, input.endpoint, input.idempotencyKey, JSON.stringify(response)],
       );
       await client.query("COMMIT");
+      transactionStarted = false;
       return { ...record, response, replay: false };
     } catch (error) {
-      await client.query("ROLLBACK");
+      if (client && transactionStarted) {
+        await client.query("ROLLBACK").catch(() => undefined);
+      }
       const errorCode = knownFailureCode(error);
-      await this.pool.query(
-        `UPDATE idempotency_records
-         SET status = 'failed', response = $4::jsonb, updated_at = now()
-         WHERE actor_id = $1 AND endpoint = $2 AND key = $3`,
-        [input.actorId, input.endpoint, input.idempotencyKey, JSON.stringify({ errorCode })],
-      );
+      try {
+        await this.pool.query(
+          `UPDATE idempotency_records
+           SET status = 'failed', response = $4::jsonb, updated_at = now()
+           WHERE actor_id = $1 AND endpoint = $2 AND key = $3`,
+          [input.actorId, input.endpoint, input.idempotencyKey, JSON.stringify({ errorCode })],
+        );
+      } catch {
+        throw new Error("The idempotency claim could not be reconciled after planning failed.", { cause: error });
+      }
       throw error;
     } finally {
-      client.release();
+      client?.release();
     }
   }
 
   async get(worldPrId: string): Promise<WorldPrView | null> {
     const result = await this.pool.query<{ read_model: unknown }>("SELECT read_model FROM tasks WHERE id = $1", [worldPrId]);
     if (!result.rowCount) return null;
-    return WorldPrViewSchema.parse(result.rows[0].read_model);
+    const view = WorldPrViewSchema.parse(result.rows[0].read_model);
+    if (!view.activePlan) return view;
+
+    const record = await this.readRecord(worldPrId);
+    if (!record) throw new Error("An active World PR is missing its immutable plan payload.");
+    return record.view;
   }
 
   async close(): Promise<void> {
@@ -124,7 +140,7 @@ export class PostgresWorldPrStore implements WorldPrStore {
         const stored = await this.readRecord(row.resource_id);
         if (!stored) throw new Error("task_not_found");
         const storedResponse = CreateWorldPrResponseSchema.parse(row.response);
-        return { ...stored, response: { ...storedResponse, replayPending: true }, replay: true };
+        return { ...stored, response: storedResponse, replay: true };
       }
       await delay(25);
     }
@@ -140,10 +156,39 @@ export class PostgresWorldPrStore implements WorldPrStore {
       [worldPrId],
     );
     if (!result.rowCount) return null;
-    return {
+    const record = {
       view: WorldPrViewSchema.parse(result.rows[0].read_model),
-      planPayload: InitialPlanPayloadSchema.parse(result.rows[0].payload),
+      planPayload: VerifiedInitialPlanPayloadSchema.parse(result.rows[0].payload),
     };
+    assertStoredRecordConsistency(record);
+    return record;
+  }
+}
+
+function assertStoredRecordConsistency(record: StoredWorldPrRecord): void {
+  const activePlan = record.view.activePlan;
+  const payload = record.planPayload;
+  const selected = payload.candidateSet.find((candidate) => candidate.candidateId === payload.selectedCandidateId);
+  const alternativeId = payload.alternativeCandidateIds[0];
+  const alternative = payload.candidateSet.find((candidate) => candidate.candidateId === alternativeId);
+  if (
+    !activePlan ||
+    record.view.worldPrId !== payload.taskId ||
+    record.view.request !== payload.request ||
+    activePlan.pointer.planId !== payload.planId ||
+    activePlan.pointer.version !== payload.version ||
+    activePlan.pointer.digest !== payload.digest ||
+    !selected ||
+    !alternative ||
+    activePlan.selectedCandidate.candidateId !== selected.candidateId ||
+    activePlan.selectedCandidate.label !== selected.title ||
+    activePlan.alternatives[0].candidateId !== alternativeId ||
+    activePlan.alternatives[0].label !== alternative.title ||
+    record.view.runId !== payload.actions[2].desired.runId ||
+    canonicalJson(activePlan.assumptions) !== canonicalJson(payload.assumptions) ||
+    canonicalJson(activePlan.actions) !== canonicalJson(payload.actions)
+  ) {
+    throw new Error("Stored World PR read model does not match its immutable plan payload.");
   }
 }
 

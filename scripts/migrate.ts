@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
+import { loadPrivateLocalEnvironment, requireDatabaseUrl } from "@/lib/db/config";
 
 async function main(): Promise<void> {
-  const databaseUrl = process.env.DATABASE_MIGRATION_URL ?? process.env.DATABASE_URL;
-  if (!databaseUrl) throw new Error("DATABASE_MIGRATION_URL or DATABASE_URL is required for db:migrate; no migration was attempted.");
+  loadPrivateLocalEnvironment();
+  const databaseUrl = requireDatabaseUrl("DATABASE_MIGRATION_URL");
   const sql = await readFile(new URL("../db/migrations/0001_phase0_foundation.sql", import.meta.url), "utf8");
   const pool = new Pool({ connectionString: databaseUrl });
   try {

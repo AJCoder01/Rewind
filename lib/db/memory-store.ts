@@ -20,7 +20,7 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
       if (existing.bodyHash !== input.bodyHash) {
         throw new Error("idempotency_conflict");
       }
-      return { ...existing.result, replay: true, response: { ...existing.result.response, replayPending: true } };
+      return { ...existing.result, replay: true };
     }
     if (this.scenarioLocked) throw new Error("scenario_busy");
     this.scenarioLocked = true;

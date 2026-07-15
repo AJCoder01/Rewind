@@ -1,12 +1,12 @@
 # Rewind MVP progress
 
-Current status: master-plan tasks `S001`–`S006` are complete; the first unfinished task is `S007` (provision Supabase PostgreSQL), and Gate G0 remains open.
+Current status: master-plan tasks `S001`–`S007` are complete; the first unfinished task is `S008` (apply and verify the real migration), and Gate G0 remains open.
 
 | Field | Value |
 |---|---|
 | Status | Live checklist |
-| Current phase | G0 foundation; restart at `S007` |
-| Last updated | 2026-07-14 |
+| Current phase | G0 foundation; restart at `S008` |
+| Last updated | 2026-07-15 |
 | Implementation update | One sequential `S001`–`S103` plan replaces the prior person-specific workstreams; no live provider integration is enabled. |
 
 This file records status and evidence only. It does not create or change requirements.
@@ -38,7 +38,7 @@ Do not infer implementation progress from completed documentation.
 
 - [x] `create_world_pr` exists as the sole required MCP tool. Evidence: `mcp/server.ts` exposes only this tool and never approves or executes.
 - [x] Dashboard composer and MCP use the same authenticated backend application service. Evidence: MCP is a thin bearer-authenticated HTTP client for `POST /api/v1/world-prs`; the route invokes `lib/services/world-pr.ts`.
-- [x] In-progress/completed idempotency and the one effect-bearing-scenario lock are enforced in the fixture and PostgreSQL repositories; rule-matched clarification remains deferred.
+- [~] Completed replay, failed-claim reconciliation, plan-less clarification reads, and the one effect-bearing-scenario lock are covered in the fixture/PostgreSQL repositories. In-progress replay/lease recovery and rule-matched clarification remain explicitly deferred to `S021`.
 - [x] Backend persists a versioned World PR and returns a non-secret review URL. Evidence: fixture create/read smoke returned 201/200 and an immutable plan digest.
 - [x] Authenticated dashboard loads the World PR. Evidence: `npm run test:e2e` exercised login, creation, and review rendering in fixture mode and exited successfully.
 - [ ] Exactly two tagged Calendar candidates are fetched from the controlled calendar.
@@ -121,7 +121,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 
 | Gate | Sequential scope | Status | Evidence |
 |---|---|---|---|
-| G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | In progress | `S001`–`S006` complete; start `S007`; cloud provisioning/migration and traceability remain |
+| G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | In progress | `S001`–`S007` complete; start `S008`; migration, remaining provisioning, and traceability remain |
 | G1 | `S019`–`S030`: non-effecting MCP → API → PostgreSQL → dashboard | In progress behind G0 | Fixture create/review path and browser smoke pass; durable deployed/replay/error coverage remains |
 | G2 | `S031`–`S045`: OAuth, Calendar/Gmail/artifact/model primitives and live spikes | Not started | TBD |
 | G3 | `S046`–`S059`: initial World PR, approval, execution, receipts | Not started | TBD |
@@ -133,7 +133,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 ### Current phase actions
 
 - [x] `S001`–`S006`: repository, decisions, scaffold, minimal contracts/migration, and local fixture slice.
-- [ ] `S007`: provision Supabase PostgreSQL in Mumbai and store both connection URLs privately.
+- [x] `S007`: Supabase PostgreSQL provisioned and hardened in Mumbai; private transaction/session URLs and live TLS/role/ACL checks passed. Evidence: [sanitized S007 report](../artifacts/test-runs/2026-07-15-s007-supabase.md).
 - [ ] `S008`: apply and verify the real migration.
 - [ ] `S009`–`S012`: provision Vercel/Google/OpenAI prerequisites and finalize private environment/startup validation.
 - [ ] `S013`–`S018`: CI/security, controlled fixtures, traceability, accessibility review, and clean-checkout G0 evidence.
@@ -142,12 +142,12 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 
 | Blocker | Impact | Next action | Status |
 |---|---|---|---|
-| Supabase/Vercel accounts are not authenticated/provisioned | Cannot run the real migration or deployed slice | Complete `S007`, then `S008` and `S009` | Open |
+| Vercel project is not provisioned | Cannot run the deployed slice | Complete `S008`, then `S009` | Open |
 | Google OAuth credentials and controlled IDs are not configured | Calendar/Gmail risk cannot be retired | Complete `S010` and `S012`, then G2 OAuth/provider tasks | Open |
 | OpenAI project/model access is unverified | Planner feasibility is unknown | Complete `S011`, then `S040`–`S045` | Open |
 | Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Direct smoke runner tears down cleanly; retain conventional spec for CI migration | Resolved |
 
-The setup choices are now fixed, but provider resources and secrets are not configured. Next: provision Vercel/Supabase, prove the migration on the selected database, finish traceability fixtures, and freeze the G1 packet before live Google/OpenAI work.
+Supabase is provisioned and its private connections are validated, but the schema has not been applied and the remaining provider resources/secrets are not configured. Next: complete `S008`, then provision Vercel and the later Google/OpenAI prerequisites in numeric order.
 
 ## Verification evidence log
 
@@ -164,6 +164,9 @@ Add entries only after work is actually complete:
 | 2026-07-14 | Fixture API smoke | Authenticated fixture POST returned 201; authenticated World PR GET returned 200 with 3 actions and 2 timeline entries | Passed | Codex |
 | 2026-07-14 | Critical Playwright flow | `npm run test:e2e` reported the unauthenticated redirect, login, create, and review assertions as passed | Passed | Codex |
 | 2026-07-14 | Review and safety regression pass | 12 unit/contract tests cover strict action shape, plan digest reproduction, PostgreSQL insert order/idempotency claim and replay, auth origin/secret checks, and fixture service behavior | Passed | Codex |
+| 2026-07-15 | Full foundation audit and repair | [Sanitized audit evidence](../artifacts/test-runs/2026-07-15-foundation-audit.md): Node 24 install/lint/typecheck/28 tests/build/E2E/dependency/secret checks; auth, contracts, storage, provenance, and setup defects repaired | Passed for the local non-effecting fixture slice; live PostgreSQL remains S007/S008 | Codex |
+| 2026-07-15 | S007 Supabase provisioning | [Sanitized S007 evidence](../artifacts/test-runs/2026-07-15-s007-supabase.md): private file hygiene, transaction/session TLS authentication, restricted role flags, future-object ACLs, and plaintext rejection | Passed; migration deliberately not run | User + Codex |
+| 2026-07-15 | Full codebase cleanup and regression audit | [Sanitized audit evidence](../artifacts/test-runs/2026-07-15-codebase-cleanup-audit.md): complete file-purpose inventory, clean install, lint, strict/unused type checks, 28 tests, production build, browser and actual MCP smokes, dependency/secret/link/client-bundle checks, and read-only S007 regression | Passed; no redundant tracked file found, generated caches removed, and `S008` remains next | Codex |
 
 ## MVP definition of done
 

@@ -549,7 +549,7 @@ interface InitialPlanV1 {
     "initial.calendar.move",
     "initial.mail.notify"
   ];
-  modelMetadata: ModelMetadata;
+  modelMetadata: ModelMetadata | FixtureModelMetadata;
   digest: string;
 }
 
@@ -996,9 +996,19 @@ interface ModelMetadata {
   responseId?: string;
   source: "model" | "fallback";
 }
+
+interface FixtureModelMetadata {
+  provider: "fixture";
+  model: string;
+  promptVersion: string;
+  schemaVersion: string;
+  reasoningEffort: "none";
+  responseId?: string;
+  source: "fixture";
+}
 ```
 
-`OPENAI_MODEL` supplies the model. The provider/model risk phase initially tests `gpt-5.6-sol` if the project can access it and strict-schema evaluation passes. Store the actual returned model metadata. A fallback source must be visibly logged and is forbidden during the recorded demo unless explicitly disclosed.
+`OPENAI_MODEL` supplies the model. The provider/model risk phase initially tests `gpt-5.6-sol` if the project can access it and strict-schema evaluation passes. Store the actual returned model metadata. `FixtureModelMetadata` is permitted only for the explicitly labeled deterministic test/development slice and is forbidden in deployed live mode. A fallback source must be visibly logged and is forbidden during the recorded demo unless explicitly disclosed.
 
 ## 13. Plan hashing and idempotency
 

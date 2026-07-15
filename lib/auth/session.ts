@@ -7,7 +7,7 @@ const sessionLifetimeSeconds = 60 * 60 * 8;
 export type AuthenticatedActor = { actorId: string; source: "dashboard" | "mcp" };
 
 function sessionSecret(): string | null {
-  return process.env.REWIND_SESSION_SECRET || (process.env.NODE_ENV !== "production" ? "development-only-session-secret" : null);
+  return process.env.REWIND_SESSION_SECRET || null;
 }
 
 function signature(payload: string, secret: string): string {
@@ -25,7 +25,9 @@ export function readDashboardActor(request: NextRequest): AuthenticatedActor | n
   const secret = sessionSecret();
   const value = request.cookies.get(sessionCookie)?.value;
   if (!secret || !value) return null;
-  const [actorId, expiryText, providedSignature] = value.split(".");
+  const segments = value.split(".");
+  if (segments.length !== 3) return null;
+  const [actorId, expiryText, providedSignature] = segments;
   if (!actorId || !expiryText || !providedSignature) return null;
   const payload = `${actorId}.${expiryText}`;
   const expected = signature(payload, secret);

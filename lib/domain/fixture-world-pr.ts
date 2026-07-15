@@ -1,6 +1,5 @@
 import {
   InitialPlanPayloadCoreSchema,
-  InitialPlanPayloadSchema,
   InitialPlanViewSchema,
   type InitialPlanPayload,
   type InitialPlanView,
@@ -8,8 +7,14 @@ import {
   WorldPrViewSchema,
   type WorldPrView,
 } from "@/lib/contracts/v1";
+import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import { sha256Digest, sha256Text } from "@/lib/domain/digest";
 import { createOpaqueId } from "@/lib/domain/ids";
+import {
+  ACCOUNT_BRIEF_VALIDATOR_VERSION,
+  PARENT_ACCOUNT_NOTES_FIXTURE,
+  assertAccountBriefIndependent,
+} from "@/lib/domain/account-brief";
 
 const demoDate = "2026-08-20";
 const timeZone = "America/New_York";
@@ -35,6 +40,7 @@ export interface FixtureWorldPrRecord {
 }
 
 export function buildFixtureWorldPrRecord(request: string, now = new Date()): FixtureWorldPrRecord {
+  assertAccountBriefIndependent(briefContent);
   const worldPrId = createOpaqueId("wpr_");
   const runId = createOpaqueId("run_");
   const planId = createOpaqueId("plan_");
@@ -65,14 +71,14 @@ export function buildFixtureWorldPrRecord(request: string, now = new Date()): Fi
       contentHash: sha256Text(briefContent),
       provenance: {
         sourceId: "acme_parent_account_notes" as const,
-        sourceDigest: sha256Text("fixture-parent-account-notes-v1"),
+        sourceDigest: sha256Text(PARENT_ACCOUNT_NOTES_FIXTURE),
         excludedDimensions: ["calendar_event", "region", "attendees", "meeting_time"] as [
           "calendar_event",
           "region",
           "attendees",
           "meeting_time",
         ],
-        validatorVersion: "artifact-independence.v1",
+        validatorVersion: ACCOUNT_BRIEF_VALIDATOR_VERSION,
       },
     },
   };
@@ -170,11 +176,14 @@ export function buildFixtureWorldPrRecord(request: string, now = new Date()): Fi
       provider: "fixture",
       model: "fixture-initial.v1",
       promptVersion: "fixture-initial.v1",
+      schemaVersion: "initial-reasoning.v1",
+      reasoningEffort: "none",
       responseId: "fixture-response",
+      source: "fixture",
     },
   });
   const digest = sha256Digest(planPayloadCore);
-  const planPayload = InitialPlanPayloadSchema.parse({ ...planPayloadCore, digest });
+  const planPayload = VerifiedInitialPlanPayloadSchema.parse({ ...planPayloadCore, digest });
   const plan = InitialPlanViewSchema.parse({
     pointer: { planId, kind: "initial", version: 1, digest },
     selectedCandidate: uk,

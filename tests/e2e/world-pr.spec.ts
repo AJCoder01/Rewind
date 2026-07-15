@@ -21,4 +21,15 @@ test("operator can create and review a fixture-backed World PR", async ({ page }
   await expect(page.getByText("artifact-independence.v1", { exact: true })).toBeVisible();
   await expect(page.getByText("Requires initial.calendar.move to succeed", { exact: true })).toBeVisible();
   await expect(page.getByText("External integrations remain disabled until their safety gates pass.")).toBeVisible();
+
+  const reviewUrl = page.url();
+  await page.context().clearCookies();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByText("Your review session has expired. Sign in again.", { exact: false })).toBeVisible();
+  await page.getByRole("link", { name: "Sign in" }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/login" && url.searchParams.get("next") === new URL(reviewUrl).pathname);
+  await page.getByLabel("Demo passcode").fill("playwright-demo-passcode");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(reviewUrl);
+  await expect(page.getByRole("heading", { name: "Acme UK renewal" })).toBeVisible();
 });

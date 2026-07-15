@@ -4,6 +4,7 @@ import { sha256Digest, sha256Text } from "@/lib/domain/digest";
 import { buildFixtureWorldPrRecord } from "@/lib/domain/fixture-world-pr";
 import { SUPPORTED_SCENARIO_REQUEST } from "@/lib/domain/scenario";
 import { createWorldPr } from "@/lib/services/world-pr";
+import { PARENT_ACCOUNT_NOTES_FIXTURE, assertAccountBriefIndependent } from "@/lib/domain/account-brief";
 
 const request = SUPPORTED_SCENARIO_REQUEST;
 
@@ -18,6 +19,7 @@ describe("fixture-backed World PR service", () => {
     const replay = await createWorldPr({ actorId: "test:operator", source: "dashboard", idempotencyKey: "idempotency-key-0001", request: { request } });
     expect(first.response.worldPrId).toBe(replay.response.worldPrId);
     expect(replay.replay).toBe(true);
+    expect(replay.response.replayPending).toBeUndefined();
     expect(first.view.activePlan?.actions).toHaveLength(3);
     expect(first.view.activePlan?.pointer.digest).toMatch(/^sha256:/);
   });
@@ -36,5 +38,12 @@ describe("fixture-backed World PR service", () => {
     const { digest, ...core } = planPayload;
     expect(sha256Digest(core)).toBe(digest);
     expect(sha256Text("abc")).toBe("sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  });
+
+  it("binds artifact provenance to exact source bytes and rejects scenario leakage", () => {
+    const { planPayload } = buildFixtureWorldPrRecord(request, new Date("2026-07-14T00:00:00.000Z"));
+    expect(planPayload.actions[0].desired.provenance.sourceDigest).toBe(sha256Text(PARENT_ACCOUNT_NOTES_FIXTURE));
+    expect(() => assertAccountBriefIndependent(planPayload.actions[0].desired.content)).not.toThrow();
+    expect(() => assertAccountBriefIndependent("Prepare this for Acme UK attendees on 2026-08-20.")).toThrow("forbidden scenario dimension");
   });
 });

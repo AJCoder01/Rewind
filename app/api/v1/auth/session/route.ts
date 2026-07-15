@@ -16,7 +16,13 @@ export async function POST(request: NextRequest) {
   if (!configured || !safeSecretEqual(body.passcode, configured)) {
     return apiError("unauthorized", "The dashboard passcode was not accepted.", requestId, 401);
   }
+  let sessionValue: string;
+  try {
+    sessionValue = createSessionValue("demo-operator");
+  } catch {
+    return apiError("provider_unavailable", "Dashboard authentication is not configured; no session was created.", requestId, 503, true);
+  }
   const response = NextResponse.json({ status: "authenticated" });
-  response.cookies.set(sessionCookieName(), createSessionValue("demo-operator"), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 8 });
+  response.cookies.set(sessionCookieName(), sessionValue, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 8 });
   return response;
 }

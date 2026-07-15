@@ -28,7 +28,7 @@ export default function HomePage() {
       });
       const body: unknown = await response.json().catch(() => null);
       if (response.status === 401) {
-        router.push("/login");
+        router.push("/login?next=%2F");
         return;
       }
       if (!response.ok) {

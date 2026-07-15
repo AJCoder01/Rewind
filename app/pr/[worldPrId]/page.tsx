@@ -45,7 +45,7 @@ function ActionDetails({ action }: { action: PlannedAction }) {
   if (action.type === "calendar.move") {
     return (
       <>
-        <p>Move the selected event from {formatTime(action.preconditions.expectedStart.instant, action.preconditions.expectedStart.timeZone)} to {formatTime(action.desired.start.instant, action.desired.start.timeZone)} for {action.desired.durationMinutes} minutes.</p>
+        <p>Move the selected event from {formatTime(action.preconditions.expectedStart.instant, action.preconditions.expectedStart.timeZone)}–{formatTime(action.preconditions.expectedEnd.instant, action.preconditions.expectedEnd.timeZone)} to {formatTime(action.desired.start.instant, action.desired.start.timeZone)}–{formatTime(action.desired.end.instant, action.desired.end.timeZone)} for {action.desired.durationMinutes} minutes.</p>
         <dl className="action-details">
           <div><dt>Dependency</dt><dd>{dependency}</dd></div>
           <div><dt>IANA time zone</dt><dd>{action.desired.start.timeZone}</dd></div>
@@ -106,7 +106,7 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
     return () => controller.abort();
   }, [worldPrId]);
 
-  if (message) return <main className="shell"><div className="content"><div className="notice" role="alert">{message}{loginRequired ? <> <Link href="/login">Sign in</Link></> : null}</div></div></main>;
+  if (message) return <main className="shell"><div className="content"><div className="notice" role="alert">{message}{loginRequired ? <> <Link href={`/login?next=${encodeURIComponent(`/pr/${worldPrId}`)}`}>Sign in</Link></> : null}</div></div></main>;
   if (!view || !view.activePlan) return <main className="shell"><div className="content"><p className="muted" aria-live="polite">Loading the immutable review record…</p></div></main>;
   const plan = view.activePlan;
   const assumption = plan.assumptions[0];
@@ -138,7 +138,7 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
           <section className="panel">
             <div className="panel-inner">
               <h2>Recorded assumption</h2>
-              <div className="assumption"><strong>{assumption.statement}</strong><p>This is the decision the later recovery flow will be able to revisit.</p></div>
+              <div className="assumption"><strong>{assumption.statement}</strong><p>This is the decision the later recovery flow will be able to revisit. Recorded confidence: {Math.round(assumption.confidence * 100)}%.</p></div>
               <ul className="evidence">{assumption.evidence.map((item) => <li key={item}>{item}</li>)}</ul>
             </div>
           </section>

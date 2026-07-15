@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { safeReturnPath } from "@/lib/auth/return-path";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,7 +20,10 @@ export default function LoginPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ passcode }),
       });
-      if (response.ok) router.push("/");
+      if (response.ok) {
+        const destination = safeReturnPath(new URLSearchParams(window.location.search).get("next"));
+        router.push(destination);
+      }
       else setMessage("Sign-in failed. Configure the demo operator passcode for this environment.");
     } catch {
       setMessage("The sign-in service could not be reached.");

@@ -38,7 +38,8 @@ async function main(): Promise<void> {
           return { isError: true, content: [{ type: "text" as const, text: message }] };
         }
         const result = CreateWorldPrResponseSchema.parse(body);
-        return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+        const safeToolResult = { worldPrId: result.worldPrId, status: result.status, reviewUrl: result.reviewUrl };
+        return { content: [{ type: "text" as const, text: JSON.stringify(safeToolResult) }] };
       } catch {
         return {
           isError: true,

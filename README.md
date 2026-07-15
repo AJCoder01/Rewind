@@ -16,7 +16,7 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Implementation | Fixture-backed non-effecting G1 slice in progress |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
-| Last updated | 2026-07-14 |
+| Last updated | 2026-07-15 |
 
 The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, and a reviewable World PR. No Calendar, Gmail, OpenAI, or external-effect path is enabled yet. Verified locally: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, and `npm run test:e2e`.
 
@@ -121,8 +121,9 @@ Read these in order:
 6. [Demo runbook](docs/DEMO_RUNBOOK.md) — seed data, preflight, narration, and reset.
 7. [Decisions](docs/DECISIONS.md) — accepted trade-offs, rejected options, and open decisions.
 8. [Implementation plan](docs/IMPLEMENTATION_PLAN.md) — the single sequential `S001`–`S103` execution queue and gates.
-9. [Progress](docs/PROGRESS.md) — live phase-gate checklist and evidence links.
-10. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
+9. [S007 Supabase guide](docs/S007_SUPABASE_GUIDE.md) — the manual, credential-safe database provisioning procedure.
+10. [Progress](docs/PROGRESS.md) — live phase-gate checklist and evidence links.
+11. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
 
 Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot be traded away, Architecture owns **how**, Contracts own boundary shapes, and the Implementation Plan owns the exact implementation sequence and gates. Executable schemas/tests become canonical for exact fields once implemented. Progress and the runbook never create new requirements.
 
@@ -142,7 +143,7 @@ Current OpenAI documentation lists GPT-5.6 Sol as supporting the Responses API a
 
 ## First contributor actions
 
-1. Start at `S007` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): provision the selected Supabase project.
+1. Start at `S008` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): apply and independently verify the real migration using the provisioned Supabase project.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 

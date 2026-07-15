@@ -207,6 +207,31 @@ export const CalendarCandidateSchema = z
   })
   .strict();
 
+export const ModelMetadataSchema = z.discriminatedUnion("provider", [
+  z
+    .object({
+      provider: z.literal("openai"),
+      model: z.string().min(1).max(200),
+      promptVersion: z.string().min(1).max(100),
+      schemaVersion: z.string().min(1).max(100),
+      reasoningEffort: z.string().min(1).max(100),
+      responseId: z.string().min(1).max(200).optional(),
+      source: z.enum(["model", "fallback"]),
+    })
+    .strict(),
+  z
+    .object({
+      provider: z.literal("fixture"),
+      model: z.string().min(1).max(200),
+      promptVersion: z.string().min(1).max(100),
+      schemaVersion: z.string().min(1).max(100),
+      reasoningEffort: z.literal("none"),
+      responseId: z.string().min(1).max(200).optional(),
+      source: z.literal("fixture"),
+    })
+    .strict(),
+]);
+
 export const InitialPlanPayloadCoreSchema = z
   .object({
     schemaVersion: z.literal("initial-plan.v1"),
@@ -225,20 +250,54 @@ export const InitialPlanPayloadCoreSchema = z
       z.literal("initial.calendar.move"),
       z.literal("initial.mail.notify"),
     ]),
-    modelMetadata: z
-      .object({
-        provider: z.string().min(1).max(100),
-        model: z.string().min(1).max(200),
-        promptVersion: z.string().min(1).max(100),
-        responseId: z.string().min(1).max(200),
-      })
-      .strict(),
+    modelMetadata: ModelMetadataSchema,
   })
   .strict();
 
 export const InitialPlanPayloadSchema = InitialPlanPayloadCoreSchema.extend({
   digest: Sha256DigestSchema,
-}).strict();
+})
+  .strict()
+  .superRefine((value, context) => {
+    const [artifact, calendar] = value.actions;
+    const candidateIds = new Set(value.candidateSet.map((candidate) => candidate.candidateId));
+    const candidateRegions = new Set(value.candidateSet.map((candidate) => candidate.region));
+    const selected = value.candidateSet.find((candidate) => candidate.candidateId === value.selectedCandidateId);
+    const alternativeId = value.alternativeCandidateIds[0];
+    if (
+      candidateIds.size !== 2 ||
+      candidateRegions.size !== 2 ||
+      !candidateRegions.has("UK") ||
+      !candidateRegions.has("US") ||
+      !selected ||
+      !candidateIds.has(alternativeId) ||
+      alternativeId === value.selectedCandidateId
+    ) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["selectedCandidateId"], message: "Selected and alternative candidates must identify the closed two-candidate universe" });
+      return;
+    }
+    if (selected.region !== "UK") {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["selectedCandidateId"], message: "The controlled initial plan must select the UK candidate" });
+    }
+    if (value.assumptions[0].resolvedCandidateId !== selected.candidateId) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["assumptions", 0, "resolvedCandidateId"], message: "The assumption must resolve to the selected candidate" });
+    }
+    if (
+      calendar.target.providerEventId !== selected.providerEventId ||
+      calendar.preconditions.expectedEtag !== selected.etag ||
+      calendar.preconditions.attendeeSetDigest !== selected.attendeeSetDigest ||
+      calendar.preconditions.expectedStart.instant !== selected.start.instant ||
+      calendar.preconditions.expectedStart.timeZone !== selected.start.timeZone ||
+      calendar.preconditions.expectedEnd.instant !== selected.end.instant ||
+      calendar.preconditions.expectedEnd.timeZone !== selected.end.timeZone ||
+      calendar.preconditions.privateTags.region !== selected.region
+    ) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["actions", 1], message: "Calendar target and preconditions must match the selected candidate" });
+    }
+    if (artifact.desired.contentHash !== value.accountBriefContentHash) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["accountBriefContentHash"], message: "Account brief hashes must match the exact approved content" });
+    }
+  });
 
 export const TimelineItemSchema = z
   .object({
@@ -276,6 +335,15 @@ export const WorldPrViewSchema = z
     }
     if (value.status === "clarification_required" && (!value.clarification || value.activePlan)) {
       context.addIssue({ code: z.ZodIssueCode.custom, message: "clarification_required requires a clarification and no active plan" });
+    }
+    if (value.activePlan) {
+      const selectedId = value.activePlan.selectedCandidate.candidateId;
+      if (value.activePlan.assumptions[0].resolvedCandidateId !== selectedId) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["activePlan", "assumptions", 0, "resolvedCandidateId"], message: "Active-plan assumption must resolve to the selected candidate" });
+      }
+      if (value.activePlan.alternatives[0].candidateId === selectedId) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["activePlan", "alternatives", 0], message: "Selected and alternative candidates must be distinct" });
+      }
     }
   });
 

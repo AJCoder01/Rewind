@@ -60,6 +60,9 @@ async function main(): Promise<void> {
     await page.getByRole("heading", { name: "Make the reasoning behind an action visible." }).waitFor({ state: "visible" });
     await page.getByRole("button", { name: "Create World PR" }).click();
     await page.waitForURL((url) => url.pathname === "/login");
+    await page.getByLabel("Demo passcode").fill("wrong-playwright-passcode");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByText("Sign-in failed. Configure the demo operator passcode for this environment.").waitFor({ state: "visible" });
     await page.getByLabel("Demo passcode").fill("playwright-demo-passcode");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.waitForURL((url) => url.pathname === "/");
@@ -73,7 +76,17 @@ async function main(): Promise<void> {
     await page.getByText("artifact-independence.v1", { exact: true }).waitFor({ state: "visible" });
     await page.getByText("Requires initial.calendar.move to succeed", { exact: true }).waitFor({ state: "visible" });
     await page.getByText("External integrations remain disabled until their safety gates pass.").waitFor({ state: "visible" });
-    console.log("E2E passed: unauthenticated redirect, dashboard login, World PR creation, and review rendering.");
+    const reviewUrl = page.url();
+    await page.context().clearCookies();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByText("Your review session has expired. Sign in again.", { exact: false }).waitFor({ state: "visible" });
+    await page.getByRole("link", { name: "Sign in" }).click();
+    await page.waitForURL((url) => url.pathname === "/login" && url.searchParams.get("next") === new URL(reviewUrl).pathname);
+    await page.getByLabel("Demo passcode").fill("playwright-demo-passcode");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.waitForURL(reviewUrl);
+    await page.getByRole("heading", { name: "Acme UK renewal" }).waitFor({ state: "visible" });
+    console.log("E2E passed: auth rejection, login, creation, strict review rendering, expired-session handling, and safe return to the review URL.");
     exitCode = 0;
   } finally {
     await browser?.close();

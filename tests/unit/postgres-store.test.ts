@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { describe, expect, it, vi } from "vitest";
-import { InitialPlanPayloadSchema } from "@/lib/contracts/v1";
+import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import { PostgresWorldPrStore } from "@/lib/db/postgres-store";
 import { sha256Digest } from "@/lib/domain/digest";
 import { buildFixtureWorldPrRecord } from "@/lib/domain/fixture-world-pr";
@@ -41,7 +41,7 @@ describe("PostgresWorldPrStore", () => {
 
     const planCall = calls.find(({ sql }) => sql.includes("INSERT INTO plans"));
     expect(planCall).toBeDefined();
-    const payload = InitialPlanPayloadSchema.parse(JSON.parse(String(planCall?.params[2])));
+    const payload = VerifiedInitialPlanPayloadSchema.parse(JSON.parse(String(planCall?.params[2])));
     const { digest, ...core } = payload;
     expect(sha256Digest(core)).toBe(digest);
     expect(result.planPayload).toEqual(payload);
@@ -84,7 +84,72 @@ describe("PostgresWorldPrStore", () => {
     });
 
     expect(replay.replay).toBe(true);
-    expect(replay.response).toEqual({ ...storedResponse, replayPending: true });
+    expect(replay.response).toEqual(storedResponse);
     expect(connect).not.toHaveBeenCalled();
+  });
+
+  it("marks a claimed idempotency record failed when client acquisition fails", async () => {
+    const calls: QueryCall[] = [];
+    const poolQuery = vi.fn(async (sql: string, params: readonly unknown[] = []) => {
+      calls.push({ sql, params });
+      if (sql.includes("RETURNING key")) return { rowCount: 1, rows: [{ key: "idempotency-key-0001" }] };
+      if (sql.includes("SET status = 'failed'")) return { rowCount: 1, rows: [] };
+      throw new Error(`Unexpected SQL in connection-failure test: ${sql}`);
+    });
+    const connect = vi.fn(async () => {
+      throw new Error("database connection unavailable");
+    });
+    const store = new PostgresWorldPrStore({ query: poolQuery, connect } as unknown as Pool);
+
+    await expect(
+      store.createInitial({
+        actorId: "test:operator",
+        endpoint: "POST /api/v1/world-prs",
+        idempotencyKey: "idempotency-key-0001",
+        bodyHash: sha256Digest({ request: SUPPORTED_SCENARIO_REQUEST }),
+        request: SUPPORTED_SCENARIO_REQUEST,
+        requestId: "req_connectfail",
+        reviewUrl: "http://localhost:3000/pr/{worldPrId}",
+      }),
+    ).rejects.toThrow("database connection unavailable");
+
+    expect(calls.some(({ sql }) => sql.includes("SET status = 'failed'"))).toBe(true);
+  });
+
+  it("reads a persisted clarification that intentionally has no plan", async () => {
+    const stored = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
+    const clarification = structuredClone(stored.view);
+    clarification.status = "clarification_required";
+    delete clarification.activePlan;
+    clarification.clarification = {
+      question: "Which Acme region did you intend?",
+      candidates: [
+        { candidateId: "cal_event_acme_uk", label: "Acme UK renewal" },
+        { candidateId: "cal_event_acme_us", label: "Acme US renewal" },
+      ],
+    };
+    const poolQuery = vi.fn(async (sql: string) => {
+      if (sql === "SELECT read_model FROM tasks WHERE id = $1") return { rowCount: 1, rows: [{ read_model: clarification }] };
+      throw new Error(`Plan lookup must not run for clarification state: ${sql}`);
+    });
+    const store = new PostgresWorldPrStore({ query: poolQuery } as unknown as Pool);
+
+    await expect(store.get(clarification.worldPrId)).resolves.toEqual(clarification);
+    expect(poolQuery).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a human-visible read model that disagrees with its immutable payload", async () => {
+    const stored = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
+    const tamperedView = structuredClone(stored.view);
+    if (!tamperedView.activePlan) throw new Error("Fixture must contain an active plan");
+    tamperedView.activePlan.selectedCandidate.label = "Acme US renewal";
+    const poolQuery = vi.fn(async (sql: string) => {
+      if (sql === "SELECT read_model FROM tasks WHERE id = $1") return { rowCount: 1, rows: [{ read_model: tamperedView }] };
+      if (sql.includes("JOIN plans")) return { rowCount: 1, rows: [{ read_model: tamperedView, payload: stored.planPayload }] };
+      throw new Error(`Unexpected SQL in consistency test: ${sql}`);
+    });
+    const store = new PostgresWorldPrStore({ query: poolQuery } as unknown as Pool);
+
+    await expect(store.get(stored.view.worldPrId)).rejects.toThrow("does not match its immutable plan payload");
   });
 });
