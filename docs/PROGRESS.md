@@ -135,7 +135,8 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 - [x] `S001`–`S006`: repository, decisions, scaffold, minimal contracts/migration, and local fixture slice.
 - [x] `S007`: Supabase PostgreSQL provisioned and hardened in Mumbai; private transaction/session URLs and live TLS/role/ACL checks passed. Evidence: [sanitized S007 report](../artifacts/test-runs/2026-07-15-s007-supabase.md).
 - [x] `S008`: real migration applied atomically and repeatably; exact live catalog, constraints, grants, TLS, rollback-only probes, and readiness passed. Evidence: [sanitized S008 report](../artifacts/test-runs/2026-07-15-s008-migration.md).
-- [ ] `S009`–`S012`: provision Vercel/Google/OpenAI prerequisites and finalize private environment/startup validation.
+- [~] `S009`: manual Vercel provisioning guide is ready; waiting for the production origin, minimum secret configuration, health/readiness results, and secure-cookie checkpoint. Evidence target: [S009 manual guide](S009_VERCEL_GUIDE.md).
+- [ ] `S010`–`S012`: provision Google/OpenAI prerequisites and finalize private environment/startup validation after S009.
 - [ ] `S013`–`S018`: CI/security, controlled fixtures, traceability, accessibility review, and clean-checkout G0 evidence.
 
 ## Current blockers

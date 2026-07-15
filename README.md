@@ -122,8 +122,9 @@ Read these in order:
 7. [Decisions](docs/DECISIONS.md) — accepted trade-offs, rejected options, and open decisions.
 8. [Implementation plan](docs/IMPLEMENTATION_PLAN.md) — the single sequential `S001`–`S103` execution queue and gates.
 9. [S007 Supabase guide](docs/S007_SUPABASE_GUIDE.md) — the manual, credential-safe database provisioning procedure.
-10. [Progress](docs/PROGRESS.md) — live phase-gate checklist and evidence links.
-11. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
+10. [S009 Vercel guide](docs/S009_VERCEL_GUIDE.md) — the manual, credential-safe deployment checkpoint.
+11. [Progress](docs/PROGRESS.md) — live phase-gate checklist and evidence links.
+12. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
 
 Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot be traded away, Architecture owns **how**, Contracts own boundary shapes, and the Implementation Plan owns the exact implementation sequence and gates. Executable schemas/tests become canonical for exact fields once implemented. Progress and the runbook never create new requirements.
 

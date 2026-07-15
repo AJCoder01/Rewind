@@ -258,6 +258,7 @@ Resolve these by the gate shown. Record the answer, date, and evidence here; upd
 | OPEN-011 | Freeze the exact short company-wide synthetic account-note fixture with no regional input | G0 | Open; scheduled by `S014` |
 | OPEN-012 | Use one canonical sequential implementation queue with no person-specific task lanes | Complete | Superseded 2026-07-14; `IMPLEMENTATION_PLAN.md` now owns `S001`–`S103` in order |
 | OPEN-013 | Sanitized Markdown in `artifacts/test-runs/`; raw logs/screenshots ignored; private provider receipts remain outside Git | Complete | Resolved 2026-07-14; tracked evidence index and `.gitignore` policy |
+| OPEN-014 | S009 closes Vercel infrastructure/origin/readiness/cookie proof only; deployed create/review proof waits for S023/S028 fake-provider isolation. Freeze Google’s callback as `/api/v1/oauth/google/callback`; generate the minimum deployment secrets in S009 and validate/rotate them in S012; OIDC subject and refresh-token ciphertext remain deferred until S031–S032 obtain them. | Complete | Resolved 2026-07-15; [S009 manual guide](S009_VERCEL_GUIDE.md), S023/S028 sequencing, and provider boundary review |
 
 ### Phase 0 resolution notes
 
