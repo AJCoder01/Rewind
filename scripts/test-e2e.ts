@@ -1,15 +1,17 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { chromium, expect } from "@playwright/test";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const port = "3100";
-const baseUrl = `http://127.0.0.1:${port}`;
+const host = "127.0.0.1";
+const fixtureBaseUrl = "http://127.0.0.1:3100";
 
 // This is a complete, explicitly fixture-only server environment. Do not
 // inherit process.env: in particular, the smoke must not receive deployment
 // credentials or let Next load .env.local in development mode.
-export const FIXTURE_E2E_SERVER_ENVIRONMENT = {
+export function createFixtureE2EServerEnvironment(baseUrl: string) {
+  return {
   NODE_ENV: "test",
   APP_BASE_URL: baseUrl,
   REWIND_STORAGE_MODE: "memory_fixture",
@@ -25,18 +27,37 @@ export const FIXTURE_E2E_SERVER_ENVIRONMENT = {
   REWIND_GOOGLE_EXPECTED_EMAIL: "fixture-team@example.test",
   REWIND_RECIPIENT_ALLOWLIST: JSON.stringify({ UK: ["uk-ops@example.test"], US: ["us-ops@example.test"] }),
   REWIND_DEMO_DATE: "2026-08-20",
-} as const;
+  } as const;
+}
 
-function spawnServer(): ChildProcess {
-  return spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", port], {
+export const FIXTURE_E2E_SERVER_ENVIRONMENT = createFixtureE2EServerEnvironment(fixtureBaseUrl);
+
+function spawnServer(port: number, baseUrl: string): ChildProcess {
+  return spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", host, "--port", String(port)], {
     cwd: root,
-    env: FIXTURE_E2E_SERVER_ENVIRONMENT,
+    env: createFixtureE2EServerEnvironment(baseUrl),
     stdio: "inherit",
     windowsHide: true,
   });
 }
 
-async function waitForHealth(): Promise<void> {
+async function chooseAvailablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, host, () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close();
+        reject(new Error("Could not reserve a loopback port for the fixture browser smoke."));
+        return;
+      }
+      server.close((error) => (error ? reject(error) : resolve(address.port)));
+    });
+  });
+}
+
+async function waitForHealth(baseUrl: string): Promise<void> {
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     try {
@@ -62,11 +83,13 @@ function stopProcessTree(server: ChildProcess): void {
 }
 
 async function main(): Promise<void> {
-  const server = spawnServer();
+  const port = await chooseAvailablePort();
+  const baseUrl = `http://${host}:${port}`;
+  const server = spawnServer(port, baseUrl);
   let exitCode = 1;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
-    await waitForHealth();
+    await waitForHealth(baseUrl);
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     page.setDefaultTimeout(15_000);
