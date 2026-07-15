@@ -5,7 +5,7 @@
 | Status | Active canonical execution queue |
 | Execution model | One sequential task at a time |
 | Current gate | G0 — foundation |
-| Current restart point | `S012` — finalize the private environment contract |
+| Current restart point | `S013` — add fast CI and repository security checks |
 | Last updated | 2026-07-15 |
 
 This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
@@ -43,7 +43,7 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 - [x] **S009 — Provision and verify Vercel.** Follow [the manual S009 guide](S009_VERCEL_GUIDE.md): connect the GitHub repository, use Node 24 and Fluid Compute in Mumbai (`bom1`), configure the minimum private Production environment, deploy over TLS, and prove health/readiness, secure cookies, and the frozen base URL. Evidence: [sanitized S009 report](../artifacts/test-runs/2026-07-15-s009-vercel.md). The deployed create/review saga remains deferred to S023/S028 while the PostgreSQL store is fixture-backed.
 - [x] **S010 — Prepare Google Cloud access without live effects.** Follow the [manual S010 guide](S010_GOOGLE_GUIDE.md): create the project, enable Calendar/Gmail APIs, configure External/Testing audience and the exact test identity, register exact local/deployed redirects, request only OIDC + `calendar.events.owned` + `gmail.send`, and store no credential in Git. Evidence: [sanitized S010 report](../artifacts/test-runs/2026-07-15-s010-google.md). No live OAuth grant or provider effect was performed in S010.
 - [x] **S011 — Prepare OpenAI project access.** Create/confirm the API project, keep the key in local/deployment secrets, verify the configured model is available, and defer product model calls until G2 strict-schema tests exist. Evidence: [sanitized S011 report](../artifacts/test-runs/2026-07-15-s011-openai.md).
-- [~] **S012 — Finalize the private environment contract.** Follow the [manual S012 guide](S012_PRIVATE_ENVIRONMENT_GUIDE.md): generate strong secrets, configure the private Google/OpenAI/database fields and structured allowlist, run sanitized startup validation, and never log literal values.
+- [x] **S012 — Finalize the private environment contract.** Follow the [manual S012 guide](S012_PRIVATE_ENVIRONMENT_GUIDE.md): generate strong secrets, configure the private Google/OpenAI/database fields and structured allowlist, run sanitized startup validation, and never log literal values. Evidence: [sanitized S012 report](../artifacts/test-runs/2026-07-15-s012-environment.md).
 - [ ] **S013 — Add fast CI and repository security checks.** Run install, lint, typecheck, unit/contract tests, production build, dependency audit, secret scan, migration validation against ephemeral PostgreSQL, and fake-in-production checks on every change.
 - [ ] **S014 — Freeze the controlled content and UI inventory.** Finalize the synthetic parent-account note fixture, demo copy, required UI states, component boundaries, viewport, reduced-motion behavior, and sanitized evidence format.
 - [ ] **S015 — Build executable requirement traceability.** Map FR-01–32, SAFE-01–10, and NFR-01–10 to code paths, tests, fixture IDs, and evidence under `tests/fixtures/traceability/**`.
