@@ -5,10 +5,16 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import { databaseCatalogMatches } from "@/lib/db/catalog";
 import { loadPrivateLocalEnvironment, requireDatabaseUrl } from "@/lib/db/config";
 import { runtimePrivilegesMatch } from "@/lib/db/privileges";
+import { assertOAuthCatalog } from "@/lib/db/oauth-migrate";
 import { evaluateDatabaseReadiness } from "@/lib/db/readiness";
 import {
   FOUNDATION_MIGRATION_ID,
   isKnownFoundationMigrationChecksum,
+  OAUTH_CONSTRAINTS,
+  OAUTH_COLUMN_SIGNATURES,
+  OAUTH_MIGRATION_CHECKSUM,
+  OAUTH_MIGRATION_ID,
+  OAUTH_TABLES,
   REWIND_COLUMN_SIGNATURES,
   REWIND_CONSTRAINTS,
   REWIND_DATABASE_TABLES,
@@ -108,6 +114,7 @@ async function main(): Promise<void> {
       ...(await verifyIdentityAndTls(runtime, migration)),
       exactCatalog: await databaseCatalogMatches(queryFrom(runtime)),
       exactColumnsAndDefaults: await verifyColumns(migration),
+      exactOAuthCatalog: await verifyOAuthCatalog(migration),
       exactConstraintCount: await verifyConstraintCount(migration),
       exactRuntimePrivileges: await runtimePrivilegesMatch(queryFrom(runtime)),
       publicAndApiRolesExcluded: await verifyExcludedRoles(migration),
@@ -181,6 +188,7 @@ async function verifyIdentityAndTls(runtime: PoolClient, migration: PoolClient):
 }
 
 async function verifyColumns(client: PoolClient): Promise<boolean> {
+  const allTables = [...REWIND_DATABASE_TABLES, ...OAUTH_TABLES];
   const rows = (await client.query<{
     table_name: string;
     column_name: string;
@@ -200,29 +208,40 @@ async function verifyColumns(client: PoolClient): Promise<boolean> {
      FROM information_schema.columns
      WHERE table_schema = 'public' AND table_name = ANY($1::text[])
      ORDER BY table_name, ordinal_position`,
-    [REWIND_DATABASE_TABLES],
+    [allTables],
   )).rows;
   const actual: Record<string, string[]> = {};
   for (const row of rows) {
     actual[row.table_name] ??= [];
     actual[row.table_name].push(`${row.column_name}:${row.data_type}:${row.is_nullable}:${row.default_kind}`);
   }
-  return JSON.stringify(actual) === JSON.stringify(Object.fromEntries(Object.entries(REWIND_COLUMN_SIGNATURES).sort()));
+  return JSON.stringify(actual) === JSON.stringify(Object.fromEntries(Object.entries({ ...REWIND_COLUMN_SIGNATURES, ...OAUTH_COLUMN_SIGNATURES }).sort()));
 }
 
 async function verifyConstraintCount(client: PoolClient): Promise<boolean> {
+  const allTables = [...REWIND_DATABASE_TABLES, ...OAUTH_TABLES];
   const row = (await client.query<{ count: number }>(
     `SELECT count(*)::int AS count
      FROM pg_constraint con
      JOIN pg_class cls ON cls.oid = con.conrelid
      JOIN pg_namespace ns ON ns.oid = cls.relnamespace
      WHERE ns.nspname = 'public' AND cls.relname = ANY($1::text[])`,
-    [REWIND_DATABASE_TABLES],
+    [allTables],
   )).rows[0];
-  return row.count === REWIND_CONSTRAINTS.length;
+  return row.count === REWIND_CONSTRAINTS.length + OAUTH_CONSTRAINTS.length;
+}
+
+async function verifyOAuthCatalog(client: PoolClient): Promise<boolean> {
+  try {
+    await assertOAuthCatalog((text, values) => client.query(text, values ? [...values] : undefined));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function verifyExcludedRoles(client: PoolClient): Promise<boolean> {
+  const allTables = [...REWIND_DATABASE_TABLES, ...OAUTH_TABLES];
   const rows = (await client.query<{ role_name: string; allowed_count: number }>(
     `SELECT role_name,
             count(*) FILTER (
@@ -233,7 +252,7 @@ async function verifyExcludedRoles(client: PoolClient): Promise<boolean> {
      CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) AS privileges(privilege)
      GROUP BY role_name
      ORDER BY role_name`,
-    [REWIND_DATABASE_TABLES],
+    [allTables],
   )).rows;
   const tableAccessAbsent = rows.length === 3 && rows.every((row) => row.allowed_count === 0);
   const sequenceRows = (await client.query<{ role_name: string; allowed: boolean }>(
@@ -250,7 +269,7 @@ async function verifyExcludedRoles(client: PoolClient): Promise<boolean> {
      WHERE n.nspname = 'public'
        AND (c.relname = ANY($1::text[]) OR c.relname = 'audit_events_id_seq')
        AND acl.grantee = 0`,
-    [REWIND_DATABASE_TABLES],
+    [allTables],
   )).rows[0];
   return tableAccessAbsent && sequenceRows.every((row) => !row.allowed) && publicAcl.count === 0;
 }
@@ -275,7 +294,9 @@ async function verifyMigrationLedger(client: PoolClient): Promise<boolean> {
   const rows = (await client.query<{ migration_id: string; checksum: string }>(
     "SELECT migration_id, checksum FROM rewind_schema_migrations ORDER BY migration_id",
   )).rows;
-  return rows.length === 1 && rows[0].migration_id === FOUNDATION_MIGRATION_ID && isKnownFoundationMigrationChecksum(rows[0].checksum);
+  const foundation = rows.find((row) => row.migration_id === FOUNDATION_MIGRATION_ID);
+  const oauth = rows.find((row) => row.migration_id === OAUTH_MIGRATION_ID);
+  return rows.length === 2 && Boolean(foundation && isKnownFoundationMigrationChecksum(foundation.checksum)) && oauth?.checksum === OAUTH_MIGRATION_CHECKSUM;
 }
 
 async function verifyConstraintBehavior(client: PoolClient): Promise<boolean> {

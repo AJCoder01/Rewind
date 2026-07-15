@@ -5,7 +5,7 @@
 | Status | Active canonical execution queue |
 | Execution model | One sequential task at a time |
 | Current gate | G2 — OAuth, provider, and model risk retirement |
-| Current restart point | `S031` — implement the OAuth transaction flow |
+| Current restart point | `S032` — enforce connected Google identity claims |
 | Last updated | 2026-07-16 |
 
 This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
@@ -82,7 +82,7 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 
 ### G2 — OAuth, provider, and model risk retirement
 
-- [ ] **S031 — Implement the OAuth transaction flow.** Add state, OIDC nonce, PKCE S256, exact redirect validation, short-lived session-bound transaction storage, atomic one-use consumption, and encrypted token persistence.
+- [x] **S031 — Implement the OAuth transaction flow.** Added state, OIDC nonce, PKCE S256, exact redirect validation, short-lived session-bound transaction storage, atomic one-use consumption, encrypted verifier/refresh-token persistence primitives, authenticated start/callback routes, and the reviewed `0002_oauth_transaction` migration. Evidence: [S031 OAuth transaction report](../artifacts/test-runs/2026-07-16-s031-oauth-transaction.md). The callback remains fail-closed until S032 validates signed OIDC claims; no live provider effect was run.
 - [ ] **S032 — Enforce connected identity claims.** Validate signature, issuer, audience, expiry, issued-at, nonce, verified email, stable subject, expected account, refresh behavior, and account substitution failure without Gmail mailbox/profile reads.
 - [ ] **S033 — Add OAuth negative tests.** Prove replay, missing/mismatched state/nonce/PKCE, wrong redirect/audience/issuer/subject/account, expired token, and unverified email all fail closed.
 - [ ] **S034 — Define explicit provider ports and deterministic fakes.** Add scenario-specific Calendar, Gmail, artifact, and model interfaces plus failure injection; do not add a generic compensation framework.

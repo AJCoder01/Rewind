@@ -73,7 +73,7 @@ export async function applyFoundationMigration(pool: Pool, sql: string): Promise
   }
 }
 
-async function assertMigrationLedgerShape(client: PoolClient): Promise<void> {
+export async function assertMigrationLedgerShape(client: PoolClient): Promise<void> {
   const result = await client.query<{
     column_name: string;
     data_type: string;

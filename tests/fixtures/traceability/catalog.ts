@@ -15,6 +15,7 @@ const g1Evidence = [
   "artifacts/test-runs/2026-07-16-s029-interface-freeze.md",
   "artifacts/test-runs/2026-07-16-s030-g1-close.md",
 ];
+const oauthEvidence = [...g1Evidence, "artifacts/test-runs/2026-07-16-s031-oauth-transaction.md"];
 const initialFixtures: TraceabilityFixtureId[] = ["fixture-initial.v1", "controlled-content.v1", "artifact-independence.v1"];
 const intakeCode = ["app/page.tsx", "app/api/v1/world-prs/route.ts", "lib/services/world-pr.ts", "mcp/server.ts"];
 const intakeTests = ["tests/unit/world-pr.test.ts", "tests/unit/g1-routes-auth.test.ts", "tests/unit/g1-mcp.test.ts", "scripts/test-e2e.ts"];
@@ -143,8 +144,8 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   }),
   current({
     id: "SAFE-09", kind: "SAFE", title: "Server-only private environment boundary", planTasks: ["S003", "S012", "S013", "S031"],
-    codePaths: ["lib/config/environment.ts", "lib/db/config.ts", "scripts/security-scan.ts"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/db-config.test.ts", "tests/unit/security-scan.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: [...foundationEvidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
-    note: "Configuration validation and tracked-file scanning are covered; encrypted OAuth storage is future work.",
+    codePaths: ["lib/config/environment.ts", "lib/db/config.ts", "lib/google/oauth.ts", "lib/google/credentials.ts", "lib/db/oauth-store.ts", "db/migrations/0002_oauth_transaction.sql", "scripts/security-scan.ts"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/db-config.test.ts", "tests/unit/oauth-transaction.test.ts", "tests/unit/oauth-migration.test.ts", "tests/unit/oauth-routes.test.ts", "tests/unit/security-scan.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: [...oauthEvidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
+    note: "Configuration validation, exact redirect/session binding, encrypted verifier/refresh-token storage, migration grants, and tracked-file scanning are covered; signed identity validation and live provider refresh remain S032/S043 work.",
   }),
   current({
     id: "SAFE-10", kind: "SAFE", title: "Controlled data minimization and redaction", planTasks: ["S003", "S012", "S013", "S089"],
