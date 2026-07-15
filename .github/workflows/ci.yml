@@ -55,6 +55,9 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Client bundle scan
+        run: npm run client:scan
+
       - name: Dependency audit
         run: npm audit --audit-level=moderate
 
