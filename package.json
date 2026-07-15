@@ -18,6 +18,7 @@
     "reset:demo": "tsx scripts/reset-demo.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:verify": "tsx scripts/verify-database.ts",
+    "verify:openai-access": "tsx scripts/verify-openai-access.ts",
     "mcp": "tsx mcp/server.ts"
   },
   "overrides": {
