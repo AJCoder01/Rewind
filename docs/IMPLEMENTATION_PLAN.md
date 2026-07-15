@@ -4,8 +4,8 @@
 |---|---|
 | Status | Active canonical execution queue |
 | Execution model | One sequential task at a time |
-| Current gate | G0 — foundation |
-| Current restart point | `S018` — collect clean-checkout G0 evidence; human-only private-environment checks remain |
+| Current gate | G1 — non-effecting MCP → API → PostgreSQL → dashboard |
+| Current restart point | `S019` — complete lifecycle and error contracts |
 | Last updated | 2026-07-15 |
 
 This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
@@ -44,19 +44,19 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 - [x] **S010 — Prepare Google Cloud access without live effects.** Follow the [manual S010 guide](S010_GOOGLE_GUIDE.md): create the project, enable Calendar/Gmail APIs, configure External/Testing audience and the exact test identity, register exact local/deployed redirects, request only OIDC + `calendar.events.owned` + `gmail.send`, and store no credential in Git. Evidence: [sanitized S010 report](../artifacts/test-runs/2026-07-15-s010-google.md). No live OAuth grant or provider effect was performed in S010.
 - [x] **S011 — Prepare OpenAI project access.** Create/confirm the API project, keep the key in local/deployment secrets, verify the configured model is available, and defer product model calls until G2 strict-schema tests exist. Evidence: [sanitized S011 report](../artifacts/test-runs/2026-07-15-s011-openai.md).
 - [x] **S012 — Finalize the private environment contract.** Follow the [manual S012 guide](S012_PRIVATE_ENVIRONMENT_GUIDE.md): generate strong secrets, configure the private Google/OpenAI/database fields and structured allowlist, run sanitized startup validation, and never log literal values. Evidence: [sanitized S012 report](../artifacts/test-runs/2026-07-15-s012-environment.md).
-- [x] **S013 — Add fast CI and repository security checks.** Run install, lint, typecheck, unit/contract tests, production build, dependency audit, reachable-history secret scan, migration validation against ephemeral PostgreSQL, and fake-in-production checks on every change. Evidence: [sanitized S013 report](../artifacts/test-runs/2026-07-15-s013-ci-security.md); hosted verification remains pending after push.
+- [x] **S013 — Add fast CI and repository security checks.** Run install, lint, typecheck, unit/contract tests, production build, dependency audit, reachable-history secret scan, migration validation against ephemeral PostgreSQL, and fake-in-production checks on every change. Evidence: [sanitized S013 report](../artifacts/test-runs/2026-07-15-s013-ci-security.md); hosted verification is recorded in the [S018 G0 report](../artifacts/test-runs/2026-07-15-s018-g0.md).
 - [x] **S014 — Freeze the controlled content and UI inventory.** Finalize the synthetic parent-account note fixture, demo copy, required UI states, component boundaries, viewport, reduced-motion behavior, and sanitized evidence format. Evidence: [sanitized S014 report](../artifacts/test-runs/2026-07-15-s014-content-ui.md) and [controlled content/UI inventory](CONTROLLED_CONTENT_UI_INVENTORY.md).
 - [x] **S015 — Build executable requirement traceability.** Map FR-01–32, SAFE-01–10, and NFR-01–10 to code paths, tests, fixture IDs, and evidence under `tests/fixtures/traceability/**`. Evidence: [sanitized S015 report](../artifacts/test-runs/2026-07-15-s015-traceability.md), [traceability catalog guide](TRACEABILITY.md), and `npm run traceability:check`.
 - [x] **S016 — Create the complete golden contract fixture set.** Add strict success/error/read-model fixtures for analyzing, clarification, preview, executing, completed, correction, recovery, attention, recovered, rule, reset, cancelled, and failed states. Evidence: [sanitized S016 report](../artifacts/test-runs/2026-07-15-s016-golden-contracts.md) and [golden fixture guide](GOLDEN_CONTRACT_FIXTURES.md).
 - [x] **S017 — Validate the scaffold for accessibility and testability.** Confirm semantic structure, keyboard reachability, focus order, non-color state labels, reduced-motion baseline, stable test selectors, and honest fixture labeling. Evidence: [sanitized S017 report](../artifacts/test-runs/2026-07-15-s017-accessibility.md), [accessibility/testability guide](ACCESSIBILITY_TESTABILITY.md), and the fixture E2E smoke.
-- [ ] **S018 — Close G0 on a clean checkout.** Install with Node 24, apply migrations, build, lint, typecheck, run fast tests and secret scanning, verify no secret/client leak, update all command truth, and store sanitized G0 evidence.
+- [x] **S018 — Close G0 on a clean checkout.** Install with Node 24, apply migrations, build, lint, typecheck, run fast tests and secret scanning, verify no secret/client leak, update all command truth, and store sanitized G0 evidence. Evidence: [sanitized S018 G0 report](../artifacts/test-runs/2026-07-15-s018-g0.md).
 
 #### Gate G0 acceptance
 
-- [ ] Supabase and Vercel are provisioned and the real migration/readiness checks pass.
-- [ ] Google/OpenAI access prerequisites exist without enabling unapproved product effects.
-- [ ] Contracts, migrations, golden fixtures, and traceability are frozen in dependency order.
-- [ ] Clean-checkout build/lint/typecheck/test/security checks pass with no committed secret.
+- [x] Supabase and Vercel are provisioned and the real migration/readiness checks pass.
+- [x] Google/OpenAI access prerequisites exist without enabling unapproved product effects.
+- [x] Contracts, migrations, golden fixtures, and traceability are frozen in dependency order.
+- [x] Clean-checkout build/lint/typecheck/test/security checks pass with no committed secret.
 
 ### G1 — Non-effecting MCP → API → PostgreSQL → dashboard slice
 
