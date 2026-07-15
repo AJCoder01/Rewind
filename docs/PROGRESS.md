@@ -1,11 +1,11 @@
 # Rewind MVP progress
 
-Current status: master-plan tasks `S001`–`S013` are complete; the first unfinished task is `S014` (freeze the controlled content and UI inventory), and Gate G0 remains open.
+Current status: master-plan tasks `S001`–`S014` are complete; the first unfinished task is `S015` (build executable requirement traceability), and Gate G0 remains open.
 
 | Field | Value |
 |---|---|
 | Status | Live checklist |
-| Current phase | G0 foundation; restart at `S014` |
+| Current phase | G0 foundation; restart at `S015` |
 | Last updated | 2026-07-15 |
 | Implementation update | One sequential `S001`–`S103` plan replaces the prior person-specific workstreams; no live provider integration is enabled. |
 
@@ -121,7 +121,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 
 | Gate | Sequential scope | Status | Evidence |
 |---|---|---|---|
-| G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | In progress | `S001`–`S013` complete; start `S014`; controlled content, golden fixtures, traceability, accessibility, and clean-checkout evidence remain |
+| G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | In progress | `S001`–`S014` complete; start `S015`; traceability, golden fixtures, accessibility, and clean-checkout evidence remain |
 | G1 | `S019`–`S030`: non-effecting MCP → API → PostgreSQL → dashboard | In progress behind G0 | Fixture create/review path and browser smoke pass; durable deployed/replay/error coverage remains |
 | G2 | `S031`–`S045`: OAuth, Calendar/Gmail/artifact/model primitives and live spikes | Not started | TBD |
 | G3 | `S046`–`S059`: initial World PR, approval, execution, receipts | Not started | TBD |
@@ -140,7 +140,8 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 - [x] `S011`: OpenAI project/model access verified for `gpt-5.6-sol` with the sanitized read-only verifier; no product model call was enabled. Evidence: [sanitized S011 evidence](../artifacts/test-runs/2026-07-15-s011-openai.md).
 - [x] `S012`: private environment shape, local application/MCP validation, Production configuration, redeployment, health/readiness, and secure-cookie checks passed. Evidence: [sanitized S012 evidence](../artifacts/test-runs/2026-07-15-s012-environment.md).
 - [x] `S013`: CI workflow, tracked secret scan, dependency audit command, production fake-mode guard, and ephemeral migration replay script added. Evidence: [sanitized S013 evidence](../artifacts/test-runs/2026-07-15-s013-ci-security.md).
-- [ ] `S014`–`S018`: controlled fixtures, traceability, accessibility review, and clean-checkout G0 evidence.
+- [x] `S014`: controlled content/UI inventory and `controlled-content.v1` source/output fixture frozen. Evidence: [sanitized S014 evidence](../artifacts/test-runs/2026-07-15-s014-content-ui.md).
+- [ ] `S015`–`S018`: traceability, golden fixtures, accessibility review, and clean-checkout G0 evidence.
 
 ## Current blockers
 
@@ -149,7 +150,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 | OAuth token and live provider ownership are not configured | Calendar/Gmail risk cannot be retired | Complete S031–S043 in G2 | Open |
 | Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Direct smoke runner tears down cleanly; retain conventional spec for CI migration | Resolved |
 
-Supabase is provisioned, the frozen schema is applied, and S009 Vercel health/readiness and cookie checks pass. Google Cloud and OpenAI access prerequisites are configured without live product effects. S012 private environment validation and S013 CI/security checks also passed. Next: execute S014–S018 to close G0.
+Supabase is provisioned, the frozen schema is applied, and S009 Vercel health/readiness and cookie checks pass. Google Cloud and OpenAI access prerequisites are configured without live product effects. S012 private environment validation, S013 CI/security checks, and S014 controlled content/UI freeze also passed. Next: execute S015–S018 to close G0.
 
 ## Verification evidence log
 
@@ -174,6 +175,7 @@ Add entries only after work is actually complete:
 | 2026-07-15 | S011 OpenAI project access | [Sanitized S011 evidence](../artifacts/test-runs/2026-07-15-s011-openai.md): private project/key, configured model, read-only access check, and no product call | Passed; S012 is next | User + Codex |
 | 2026-07-15 | S012 private environment and startup validation | [Sanitized S012 evidence](../artifacts/test-runs/2026-07-15-s012-environment.md): local config check, Production configuration/redeploy, health/readiness, login, and secure-cookie flags | Passed; S013 is next | User + Codex |
 | 2026-07-15 | S013 CI and repository security checks | [Sanitized S013 evidence](../artifacts/test-runs/2026-07-15-s013-ci-security.md): clean install, lint, typecheck, 95 tests, build, 0-vulnerability audit, tracked secret scan, fake-production guard, fixture E2E, and CI-only ephemeral migration job | Passed locally; hosted ephemeral migration remains pending | Codex |
+| 2026-07-15 | S014 controlled content and UI inventory | [Sanitized S014 evidence](../artifacts/test-runs/2026-07-15-s014-content-ui.md): `controlled-content.v1` source/output fixture, copy/state inventory, viewports, reduced-motion baseline, selectors, and evidence policy | Passed; S015 is next | Codex |
 | 2026-07-15 | Full codebase cleanup and regression audit | [Sanitized audit evidence](../artifacts/test-runs/2026-07-15-codebase-cleanup-audit.md): complete file-purpose inventory, clean install, lint, strict/unused type checks, 28 tests, production build, browser and actual MCP smokes, dependency/secret/link/client-bundle checks, and read-only S007 regression | Passed at the time; no redundant tracked file found and S008 was next then | Codex |
 
 ## MVP definition of done

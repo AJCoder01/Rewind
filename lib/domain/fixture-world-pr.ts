@@ -11,6 +11,9 @@ import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-s
 import { sha256Digest, sha256Text } from "@/lib/domain/digest";
 import { createOpaqueId } from "@/lib/domain/ids";
 import {
+  ACCOUNT_BRIEF_CONTENT_FIXTURE,
+  ACCOUNT_BRIEF_SOURCE_ID,
+  ACCOUNT_BRIEF_TITLE,
   ACCOUNT_BRIEF_VALIDATOR_VERSION,
   PARENT_ACCOUNT_NOTES_FIXTURE,
   assertAccountBriefIndependent,
@@ -18,13 +21,6 @@ import {
 
 const demoDate = "2026-08-20";
 const timeZone = "America/New_York";
-const briefContent = [
-  "Acme parent-account renewal risk brief",
-  "",
-  "- Adoption is healthy, but executive sponsorship should be reconfirmed.",
-  "- Procurement timing is the main schedule risk.",
-  "- Next step: confirm decision owners and renewal milestones.",
-].join("\n");
 
 function zoned(instant: string) {
   return { instant, timeZone };
@@ -40,7 +36,7 @@ export interface FixtureWorldPrRecord {
 }
 
 export function buildFixtureWorldPrRecord(request: string, now = new Date()): FixtureWorldPrRecord {
-  assertAccountBriefIndependent(briefContent);
+  assertAccountBriefIndependent(ACCOUNT_BRIEF_CONTENT_FIXTURE);
   const worldPrId = createOpaqueId("wpr_");
   const runId = createOpaqueId("run_");
   const planId = createOpaqueId("plan_");
@@ -66,11 +62,11 @@ export function buildFixtureWorldPrRecord(request: string, now = new Date()): Fi
     dependsOnAssumptionIds: [] as never[],
     externalEffect: false as const,
     desired: {
-      title: "Acme parent-account renewal risk brief",
-      content: briefContent,
-      contentHash: sha256Text(briefContent),
+      title: ACCOUNT_BRIEF_TITLE,
+      content: ACCOUNT_BRIEF_CONTENT_FIXTURE,
+      contentHash: sha256Text(ACCOUNT_BRIEF_CONTENT_FIXTURE),
       provenance: {
-        sourceId: "acme_parent_account_notes" as const,
+        sourceId: ACCOUNT_BRIEF_SOURCE_ID,
         sourceDigest: sha256Text(PARENT_ACCOUNT_NOTES_FIXTURE),
         excludedDimensions: ["calendar_event", "region", "attendees", "meeting_time"] as [
           "calendar_event",
