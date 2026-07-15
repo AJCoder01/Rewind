@@ -12,8 +12,8 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 
 | Field | Value |
 |---|---|
-| Phase | G1 — non-effecting MCP → API → PostgreSQL → dashboard |
-| Implementation | S028 deployed proof passed; S029 G1 interface packet is frozen; S030 closure is next |
+| Phase | G2 — OAuth, provider, and model risk retirement |
+| Implementation | G1 S019–S030 closed with deployed non-effecting evidence; S031 is next |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-15 |
@@ -31,7 +31,7 @@ Codex MCP create_world_pr call
 → authenticated dashboard review page
 ```
 
-Calendar, Gmail, recovery, rules, and animation remain deferred until the provider/model risk gates and the non-effecting slice are closed.
+Calendar, Gmail, recovery, rules, and animation remain deferred until their provider/model risk gates are closed.
 
 ## Product in one minute
 
@@ -162,7 +162,7 @@ The first command applies the frozen migration atomically and is safe to repeat 
 
 ## First contributor actions
 
-1. Start at `S030` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): close the G1 gate from the frozen interface packet and evidence.
+1. Start at `S031` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): implement the OAuth transaction flow under the G2 safety gate.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 
