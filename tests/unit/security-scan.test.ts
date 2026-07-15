@@ -16,7 +16,8 @@ describe("repository security checks", () => {
   });
 
   it("flags remote connection URLs and tracked private-file names", () => {
-    expect(scanText("notes.md", "postgresql://user:secret@remote.internal:5432/db")).toEqual([
+    const remoteFixture = ["postgresql://user:secret@", "remote.internal:5432/db"].join("");
+    expect(scanText("notes.md", remoteFixture)).toEqual([
       { file: "notes.md", rule: "remote-connection-url" },
     ]);
     expect(scanTrackedFileName(".env.local")).toEqual([{ file: ".env.local", rule: "private-environment-file" }]);
