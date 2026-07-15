@@ -45,7 +45,6 @@ export class PostgresWorldPrStore implements WorldPrStore {
   constructor(private readonly pool: Pool) {}
 
   async createInitial(input: CreateWorldPrStoreInput): Promise<CreateWorldPrStoreResult> {
-    if (process.env.NODE_ENV === "production") throw new FakeProviderConfigurationError();
     const record = buildFixtureWorldPrRecord(input.request);
     const analyzingView = buildFixtureAnalyzingView(record.view);
     const response = worldPrResponse(record.view, input);
@@ -155,7 +154,6 @@ export class PostgresWorldPrStore implements WorldPrStore {
   }
 
   async cancel(input: CancelWorldPrStoreInput): Promise<CancelWorldPrStoreResult> {
-    if (process.env.NODE_ENV === "production") throw new FakeProviderConfigurationError();
     const claim = await this.pool.query(
       `INSERT INTO idempotency_records
         (actor_id, endpoint, key, body_hash, status, resource_id, created_at, updated_at)

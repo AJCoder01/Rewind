@@ -1,12 +1,12 @@
 # Rewind MVP progress
 
-Current status: master-plan tasks `S001`–`S027` are complete; the first unfinished task is `S028` (prove the deployed non-effecting slice), and Gate G0 is closed while Gate G1 remains in progress.
+Current status: master-plan tasks `S001`–`S027` are complete; the first unfinished task is `S028` (prove the deployed non-effecting slice). The S028 production PostgreSQL boundary and local verification packet are ready, but the deployed MCP/session proof remains human-only and unperformed. Gate G0 is closed while Gate G1 remains in progress.
 
 | Field | Value |
 |---|---|
 | Status | Live checklist |
 | Current phase | G1 non-effecting vertical slice; restart at `S028` |
-| Last updated | 2026-07-15 |
+| Last updated | 2026-07-16 |
 | Implementation update | One sequential `S001`–`S103` plan replaces the prior person-specific workstreams; no live provider integration is enabled. |
 
 This file records status and evidence only. It does not create or change requirements.
@@ -147,13 +147,15 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 - [x] `S018`: clean-checkout G0 evidence. Evidence: [sanitized S018 G0 report](../artifacts/test-runs/2026-07-15-s018-g0.md).
 - [x] `S019`–`S027`: completed the strict G1 contracts, transactional PostgreSQL repository path, intake serialization and leases, auth/CSRF/resource boundaries, fixture isolation, thin create/read/status/cancel routes, scoped MCP create/status tools, non-effecting review UI, and automated regression/E2E coverage. Evidence: [sanitized S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md). Schema/fixture versions: `v1`, `initial-plan.v1`, `golden-contracts.v1`, `traceability.v1`, `fixture-initial.v1`, `prevention-rule.v1`, `reset-plan.v1`.
 
+- [~] `S028` implementation preflight: production now permits only the real PostgreSQL repository for the explicitly non-effecting G1 contract slice; `memory_fixture` and fake provider/model modes remain rejected. Local checks pass, and the credential-safe operator procedure is in [the S028 guide](S028_DEPLOYED_G1_GUIDE.md). The deployed MCP → API → PostgreSQL → dashboard proof has not been run because it requires the human operator’s deployed environment/session.
+
 - [x] G1 adversarial review correction pass: repaired MCP/dashboard controlled-workspace access, PostgreSQL lease/replay and cancellation honesty, production auth/error mapping, strict lifecycle metadata, UI-state honesty, and documentation drift. Evidence: [sanitized adversarial review](../artifacts/test-runs/2026-07-15-g1-adversarial-review.md). Requirement links: FR-01, FR-02, FR-03, FR-07, FR-09, SAFE-03, SAFE-04, SAFE-08, NFR-02, NFR-06, NFR-07, NFR-08, NFR-10. Versions: `v1`, `initial-plan.v1`, `golden-contracts.v1`, `traceability.v1`, `fixture-initial.v1`, `prevention-rule.v1`, `reset-plan.v1`. Local verification passed; deployed proof, fresh disposable migration replay, and recovery evaluation remain unverified for the recorded reasons.
 
 ## Current blockers
 
 | Blocker | Impact | Next action | Status |
 |---|---|---|---|
-| Deployed G1 proof still requires the configured Vercel/Supabase environment and an operator session | Local fixture evidence cannot prove deployed MCP → API → PostgreSQL → dashboard behavior | Run the human-only S028 guide without enabling providers or external effects | Open |
+| Deployed G1 proof still requires the configured Vercel/Supabase environment and an operator session | Local fixture evidence cannot prove deployed MCP → API → PostgreSQL → dashboard behavior | Deploy the reviewed S028 branch and run the human-only [S028 guide](S028_DEPLOYED_G1_GUIDE.md) without enabling providers or external effects | Open |
 | OAuth token and live provider ownership are not configured | Calendar/Gmail risk cannot be retired | Complete S031–S043 in G2 | Open |
 | Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Direct smoke runner tears down cleanly; retain conventional spec for CI migration | Resolved |
 
@@ -190,6 +192,7 @@ Add entries only after work is actually complete:
 | 2026-07-15 | Full codebase cleanup and regression audit | [Sanitized audit evidence](../artifacts/test-runs/2026-07-15-codebase-cleanup-audit.md): complete file-purpose inventory, clean install, lint, strict/unused type checks, 28 tests, production build, browser and actual MCP smokes, dependency/secret/link/client-bundle checks, and read-only S007 regression | Passed at the time; no redundant tracked file found and S008 was next then | Codex |
 | 2026-07-15 | S019–S027 G1 implementation packet | [Sanitized S019–S027 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md): strict contracts, repository/intake/auth/route/MCP/UI implementation, 27 test files/142 tests, production build, browser flow, audit, security scan, fake-production guard, and traceability validation | Passed locally in fixture mode; S028 deployed proof is next | Codex |
 | 2026-07-15 | G1 adversarial review and correction | [Sanitized adversarial review](../artifacts/test-runs/2026-07-15-g1-adversarial-review.md): repaired MCP/dashboard scope, lease/replay/cancel races, auth/error/contract/UI honesty; clean install, 27 files/150 tests, build, browser, audit, security/traceability/fake-production checks | Passed locally in fixture mode; fresh disposable migration and recovery evaluation remain unverified for documented scope reasons | Codex |
+| 2026-07-16 | S028 production boundary and local preflight | [Sanitized S028 preparation report](../artifacts/test-runs/2026-07-16-s028-preparation.md): production PostgreSQL repository boundary, non-effecting UI label, Node 24 clean install, 152 unit tests, build, browser smoke, lint/typecheck, security, fake-production, and traceability checks | Local packet passed; deployed MCP/session proof remains human-only and unperformed; no external effect occurred | Codex |
 
 ## MVP definition of done
 

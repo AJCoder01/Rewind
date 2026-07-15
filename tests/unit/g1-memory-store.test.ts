@@ -4,6 +4,7 @@ import { cancelWorldPr, createWorldPr, getWorldPr } from "@/lib/services/world-p
 import { SUPPORTED_SCENARIO_REQUEST } from "@/lib/domain/scenario";
 import { getWorldPrStore } from "@/lib/db";
 import { FakeProviderConfigurationError } from "@/lib/db/store";
+import { PostgresWorldPrStore } from "@/lib/db/postgres-store";
 
 const request = SUPPORTED_SCENARIO_REQUEST;
 
@@ -96,5 +97,24 @@ describe("S021 serialized fixture intake", () => {
     (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     expect(() => getWorldPrStore()).toThrow(FakeProviderConfigurationError);
     (process.env as Record<string, string | undefined>).NODE_ENV = "test";
+  });
+
+  it("allows the durable PostgreSQL repository in production for the non-effecting slice", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousStorageMode = process.env.REWIND_STORAGE_MODE;
+    const previousDatabaseUrl = process.env.DATABASE_URL;
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+    process.env.REWIND_STORAGE_MODE = "postgres";
+    process.env.DATABASE_URL = "postgresql://rewind_app:fixture@db.example.test:6543/rewind?sslmode=require&uselibpqcompat=true";
+    try {
+      expect(getWorldPrStore()).toBeInstanceOf(PostgresWorldPrStore);
+    } finally {
+      if (previousNodeEnv === undefined) delete (process.env as Record<string, string | undefined>).NODE_ENV;
+      else (process.env as Record<string, string | undefined>).NODE_ENV = previousNodeEnv;
+      if (previousStorageMode === undefined) delete process.env.REWIND_STORAGE_MODE;
+      else process.env.REWIND_STORAGE_MODE = previousStorageMode;
+      if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+      else process.env.DATABASE_URL = previousDatabaseUrl;
+    }
   });
 });

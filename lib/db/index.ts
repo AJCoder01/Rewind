@@ -13,7 +13,6 @@ export function getWorldPrStore(): WorldPrStore {
     return memoryFixtureStore;
   }
   if (!process.env.DATABASE_URL) throw new StorageNotConfiguredError();
-  if (environmentMode === "production") throw new FakeProviderConfigurationError();
   postgresStore ??= new PostgresWorldPrStore(new Pool({ connectionString: requireDatabaseUrl("DATABASE_URL") }));
   return postgresStore;
 }

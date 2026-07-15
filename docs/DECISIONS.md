@@ -42,6 +42,7 @@ This file records why a decision was made and which choices remain open. Accepte
 | ADR-021 | Make Playwright/live/eval gates mandatory | Accepted |
 | ADR-022 | Use npm scripts in the single root package | Accepted |
 | ADR-023 | Use same-origin plus double-submit CSRF for dashboard mutations | Accepted |
+| ADR-024 | Permit the deployed G1 PostgreSQL contract slice without provider effects | Accepted |
 
 ## Accepted decisions
 
@@ -228,6 +229,14 @@ This file records why a decision was made and which choices remain open. Accepte
 **Why:** The single-tenant dashboard needs a browser mutation boundary without adding a server-side session store. Origin validation and a double-submit token prevent cross-site cookie-authenticated POSTs while keeping MCP authorization explicit.
 
 **Consequence:** The session route sets a readable CSRF cookie, browser clients send `x-rewind-csrf`, and production still fails closed when the signed-session/auth configuration is missing. The token is never accepted as an authorization credential by itself.
+
+### ADR-024 — Permit the deployed G1 PostgreSQL contract slice without provider effects
+
+**Decision:** Production may use the real PostgreSQL-backed G1 repository to persist the deterministic, contract-valid non-effecting World PR slice. Production continues to reject `memory_fixture`, fake Calendar/Gmail/model adapters, and every external-effect path. The deployed UI must label this path as non-effecting and must not present the stored contract fixture as live provider or model evidence.
+
+**Why:** S028 must prove authenticated MCP → API → PostgreSQL → dashboard behavior on the deployed environment. Rejecting all PostgreSQL repository operations in production makes that proof impossible, while allowing only the durable non-effecting repository path preserves the G1 safety boundary.
+
+**Consequence:** The deployed S028 proof demonstrates durable storage, authentication, idempotency, read-model validation, and review rendering only. It does not close any Calendar, Gmail, OAuth, or model risk gate and cannot be used as live-provider evidence.
 
 ## Rejected alternatives
 

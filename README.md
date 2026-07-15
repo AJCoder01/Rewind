@@ -130,6 +130,7 @@ Read these in order:
 13. [S012 private environment guide](docs/S012_PRIVATE_ENVIRONMENT_GUIDE.md) — the manual, secret-safe environment and startup-validation checkpoint.
 14. [Progress](docs/PROGRESS.md) — live phase-gate checklist and evidence links.
 15. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
+16. [S028 deployed G1 guide](docs/S028_DEPLOYED_G1_GUIDE.md) — the credential-safe human checkpoint for the deployed non-effecting slice.
 
 Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot be traded away, Architecture owns **how**, Contracts own boundary shapes, and the Implementation Plan owns the exact implementation sequence and gates. Executable schemas/tests become canonical for exact fields once implemented. Progress and the runbook never create new requirements.
 

@@ -107,7 +107,7 @@ function Timeline({ view }: { view: WorldPrView }) {
 }
 
 function FixtureNotice() {
-  return <div className="notice fixture-notice" data-testid="fixture-mode-notice" role="status"><strong>Fixture mode:</strong> this G1 slice does not approve or execute Calendar, Gmail, or artifact effects. External integrations remain disabled until their safety gates pass.</div>;
+  return <div className="notice fixture-notice" data-testid="fixture-mode-notice" role="status"><strong>G1 non-effecting mode:</strong> this review is persisted in PostgreSQL, but it does not approve or execute Calendar, Gmail, artifact, or model effects. This contract fixture is not live-provider evidence.</div>;
 }
 
 export default function ReviewPage({ params }: { params: Promise<{ worldPrId: string }> }) {

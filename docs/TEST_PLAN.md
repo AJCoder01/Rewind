@@ -7,7 +7,7 @@
 | Planner quality gate | At least 24/25 correction paraphrases; target 25/25 |
 | Negative safety gate | 100%; zero unsafe adapter calls |
 | Live rehearsal gate | 5 consecutive complete runs |
-| Last updated | 2026-07-15 |
+| Last updated | 2026-07-16 |
 
 The purpose of testing is to prove the narrow product claim and its safety boundary, not maximize generic coverage.
 
@@ -64,6 +64,7 @@ Live tests require explicit environment gating, controlled accounts, and a confi
 3. A fixture-backed active rule can return `clarification_required` without a lock; a request that passes precheck and tries to plan while another fixture scenario owns the lock returns `scenario_busy`.
 4. The development/test preview is a complete contract-valid fixture plan, never an incomplete placeholder labelled `preview_ready`.
 5. No live Calendar, Gmail, or OpenAI adapter can run in the G1 test configuration.
+6. The deployed S028 proof uses the real PostgreSQL repository for the non-effecting contract slice, visibly labels the fixture marker, and makes no Calendar, Gmail, or OpenAI call.
 
 ### Gate G2 — Provider and model risk retirement
 
