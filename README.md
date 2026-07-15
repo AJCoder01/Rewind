@@ -12,7 +12,7 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 
 | Field | Value |
 |---|---|
-| Phase | Phase 0 — alignment and engineering foundation |
+| Phase | G1 — non-effecting MCP → API → PostgreSQL → dashboard |
 | Implementation | Fixture-backed non-effecting G1 slice in progress |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
@@ -158,7 +158,7 @@ The first command applies the frozen migration atomically and is safe to repeat 
 
 ## First contributor actions
 
-1. Start at `S018` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): close G0 with clean-checkout evidence and the remaining human-only environment checks.
+1. Start at `S019` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): complete the lifecycle and error contracts for the non-effecting vertical slice.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 
