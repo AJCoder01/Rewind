@@ -44,7 +44,7 @@ Local Codex clients support stdio MCP servers; a future remote transport is not 
 
 The implemented G1 slice keeps route handlers thin: they authorize the dashboard session or scoped MCP bearer, validate the v1 request, invoke one application service, and map a safe response. The service delegates lifecycle ordering to the store. PostgreSQL claims idempotency before planning, persists the analyzing task and planning lease transactionally, evaluates the typed fixture rule before the effect-bearing lock, and parses stored read models through the v1 schemas. The scoped MCP principal and authenticated demo operator share the one controlled workspace, so an MCP-created review URL is readable by that operator but never by an unrelated actor. A rule match persists a clarification-only task with no plan, action, run, or lock. The dashboard's cancel mutation uses the same service and releases only the lock owned by that task; an in-progress cancellation replays the current durable state rather than a speculative success. The status endpoint exposes an MCP-safe projection.
 
-The deterministic fixture adapter is limited to development and tests. Production configuration rejects fixture mode before a fake provider can produce a success. G1 proves this boundary locally; S028–S030 still must prove the deployed non-effecting path and its visible fixture labeling.
+The deterministic Calendar/Gmail/model provider adapters are limited to development and tests. Production configuration rejects `memory_fixture` and any fake provider selection before a provider-backed success can be produced. The deployed G1 path is different: it uses the real PostgreSQL repository to persist the deterministic, contract-valid non-effecting plan fixture, makes no Calendar, Gmail, or model call, and labels the review as non-effecting. G1 proves this boundary locally; S028–S030 still must prove the deployed durable path and its visible non-effecting labeling.
 
 ## 3. Intended source layout
 
@@ -497,6 +497,7 @@ The first implementation contains no live Calendar, Gmail, recovery, or AI call:
 6. authenticated dashboard loads that complete review record;
 7. duplicate create replays the same response;
 8. unauthorized and second-active-scenario requests fail correctly;
-9. deployed live mode refuses to start if any fake adapter is selected.
+9. deployed live mode refuses fake provider/model adapters, while the real PostgreSQL repository may persist this explicitly non-effecting contract slice;
+10. the deployed review visibly states that no live provider or model evidence is claimed.
 
 Only after this slice is tested may the provider/model risk-retirement phase begin. An incomplete placeholder remains `analyzing`; it is never exposed as `preview_ready`.

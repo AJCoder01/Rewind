@@ -25,6 +25,8 @@ describe("S017 accessibility and testability contract", () => {
     for (const selector of ["composer-screen", "composer-request", "create-world-pr", "fixture-status"]) expect(composer).toContain(`data-testid=\"${selector}\"`);
     for (const selector of ["login-screen", "dashboard-passcode", "login-submit"]) expect(login).toContain(`data-testid=\"${selector}\"`);
     for (const selector of ["review-screen", "assumption-panel", "planned-actions", "review-timeline", "fixture-mode-notice", "clarification-panel"]) expect(review).toContain(`data-testid=\"${selector}\"`);
+    expect(composer).toContain("G1 non-effecting mode");
+    expect(review).toContain("not live-provider evidence");
   });
 
   it("keeps semantic status/error labels, visible focus, and reduced-motion rules", () => {

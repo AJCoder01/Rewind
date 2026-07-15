@@ -142,7 +142,7 @@ async function main(): Promise<void> {
     await page.getByText("America/New_York", { exact: true }).waitFor({ state: "visible" });
     await page.getByText("artifact-independence.v1", { exact: true }).waitFor({ state: "visible" });
     await page.getByText("Requires initial.calendar.move to succeed", { exact: true }).waitFor({ state: "visible" });
-    await page.getByText("External integrations remain disabled until their safety gates pass.").waitFor({ state: "visible" });
+    await page.getByText("This contract fixture is not live-provider evidence.").waitFor({ state: "visible" });
     const reviewUrl = page.url();
     await page.context().clearCookies();
     await page.reload({ waitUntil: "domcontentloaded" });

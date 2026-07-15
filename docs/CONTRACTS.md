@@ -5,7 +5,7 @@
 | Status | Implemented v1 boundary contract; Zod schemas and contract tests are canonical for exact fields |
 | API version | `v1` |
 | Scope | Controlled Acme Calendar + Gmail scenario |
-| Last updated | 2026-07-15 |
+| Last updated | 2026-07-16 |
 
 This document owns boundary intent. Once implemented, versioned Zod schemas, migrations, and contract tests are canonical for exact field shapes. Keep this file synchronized.
 
@@ -1044,7 +1044,7 @@ interface FixtureModelMetadata {
 }
 ```
 
-`OPENAI_MODEL` supplies the model. The provider/model risk phase initially tests `gpt-5.6-sol` if the project can access it and strict-schema evaluation passes. Store the actual returned model metadata. `FixtureModelMetadata` is permitted only for the explicitly labeled deterministic test/development slice and is forbidden in deployed live mode. A fallback source must be visibly logged and is forbidden during the recorded demo unless explicitly disclosed.
+`OPENAI_MODEL` supplies the model. The provider/model risk phase initially tests `gpt-5.6-sol` if the project can access it and strict-schema evaluation passes. Store the actual returned model metadata. `FixtureModelMetadata` is permitted for the explicitly labeled deterministic test/development slice and for the deployed G1 non-effecting PostgreSQL contract proof. In the deployed proof it is a contract-fixture marker only: no model/provider call occurs, the UI must state that no live-provider evidence is claimed, and the metadata cannot authorize or support an external effect. It remains forbidden for deployed effect-bearing/live mode. A fallback source must be visibly logged and is forbidden during the recorded demo unless explicitly disclosed.
 
 ## 13. Plan hashing and idempotency
 

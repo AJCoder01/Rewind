@@ -108,9 +108,9 @@ export default function HomePage() {
         </section>
         {message ? <div className="notice" role="alert" data-testid="composer-error">{message}</div> : null}
         <section className="status-row" data-testid="fixture-status" aria-label="Current slice status">
-          <span className="status-pill"><span className="status-mark" aria-hidden="true">1</span> Fixture providers only</span>
-          <span className="status-pill"><span className="status-mark" aria-hidden="true">2</span> Two controlled candidates</span>
-          <span className="status-pill"><span className="status-mark" aria-hidden="true">3</span> Exact plan digest</span>
+          <span className="status-pill"><span className="status-mark" aria-hidden="true">1</span> G1 non-effecting mode</span>
+          <span className="status-pill"><span className="status-mark" aria-hidden="true">2</span> PostgreSQL persistence</span>
+          <span className="status-pill"><span className="status-mark" aria-hidden="true">3</span> No provider/model calls</span>
         </section>
       </div>
     </main>

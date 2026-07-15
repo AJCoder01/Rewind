@@ -10,6 +10,40 @@ import { SUPPORTED_SCENARIO_REQUEST } from "@/lib/domain/scenario";
 type QueryCall = { sql: string; params: readonly unknown[] };
 
 describe("PostgresWorldPrStore", () => {
+  it("persists the explicitly non-effecting G1 slice in production mode", async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+    const calls: QueryCall[] = [];
+    async function query(sql: string, params: readonly unknown[] = []) {
+      calls.push({ sql, params });
+      if (sql.includes("RETURNING key")) return { rowCount: 1, rows: [{ key: "production-g1-key-0001" }] };
+      if (sql.includes("RETURNING scenario_key")) return { rowCount: 1, rows: [{ scenario_key: "acme-demo" }] };
+      return { rowCount: 1, rows: [] };
+    }
+    const client = { query: vi.fn(query), release: vi.fn() };
+    const pool = { query: vi.fn(query), connect: vi.fn(async () => client) } as unknown as Pool;
+    const store = new PostgresWorldPrStore(pool);
+
+    try {
+      const result = await store.createInitial({
+        actorId: "mcp:scoped-token",
+        endpoint: "POST /api/v1/world-prs",
+        idempotencyKey: "production-g1-key-0001",
+        bodyHash: sha256Digest({ request: SUPPORTED_SCENARIO_REQUEST }),
+        request: SUPPORTED_SCENARIO_REQUEST,
+        requestId: "req_production_g1",
+        reviewUrl: "https://rewind.example.test/pr/{worldPrId}",
+      });
+
+      expect(result.response.status).toBe("preview_ready");
+      expect(calls.some(({ sql }) => sql.includes("INSERT INTO tasks"))).toBe(true);
+      expect(client.release).toHaveBeenCalledOnce();
+    } finally {
+      if (previousNodeEnv === undefined) delete (process.env as Record<string, string | undefined>).NODE_ENV;
+      else (process.env as Record<string, string | undefined>).NODE_ENV = previousNodeEnv;
+    }
+  });
+
   it("claims idempotency, inserts the task before its lock, and stores the hashed plan payload", async () => {
     const calls: QueryCall[] = [];
     async function query(sql: string, params: readonly unknown[] = []) {
