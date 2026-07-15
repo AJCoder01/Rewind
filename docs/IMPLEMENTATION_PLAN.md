@@ -5,7 +5,7 @@
 | Status | Active canonical execution queue |
 | Execution model | One sequential task at a time |
 | Current gate | G1 — non-effecting MCP → API → PostgreSQL → dashboard |
-| Current restart point | `S019` — complete lifecycle and error contracts |
+| Current restart point | `S028` — prove the deployed non-effecting slice |
 | Last updated | 2026-07-15 |
 
 This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
@@ -60,15 +60,15 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 
 ### G1 — Non-effecting MCP → API → PostgreSQL → dashboard slice
 
-- [~] **S019 — Complete lifecycle and error contracts.** Implement every G1 task/error state as strict Zod schemas and reject extra/unknown fields at every boundary.
-- [~] **S020 — Complete PostgreSQL repositories.** Persist and read tasks, plans, read models, idempotency records, locks, and audit events transactionally; parse all stored JSON back through canonical schemas.
-- [~] **S021 — Complete intake serialization.** Evaluate the fixture rule before lock acquisition, support clarification without plan/action/lock, implement planning leases, return `scenario_busy` correctly, and handle identical/conflicting/in-progress/failed idempotency replay without a second saga.
-- [~] **S022 — Complete trust boundaries.** Enforce dashboard session expiry, CSRF/origin checks, resource scope, MCP bearer scope, redacted errors, and production refusal when required auth configuration is missing.
-- [~] **S023 — Complete deterministic fixture isolation.** Supply exactly two candidates and one complete contract-valid plan only in test/development; reject unsupported tasks and make deployed live startup fail if a fake adapter is selected.
-- [~] **S024 — Complete thin application routes.** Keep handlers to authenticate, validate, call one service, and map results for create/read/cancel/status without duplicating domain rules.
-- [~] **S025 — Complete the MCP entry point.** Expose only `create_world_pr` and optional status, return a non-secret review URL, and prohibit approval, recovery, rule activation, reset, or provider credentials.
-- [~] **S026 — Complete the non-effecting product UI.** Build composer, loading, empty, review, assumption/evidence, exact actions, dependency labels, timeline shell, safe errors, cancel/back, expired-session, and fake-mode labels using strict client parsing.
-- [~] **S027 — Complete G1 automated tests.** Cover identical/conflicting/concurrent/failed replay, rule clarification without lock, scenario busy, unsupported request, unauthorized create/read, expired session, CSRF, malformed read models, duplicate click, refresh, keyboard flow, and reduced motion.
+- [x] **S019 — Complete lifecycle and error contracts.** Implement every G1 task/error state as strict Zod schemas and reject extra/unknown fields at every boundary. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
+- [x] **S020 — Complete PostgreSQL repositories.** Persist and read tasks, plans, read models, idempotency records, locks, and audit events transactionally; parse all stored JSON back through canonical schemas. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
+- [x] **S021 — Complete intake serialization.** Evaluate the fixture rule before lock acquisition, support clarification without plan/action/lock, implement planning leases, return `scenario_busy` correctly, and handle identical/conflicting/in-progress/failed idempotency replay without a second saga. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
+- [x] **S022 — Complete trust boundaries.** Enforce dashboard session expiry, CSRF/origin checks, resource scope, MCP bearer scope, redacted errors, and production refusal when required auth configuration is missing. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
+- [x] **S023 — Complete deterministic fixture isolation.** Supply exactly two candidates and one complete contract-valid plan only in test/development; reject unsupported tasks and make deployed live startup fail if a fake adapter is selected. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
+- [x] **S024 — Complete thin application routes.** Keep handlers to authenticate, validate, call one service, and map results for create/read/cancel/status without duplicating domain rules. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
+- [x] **S025 — Complete the MCP entry point.** Expose only `create_world_pr` and optional status, return a non-secret review URL, and prohibit approval, recovery, rule activation, reset, or provider credentials. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
+- [x] **S026 — Complete the non-effecting product UI.** Build composer, loading, empty, review, assumption/evidence, exact actions, dependency labels, timeline shell, safe errors, cancel/back, expired-session, and fake-mode labels using strict client parsing. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
+- [x] **S027 — Complete G1 automated tests.** Cover identical/conflicting/concurrent/failed replay, rule clarification without lock, scenario busy, unsupported request, unauthorized create/read, expired session, CSRF, malformed read models, duplicate click, refresh, keyboard flow, and reduced motion. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
 - [ ] **S028 — Prove the deployed non-effecting slice.** Run MCP → authenticated API → Supabase → authenticated dashboard on the deployed environment with fixture providers visibly disabled from live claims.
 - [ ] **S029 — Freeze the G1 interface packet.** Freeze schemas, migrations, golden HTTP/read-model fixtures, error matrix, fixture versions, and the create/read browser evidence before provider work.
 - [ ] **S030 — Close G1.** Record all G1 command outputs, deployed screenshots, replay/auth results, fake-mode proof, known risks, and requirement links.

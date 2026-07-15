@@ -42,6 +42,10 @@ Codex calls only Rewind's high-level `create_world_pr` tool. It never receives G
 
 Local Codex clients support stdio MCP servers; a future remote transport is not required for the MVP. The MCP process is a thin authenticated HTTP client and owns no product state. See the current [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp).
 
+The implemented G1 slice keeps route handlers thin: they authorize the dashboard session or scoped MCP bearer, validate the v1 request, invoke one application service, and map a safe response. The service delegates lifecycle ordering to the store. PostgreSQL claims idempotency before planning, persists the analyzing task and planning lease transactionally, evaluates the typed fixture rule before the effect-bearing lock, and parses stored read models through the v1 schemas. The scoped MCP principal and authenticated demo operator share the one controlled workspace, so an MCP-created review URL is readable by that operator but never by an unrelated actor. A rule match persists a clarification-only task with no plan, action, run, or lock. The dashboard's cancel mutation uses the same service and releases only the lock owned by that task; an in-progress cancellation replays the current durable state rather than a speculative success. The status endpoint exposes an MCP-safe projection.
+
+The deterministic fixture adapter is limited to development and tests. Production configuration rejects fixture mode before a fake provider can produce a success. G1 proves this boundary locally; S028–S030 still must prove the deployed non-effecting path and its visible fixture labeling.
+
 ## 3. Intended source layout
 
 ```text

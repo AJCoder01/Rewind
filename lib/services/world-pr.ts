@@ -1,8 +1,43 @@
-import { CreateWorldPrRequestSchema, type CreateWorldPrResponse, type WorldPrView } from "@/lib/contracts/v1";
+import {
+  CancelWorldPrRequestSchema,
+  CreateWorldPrRequestSchema,
+  McpWorldPrStatusSchema,
+  OpaqueIdSchema,
+  type CreateWorldPrResponse,
+  type McpWorldPrStatus,
+  type TaskMutationResponse,
+  type WorldPrView,
+} from "@/lib/contracts/v1";
+import { getWorldPrStore } from "@/lib/db";
+import {
+  cancelBodyHash,
+  FakeProviderConfigurationError,
+  requestBodyHash,
+  StorageNotConfiguredError,
+  StoreError,
+  type CancelWorldPrStoreResult,
+} from "@/lib/db/store";
 import { createOpaqueId } from "@/lib/domain/ids";
 import { isSupportedScenarioRequest } from "@/lib/domain/scenario";
-import { getWorldPrStore } from "@/lib/db";
-import { requestBodyHash } from "@/lib/db/memory-store";
+
+export type ServiceErrorCode =
+  | "unauthorized"
+  | "forbidden"
+  | "invalid_request"
+  | "unsupported_request"
+  | "idempotency_conflict"
+  | "scenario_busy"
+  | "task_not_found"
+  | "invalid_task_state"
+  | "provider_unavailable"
+  | "internal_error";
+
+export class ServiceError extends Error {
+  constructor(public readonly code: ServiceErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "ServiceError";
+  }
+}
 
 export type CreateWorldPrInput = {
   actorId: string;
@@ -12,41 +47,117 @@ export type CreateWorldPrInput = {
   request: unknown;
 };
 
-export class ServiceError extends Error {
-  constructor(public readonly code: "invalid_request" | "unsupported_request" | "idempotency_conflict" | "scenario_busy" | "task_not_found", message: string) {
-    super(message);
-    this.name = "ServiceError";
-  }
-}
+export type CancelWorldPrInput = {
+  actorId: string;
+  source: "dashboard" | "mcp";
+  idempotencyKey: string;
+  requestId?: string;
+  worldPrId: string;
+  request: unknown;
+};
 
 export async function createWorldPr(input: CreateWorldPrInput): Promise<{ response: CreateWorldPrResponse; view: WorldPrView; replay: boolean }> {
   const parsed = CreateWorldPrRequestSchema.safeParse(input.request);
   if (!parsed.success) throw new ServiceError("invalid_request", "Request must contain one supported task description.");
-  if (!isSupportedScenarioRequest(parsed.data.request)) throw new ServiceError("unsupported_request", "This demo supports only the controlled Acme Calendar, mail, and account-brief scenario.");
-  if (!input.idempotencyKey || input.idempotencyKey.length < 16 || input.idempotencyKey.length > 200) throw new ServiceError("invalid_request", "Idempotency-Key is required and must be between 16 and 200 characters.");
+  if (!isSupportedScenarioRequest(parsed.data.request)) {
+    throw new ServiceError("unsupported_request", "This demo supports only the controlled Acme Calendar, mail, and account-brief scenario.");
+  }
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
   const requestId = input.requestId ?? createOpaqueId("req_");
-  const appBaseUrl = process.env.APP_BASE_URL;
-  if (!appBaseUrl) throw new Error("APP_BASE_URL is required; no review URL was created.");
-  const store = getWorldPrStore();
+  const reviewUrl = makeReviewUrl();
   try {
-    const result = await store.createInitial({
+    const result = await getWorldPrStore().createInitial({
       actorId: input.actorId,
       endpoint: "POST /api/v1/world-prs",
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
       bodyHash: requestBodyHash(parsed.data.request),
       request: parsed.data.request,
       requestId,
-      reviewUrl: `${new URL(appBaseUrl).origin}/pr/{worldPrId}`,
+      reviewUrl,
     });
     return result;
   } catch (error) {
-    if (error instanceof Error && (error.message === "idempotency_conflict" || error.message === "scenario_busy")) {
-      throw new ServiceError(error.message, error.message === "scenario_busy" ? "The controlled demo scenario is already in use." : "This idempotency key was already used for a different request.");
-    }
-    throw error;
+    throw toServiceError(error);
   }
 }
 
-export async function getWorldPr(worldPrId: string): Promise<WorldPrView | null> {
-  return getWorldPrStore().get(worldPrId);
+export async function getWorldPr(worldPrId: string, actorId?: string): Promise<WorldPrView | null> {
+  const parsedId = OpaqueIdSchema.safeParse(worldPrId);
+  if (!parsedId.success) return null;
+  try {
+    return await getWorldPrStore().get(parsedId.data, actorId);
+  } catch (error) {
+    throw toServiceError(error);
+  }
+}
+
+export async function getWorldPrStatus(worldPrId: string, actorId?: string): Promise<McpWorldPrStatus | null> {
+  const view = await getWorldPr(worldPrId, actorId);
+  if (!view) return null;
+  return McpWorldPrStatusSchema.parse({
+    worldPrId: view.worldPrId,
+    status: view.status,
+    reviewUrl: makeReviewUrl().replace("{worldPrId}", view.worldPrId),
+    ...(view.clarification ? { clarification: view.clarification } : {}),
+    ...(view.attention ? { attention: view.attention } : {}),
+  });
+}
+
+export async function cancelWorldPr(input: CancelWorldPrInput): Promise<{ response: TaskMutationResponse; view: WorldPrView; replay: boolean }> {
+  const parsed = CancelWorldPrRequestSchema.safeParse(input.request);
+  if (!parsed.success) throw new ServiceError("invalid_request", "Cancellation accepts an empty JSON object only.");
+  const id = OpaqueIdSchema.safeParse(input.worldPrId);
+  if (!id.success) throw new ServiceError("invalid_request", "The World PR identifier is invalid.");
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+  const requestId = input.requestId ?? createOpaqueId("req_");
+  try {
+    const result: CancelWorldPrStoreResult = await getWorldPrStore().cancel({
+      actorId: input.actorId,
+      endpoint: `POST /api/v1/world-prs/${id.data}/cancel`,
+      idempotencyKey,
+      bodyHash: cancelBodyHash(id.data),
+      worldPrId: id.data,
+      requestId,
+    });
+    return result;
+  } catch (error) {
+    throw toServiceError(error);
+  }
+}
+
+function requireIdempotencyKey(value: string): string {
+  if (!value || value.length < 16 || value.length > 200) {
+    throw new ServiceError("invalid_request", "Idempotency-Key is required and must be between 16 and 200 characters.");
+  }
+  return value;
+}
+
+function makeReviewUrl(): string {
+  const appBaseUrl = process.env.APP_BASE_URL;
+  if (!appBaseUrl) throw new ServiceError("provider_unavailable", "The review service is not configured; no plan was created.");
+  try {
+    return `${new URL(appBaseUrl).origin}/pr/{worldPrId}`;
+  } catch {
+    throw new ServiceError("provider_unavailable", "The review service is not configured; no plan was created.");
+  }
+}
+
+function toServiceError(error: unknown): ServiceError {
+  if (error instanceof ServiceError) return error;
+  if (error instanceof StoreError) {
+    const messages: Record<StoreError["code"], string> = {
+      forbidden: "This World PR is outside the authenticated workspace scope.",
+      idempotency_conflict: "This idempotency key was already used for a different request.",
+      scenario_busy: "The controlled demo scenario is already in use.",
+      task_not_found: "That World PR does not exist in the current controlled workspace.",
+      invalid_task_state: "This World PR cannot be changed from its current state.",
+      provider_unavailable: "The configured storage or provider boundary is unavailable; no external action was attempted.",
+      internal_error: "The request could not be recorded safely; no external action was attempted.",
+    };
+    return new ServiceError(error.code, messages[error.code], { cause: error });
+  }
+  if (error instanceof StorageNotConfiguredError || error instanceof FakeProviderConfigurationError) {
+    return new ServiceError("provider_unavailable", "The configured storage or provider boundary is unavailable; no external action was attempted.", { cause: error });
+  }
+  return new ServiceError("internal_error", "The request could not be recorded safely; no external action was attempted.", { cause: error });
 }

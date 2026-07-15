@@ -145,7 +145,13 @@ UI/domain copy:
 - reset always says sent mail remains;
 - non-color labels and reduced-motion static state exist.
 
-### 4.2 Integration tests with deterministic adapters
+### 4.2 G1 implementation evidence
+
+The post-implementation adversarial review repaired MCP/dashboard controlled-workspace access, durable expired-lease terminalization, current-state cancellation replay, production sign-in refusal, canonical unavailable-error mapping, incompatible lifecycle metadata rejection, and UI/documentation state drift. Its local results and explicitly unverified database/deployed/evaluation checks are recorded in [the sanitized adversarial review](../artifacts/test-runs/2026-07-15-g1-adversarial-review.md).
+
+S019–S027 currently have deterministic unit/route/MCP coverage for strict unknown-field rejection, identical/conflicting/in-progress/failed replay, rule-first clarification without a plan/action/lock, planning-lease expiry, scenario-busy serialization, session expiry, CSRF/origin and resource scope, fake-provider production refusal, malformed read models, cancel/back, and the non-effecting browser flow. The sanitized command results and remaining deployed/database risk are recorded in [the S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md). No live provider or external-effect test is claimed here.
+
+### 4.3 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.
@@ -158,7 +164,7 @@ UI/domain copy:
 - Gmail adapter: success, local pre-handoff failure, explicit 4xx rejection, every post-handoff uncertainty class, allowlist failure.
 - Reset: approved digest, two-event preflight, success, zero-write conflict, second-write race/partial result, rolling ETags, in-progress rejection, archive/rule/artifact/lock semantics.
 
-### 4.3 Browser E2E with deterministic adapters
+### 4.4 Browser E2E with deterministic adapters
 
 The mandatory Playwright path covers:
 
@@ -186,7 +192,7 @@ Also cover:
 - keyboard navigation and reduced motion;
 - no browser-tab switching in the main flow.
 
-### 4.4 Live integration tests
+### 4.5 Live integration tests
 
 Run locally or in the protected demo environment only:
 

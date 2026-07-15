@@ -13,12 +13,14 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Field | Value |
 |---|---|
 | Phase | G1 — non-effecting MCP → API → PostgreSQL → dashboard |
-| Implementation | Fixture-backed non-effecting G1 slice in progress |
+| Implementation | Fixture-backed non-effecting G1 slice complete locally; deployed proof starts at S028 |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-15 |
 
 The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. No Calendar, Gmail, OpenAI, or external-effect path is enabled yet. S013 adds locked CI coverage, reachable-history secret scanning, dependency auditing, production fake-mode rejection, and an isolated ephemeral-migration replay job; S014–S017 freeze controlled content, executable traceability, golden contracts, and current-surface accessibility/testability. Verified locally with Node 24: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm audit --audit-level=moderate`, `npm run security:scan`, `npm run traceability:check`, and `npm run verify:fake-production`.
+
+S019–S027 extend this slice with session expiry, CSRF/origin and resource scope checks, transactional idempotency and planning leases, rule-first clarification, thin status/cancel routes, a read-only MCP status tool, safe loading/error/empty UI states, and a tested cancel/back flow. The fixture path remains visibly non-effecting and production rejects fake-provider mode.
 
 The implemented first slice is:
 
@@ -158,7 +160,7 @@ The first command applies the frozen migration atomically and is safe to repeat 
 
 ## First contributor actions
 
-1. Start at `S019` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): complete the lifecycle and error contracts for the non-effecting vertical slice.
+1. Start at `S028` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): prove the deployed non-effecting slice.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 

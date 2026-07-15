@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiErrorResponseSchema, CreateWorldPrResponseSchema } from "@/lib/contracts/v1";
 import { SUPPORTED_SCENARIO_REQUEST } from "@/lib/domain/scenario";
+import { newIdempotencyKey, readCsrfToken } from "@/lib/client/request";
 
 export default function HomePage() {
   const router = useRouter();
@@ -19,11 +20,22 @@ export default function HomePage() {
     inFlight.current = true;
     setSubmitting(true);
     setMessage(null);
-    idempotencyKey.current ??= `${crypto.randomUUID()}${crypto.randomUUID()}`;
+    idempotencyKey.current ??= newIdempotencyKey();
+    const csrfToken = readCsrfToken();
+    if (!csrfToken) {
+      router.push("/login?next=%2F");
+      inFlight.current = false;
+      setSubmitting(false);
+      return;
+    }
     try {
       const response = await fetch("/api/v1/world-prs", {
         method: "POST",
-        headers: { "content-type": "application/json", "idempotency-key": idempotencyKey.current },
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": idempotencyKey.current,
+          "x-rewind-csrf": csrfToken,
+        },
         body: JSON.stringify({ request }),
       });
       const body: unknown = await response.json().catch(() => null);
@@ -57,28 +69,48 @@ export default function HomePage() {
 
   return (
     <main className="shell" data-testid="composer-screen">
-      <header className="topbar">
+      <header className="topbar" role="banner">
         <div className="wordmark">rewind</div>
-        <div className="topbar-note">Recorded assumptions · reviewed repair</div>
+        <div className="topbar-note">Recorded assumptions <span aria-hidden="true">&middot;</span> reviewed repair</div>
       </header>
-      <div className="content">
+      <div className="content composer-content">
         <section className="intro" aria-labelledby="page-title">
           <p className="eyebrow">Controlled workspace proof</p>
           <h1 id="page-title">Make the reasoning behind an action visible.</h1>
           <p className="lede">Rewind records the assumption behind an approved task, then helps a human review the smallest valid repair when later context changes its meaning.</p>
         </section>
-        <form className="composer" onSubmit={submit} data-testid="composer-form">
-          <div className="field">
-            <label htmlFor="request">What should Rewind prepare?</label>
-            <textarea data-testid="composer-request" id="request" value={request} onChange={(event) => updateRequest(event.target.value)} maxLength={2000} disabled={submitting} />
+        <section className="composer-section" aria-labelledby="composer-title">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">One supported scenario</p>
+              <h2 id="composer-title">Prepare a reviewable World PR</h2>
+            </div>
+            <span className="state-label">No external effect</span>
           </div>
-          <button className="primary-button" data-testid="create-world-pr" type="submit" disabled={submitting}>{submitting ? "Preparing…" : "Create World PR"}</button>
-        </form>
-        {message ? <div className="notice" role="alert">{message}</div> : null}
+          <form className="composer" onSubmit={submit} data-testid="composer-form">
+            <div className="field">
+              <label htmlFor="request">What should Rewind prepare?</label>
+              <textarea
+                data-testid="composer-request"
+                id="request"
+                value={request}
+                onChange={(event) => updateRequest(event.target.value)}
+                maxLength={2000}
+                disabled={submitting}
+                aria-describedby="request-help"
+              />
+              <p className="field-help" id="request-help">Only the controlled Acme Calendar, Gmail, and parent-account brief scenario is supported in this proof.</p>
+            </div>
+            <button className="primary-button" data-testid="create-world-pr" type="submit" disabled={submitting}>
+              {submitting ? "Preparing..." : "Create World PR"}
+            </button>
+          </form>
+        </section>
+        {message ? <div className="notice" role="alert" data-testid="composer-error">{message}</div> : null}
         <section className="status-row" data-testid="fixture-status" aria-label="Current slice status">
-          <span className="status-pill">No external effects in this slice</span>
-          <span className="status-pill">Two controlled candidates</span>
-          <span className="status-pill">Exact plan digest</span>
+          <span className="status-pill"><span className="status-mark" aria-hidden="true">1</span> Fixture providers only</span>
+          <span className="status-pill"><span className="status-mark" aria-hidden="true">2</span> Two controlled candidates</span>
+          <span className="status-pill"><span className="status-mark" aria-hidden="true">3</span> Exact plan digest</span>
         </section>
       </div>
     </main>

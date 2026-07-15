@@ -1,8 +1,16 @@
 import { z } from "zod";
 
 const Rfc3339 = z.string().datetime({ offset: true });
-const Id = z.string().min(8).max(200);
+const Id = z
+  .string()
+  .min(8)
+  .max(200)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, "IDs must be opaque URL-safe identifiers");
+const Version = z.number().int().min(1).max(1000);
 export const Sha256DigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
+export const OpaqueIdSchema = Id;
+export const Rfc3339Schema = Rfc3339;
+export const VersionSchema = Version;
 
 export const TaskStatusSchema = z.enum([
   "analyzing",
@@ -61,7 +69,7 @@ export const InitialPlanPointerSchema = z
   .object({
     planId: Id,
     kind: z.literal("initial"),
-    version: z.literal(1),
+    version: Version,
     digest: Sha256DigestSchema,
   })
   .strict();
@@ -70,12 +78,21 @@ export const RecoveryPlanPointerSchema = z
   .object({
     planId: Id,
     kind: z.literal("recovery"),
-    version: z.literal(1),
+    version: Version,
     digest: Sha256DigestSchema,
   })
   .strict();
 
-export const PlanPointerSchema = z.union([InitialPlanPointerSchema, RecoveryPlanPointerSchema]);
+export const ResetPlanPointerSchema = z
+  .object({
+    planId: Id,
+    kind: z.literal("reset"),
+    version: Version,
+    digest: Sha256DigestSchema,
+  })
+  .strict();
+
+export const PlanPointerSchema = z.union([InitialPlanPointerSchema, RecoveryPlanPointerSchema, ResetPlanPointerSchema]);
 
 export const CandidateSchema = z
   .object({
@@ -84,7 +101,7 @@ export const CandidateSchema = z
   })
   .strict();
 
-const ZonedDateTimeSchema = z
+export const ZonedDateTimeSchema = z
   .object({
     instant: Rfc3339,
     timeZone: z.string().min(1).max(100),
@@ -254,7 +271,7 @@ export const InitialPlanPayloadCoreSchema = z
     schemaVersion: z.literal("initial-plan.v1"),
     taskId: Id,
     planId: Id,
-    version: z.literal(1),
+    version: Version,
     request: z.string().min(1).max(2000),
     candidateSet: z.tuple([CalendarCandidateSchema, CalendarCandidateSchema]),
     selectedCandidateId: Id,
@@ -410,7 +427,7 @@ export const RecoveryPlanPayloadCoreSchema = z
     schemaVersion: z.literal("recovery-plan.v1"),
     taskId: Id,
     planId: Id,
-    version: z.literal(1),
+    version: Version,
     correctedAssumption: RecoveryCorrectedAssumptionSchema,
     decisions: z.array(RecoveryDecisionSchema).length(3),
     actions: z.tuple([
@@ -468,6 +485,98 @@ export const AttentionReasonSchema = z
   })
   .strict();
 
+const PreventionRuleCoreSchema = z
+  .object({
+    schemaVersion: z.literal("prevention-rule.v1"),
+    ruleId: Id,
+    version: z.literal(1),
+    type: z.literal("calendar_company_region_ambiguity"),
+    company: z.literal("Acme"),
+    minimumMatches: z.literal(2),
+    disambiguationField: z.literal("region"),
+    protectedActions: z.tuple([z.literal("calendar.move"), z.literal("mail.notify")]),
+    requiredAction: z.literal("ask_for_confirmation"),
+    scope: z.literal("demo_workspace"),
+    sourceTaskId: Id,
+    status: z.enum(["proposed", "active", "removed"]),
+    displayText: z.string().min(1).max(500),
+    rationale: z.string().min(1).max(1000),
+  })
+  .strict();
+
+export const PreventionRuleSchema = PreventionRuleCoreSchema.extend({ digest: Sha256DigestSchema }).strict();
+export const PreventionRuleCorePayloadSchema = PreventionRuleCoreSchema;
+
+export const CalendarSemanticBaselineSchema = z
+  .object({
+    calendarId: Id,
+    providerEventId: Id,
+    start: ZonedDateTimeSchema,
+    end: ZonedDateTimeSchema,
+    durationMinutes: z.literal(30),
+    organizerDigest: Sha256DigestSchema,
+    attendeeSetDigest: Sha256DigestSchema,
+    eventType: z.literal("default"),
+    recurringEventId: z.null(),
+    privateTags: z
+      .object({ rewind_demo: z.literal("acme-renewal"), region: z.enum(["UK", "US"]) })
+      .strict(),
+  })
+  .strict();
+
+export const ResetTargetSchema = z
+  .object({
+    candidateId: z.enum(["cal_event_acme_uk", "cal_event_acme_us"]),
+    semanticBaseline: CalendarSemanticBaselineSchema,
+    approvedCurrentEtag: z.string().min(1).max(200),
+    approvedCurrentStart: ZonedDateTimeSchema,
+    approvedCurrentEnd: ZonedDateTimeSchema,
+    sendUpdates: z.literal("none"),
+  })
+  .strict();
+
+const ResetPlanBaseSchema = z
+  .object({
+    schemaVersion: z.literal("reset-plan.v1"),
+    resetPlanId: Id,
+    runId: Id,
+    worldPrId: Id,
+    version: Version,
+    targets: z.tuple([ResetTargetSchema, ResetTargetSchema]),
+    executionOrder: z.tuple([z.literal("reset.calendar.uk"), z.literal("reset.calendar.us")]),
+    sentMailRemains: z.literal(true),
+  })
+  .strict();
+
+function validateResetPlan(value: z.infer<typeof ResetPlanBaseSchema>, context: z.RefinementCtx): void {
+    const ids = value.targets.map((target) => target.candidateId);
+    if (new Set(ids).size !== 2 || !ids.includes("cal_event_acme_uk") || !ids.includes("cal_event_acme_us")) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["targets"], message: "Reset targets must contain UK and US exactly once" });
+    }
+    for (const target of value.targets) {
+      const expectedRegion = target.candidateId.endsWith("_uk") ? "UK" : "US";
+      if (target.semanticBaseline.privateTags.region !== expectedRegion) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["targets"], message: "Reset target region must match its candidate" });
+      }
+    }
+}
+
+export const ResetPlanCoreSchema = ResetPlanBaseSchema.superRefine(validateResetPlan);
+
+export const ResetPlanSchema = ResetPlanBaseSchema.extend({ digest: Sha256DigestSchema }).strict().superRefine(validateResetPlan);
+
+export const ResetCompleteResponseSchema = z
+  .object({
+    status: z.literal("reset_complete"),
+    resetPlanId: Id,
+    archivedWorldPrId: Id,
+    nextRunId: Id,
+    calendarRestored: z.literal(true),
+    sentMailDeleted: z.literal(false),
+    requestId: Id,
+  })
+  .strict();
+
 const ActivePlanViewSchema = z.union([InitialPlanViewSchema, RecoveryPlanViewSchema]);
 const initialPlanStatuses = new Set(["preview_ready", "executing", "completed", "correction_pending"]);
 const recoveryPlanStatuses = new Set(["recovery_ready", "recovering", "recovered"]);
@@ -482,6 +591,7 @@ export const WorldPrViewSchema = z
     activePlan: ActivePlanViewSchema.optional(),
     clarification: ClarificationSchema.optional(),
     attention: AttentionReasonSchema.optional(),
+    ruleProposal: PreventionRuleSchema.optional(),
     timeline: z.array(TimelineItemSchema),
     createdAt: Rfc3339,
     updatedAt: Rfc3339,
@@ -498,8 +608,8 @@ export const WorldPrViewSchema = z
     if (value.status === "clarification_required" && (!value.clarification || value.activePlan || value.runId)) {
       context.addIssue({ code: z.ZodIssueCode.custom, message: "clarification_required requires clarification-only intake with no run or plan" });
     }
-    if (noPlanStatuses.has(value.status) && (value.activePlan || value.clarification)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, message: "This lifecycle state must not expose an active plan or clarification" });
+    if (noPlanStatuses.has(value.status) && (value.runId || value.activePlan || value.clarification)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "This lifecycle state must not expose a run, active plan, or clarification" });
     }
     if (value.status === "attention_required" && !value.attention) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["attention"], message: "attention_required requires an attention reason" });
@@ -523,7 +633,39 @@ export const CreateWorldPrRequestSchema = z
   .object({ request: z.string().trim().min(1).max(2000) })
   .strict();
 
+export const CancelWorldPrRequestSchema = z.object({}).strict();
+
+export const DashboardSessionRequestSchema = z.object({ passcode: z.string().min(1).max(200) }).strict();
+
+export const TaskMutationResponseSchema = z
+  .object({
+    worldPrId: Id,
+    status: TaskStatusSchema,
+    activePlan: PlanPointerSchema.optional(),
+    attention: AttentionReasonSchema.optional(),
+    replayPending: z.literal(true).optional(),
+    requestId: Id,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.status === "attention_required" && !value.attention) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["attention"], message: "Attention responses require a reason" });
+    }
+    if (value.status !== "attention_required" && value.attention) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["attention"], message: "Only attention responses may carry a reason" });
+    }
+  });
+
 export const CreateWorldPrResponseSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      worldPrId: Id,
+      status: z.literal("analyzing"),
+      reviewUrl: z.string().url(),
+      requestId: Id,
+      replayPending: z.literal(true),
+    })
+    .strict(),
   z
     .object({
       worldPrId: Id,
@@ -540,9 +682,44 @@ export const CreateWorldPrResponseSchema = z.discriminatedUnion("status", [
       reviewUrl: z.string().url(),
       clarification: ClarificationSchema,
       requestId: Id,
+      replayPending: z.literal(true).optional(),
     })
     .strict(),
 ]);
+
+export const McpWorldPrStatusSchema = z
+  .object({
+    worldPrId: Id,
+    status: TaskStatusSchema,
+    reviewUrl: z.string().url(),
+    clarification: ClarificationSchema.optional(),
+    attention: AttentionReasonSchema.optional(),
+    replayPending: z.literal(true).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.status === "clarification_required" && !value.clarification) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["clarification"], message: "Clarification status must include the safe candidate prompt" });
+    }
+    if (value.status !== "clarification_required" && value.clarification) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["clarification"], message: "Only clarification status may expose candidate choices" });
+    }
+    if (value.status === "attention_required" && !value.attention) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["attention"], message: "Attention status must include a safe attention reason" });
+    }
+    if (value.status !== "attention_required" && value.attention) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["attention"], message: "Only attention status may expose an attention reason" });
+    }
+  });
+
+export const IdempotencyFailureSchema = z
+  .object({
+    code: ErrorCodeSchema,
+    message: z.string().min(1).max(500),
+    retryable: z.boolean(),
+    requestId: Id,
+  })
+  .strict();
 
 export const ApiErrorResponseSchema = z
   .object({
@@ -570,6 +747,10 @@ export type RecoveryPlanPayload = z.infer<typeof RecoveryPlanPayloadSchema>;
 export type WorldPrView = z.infer<typeof WorldPrViewSchema>;
 export type CreateWorldPrRequest = z.infer<typeof CreateWorldPrRequestSchema>;
 export type CreateWorldPrResponse = z.infer<typeof CreateWorldPrResponseSchema>;
+export type TaskMutationResponse = z.infer<typeof TaskMutationResponseSchema>;
+export type PreventionRule = z.infer<typeof PreventionRuleSchema>;
+export type ResetPlan = z.infer<typeof ResetPlanSchema>;
+export type McpWorldPrStatus = z.infer<typeof McpWorldPrStatusSchema>;
 export type TimelineItem = z.infer<typeof TimelineItemSchema>;
 
 export function isInitialPlanView(plan: InitialPlanView | RecoveryPlanView): plan is InitialPlanView {

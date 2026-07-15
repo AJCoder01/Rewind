@@ -119,7 +119,7 @@ async function main(): Promise<void> {
     await expect(page.getByTestId("login-submit")).toHaveCSS("outline-color", "rgb(0, 0, 0)");
     await page.getByLabel("Demo passcode").fill("wrong-playwright-passcode");
     await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByRole("alert").getByText("Sign-in failed. Configure the demo operator passcode for this environment.").waitFor({ state: "visible" });
+    await page.getByRole("alert").getByText("The dashboard passcode was not accepted.").waitFor({ state: "visible" });
     await page.getByLabel("Demo passcode").fill("playwright-demo-passcode");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.waitForURL((url) => url.pathname === "/");
@@ -154,7 +154,11 @@ async function main(): Promise<void> {
     await page.getByRole("button", { name: "Continue" }).click();
     await page.waitForURL(reviewUrl);
     await page.getByRole("heading", { name: "Acme UK renewal" }).waitFor({ state: "visible" });
-    console.log("E2E passed: auth rejection, login, creation, strict review rendering, expired-session handling, and safe return to the review URL.");
+    await page.getByRole("button", { name: "Cancel review" }).click();
+    await page.getByRole("heading", { name: "This World PR was cancelled." }).waitFor({ state: "visible" });
+    await page.getByRole("link", { name: "Back to composer" }).click();
+    await page.waitForURL((url) => url.pathname === "/");
+    console.log("E2E passed: auth rejection, login, creation, strict review rendering, expired-session handling, cancel/back, and reduced-motion responsive checks.");
     exitCode = 0;
   } finally {
     await browser?.close();
