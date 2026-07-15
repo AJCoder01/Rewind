@@ -125,8 +125,9 @@ Read these in order:
 10. [S009 Vercel guide](docs/S009_VERCEL_GUIDE.md) — the manual, credential-safe deployment checkpoint.
 11. [S010 Google guide](docs/S010_GOOGLE_GUIDE.md) — the manual, no-live-effect Google Cloud prerequisite checkpoint.
 12. [S011 OpenAI guide](docs/S011_OPENAI_GUIDE.md) — the manual, sanitized model-access checkpoint.
-13. [Progress](docs/PROGRESS.md) — live phase-gate checklist and evidence links.
-14. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
+13. [S012 private environment guide](docs/S012_PRIVATE_ENVIRONMENT_GUIDE.md) — the manual, secret-safe environment and startup-validation checkpoint.
+14. [Progress](docs/PROGRESS.md) — live phase-gate checklist and evidence links.
+15. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
 
 Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot be traded away, Architecture owns **how**, Contracts own boundary shapes, and the Implementation Plan owns the exact implementation sequence and gates. Executable schemas/tests become canonical for exact fields once implemented. Progress and the runbook never create new requirements.
 
