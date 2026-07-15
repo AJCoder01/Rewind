@@ -10,6 +10,7 @@ const request = SUPPORTED_SCENARIO_REQUEST;
 
 describe("fixture-backed World PR service", () => {
   beforeEach(() => {
+    process.env.APP_BASE_URL = "http://localhost:3000";
     process.env.REWIND_STORAGE_MODE = "memory_fixture";
     memoryFixtureStore.clear();
   });

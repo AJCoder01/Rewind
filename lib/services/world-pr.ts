@@ -25,6 +25,8 @@ export async function createWorldPr(input: CreateWorldPrInput): Promise<{ respon
   if (!isSupportedScenarioRequest(parsed.data.request)) throw new ServiceError("unsupported_request", "This demo supports only the controlled Acme Calendar, mail, and account-brief scenario.");
   if (!input.idempotencyKey || input.idempotencyKey.length < 16 || input.idempotencyKey.length > 200) throw new ServiceError("invalid_request", "Idempotency-Key is required and must be between 16 and 200 characters.");
   const requestId = input.requestId ?? createOpaqueId("req_");
+  const appBaseUrl = process.env.APP_BASE_URL;
+  if (!appBaseUrl) throw new Error("APP_BASE_URL is required; no review URL was created.");
   const store = getWorldPrStore();
   try {
     const result = await store.createInitial({
@@ -34,7 +36,7 @@ export async function createWorldPr(input: CreateWorldPrInput): Promise<{ respon
       bodyHash: requestBodyHash(parsed.data.request),
       request: parsed.data.request,
       requestId,
-      reviewUrl: `${process.env.APP_BASE_URL ?? "http://localhost:3000"}/pr/{worldPrId}`,
+      reviewUrl: `${new URL(appBaseUrl).origin}/pr/{worldPrId}`,
     });
     return result;
   } catch (error) {
