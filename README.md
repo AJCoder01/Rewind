@@ -13,7 +13,7 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Field | Value |
 |---|---|
 | Phase | G1 — non-effecting MCP → API → PostgreSQL → dashboard |
-| Implementation | Fixture-backed non-effecting G1 slice complete locally; deployed proof starts at S028 |
+| Implementation | S028 deployed proof passed; S029 G1 interface packet is frozen; S030 closure is next |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-15 |
@@ -131,6 +131,7 @@ Read these in order:
 14. [Progress](docs/PROGRESS.md) — live phase-gate checklist and evidence links.
 15. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
 16. [S028 deployed G1 guide](docs/S028_DEPLOYED_G1_GUIDE.md) — the credential-safe human checkpoint for the deployed non-effecting slice.
+17. [G1 interface packet](docs/G1_INTERFACE_PACKET.md) — the frozen schemas, migration/catalog, error matrix, fixtures, routes, and evidence boundary.
 
 Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot be traded away, Architecture owns **how**, Contracts own boundary shapes, and the Implementation Plan owns the exact implementation sequence and gates. Executable schemas/tests become canonical for exact fields once implemented. Progress and the runbook never create new requirements.
 
@@ -161,7 +162,7 @@ The first command applies the frozen migration atomically and is safe to repeat 
 
 ## First contributor actions
 
-1. Start at `S028` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): prove the deployed non-effecting slice.
+1. Start at `S030` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): close the G1 gate from the frozen interface packet and evidence.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 

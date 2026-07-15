@@ -5,7 +5,7 @@
 | Status | Active canonical execution queue |
 | Execution model | One sequential task at a time |
 | Current gate | G1 — non-effecting MCP → API → PostgreSQL → dashboard |
-| Current restart point | `S029` — freeze the G1 interface packet |
+| Current restart point | `S030` — close G1 |
 | Last updated | 2026-07-16 |
 
 This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
@@ -70,7 +70,7 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 - [x] **S026 — Complete the non-effecting product UI.** Build composer, loading, empty, review, assumption/evidence, exact actions, dependency labels, timeline shell, safe errors, cancel/back, expired-session, and fake-mode labels using strict client parsing. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
 - [x] **S027 — Complete G1 automated tests.** Cover identical/conflicting/concurrent/failed replay, rule clarification without lock, scenario busy, unsupported request, unauthorized create/read, expired session, CSRF, malformed read models, duplicate click, refresh, keyboard flow, and reduced motion. Evidence: [S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md).
 - [x] **S028 — Prove the deployed non-effecting slice.** Run MCP → authenticated API → Supabase → authenticated dashboard on the deployed environment using the real PostgreSQL repository, with Calendar/Gmail/model providers visibly disabled from live claims. Evidence: [sanitized deployed proof](../artifacts/test-runs/2026-07-16-s028-deployed.md).
-- [ ] **S029 — Freeze the G1 interface packet.** Freeze schemas, migrations, golden HTTP/read-model fixtures, error matrix, fixture versions, and the create/read browser evidence before provider work.
+- [x] **S029 — Freeze the G1 interface packet.** Freeze schemas, migrations, golden HTTP/read-model fixtures, error matrix, fixture versions, and the create/read browser evidence before provider work. Evidence: [S029 interface freeze report](../artifacts/test-runs/2026-07-16-s029-interface-freeze.md) and [G1 interface packet](G1_INTERFACE_PACKET.md).
 - [ ] **S030 — Close G1.** Record all G1 command outputs, deployed screenshots, replay/auth results, fake-mode proof, known risks, and requirement links.
 
 #### Gate G1 acceptance
