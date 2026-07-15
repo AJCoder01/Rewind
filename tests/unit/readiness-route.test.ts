@@ -1,22 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { readinessResponse } from "@/lib/api/readiness-response";
 import { ApiErrorResponseSchema } from "@/lib/contracts/v1";
+import { OAUTH_MIGRATION_ID } from "@/lib/db/schema";
 
 describe("GET /api/ready", () => {
   it("returns a non-cacheable ready response without database details", async () => {
-    const response = await readinessResponse(async () => ({ ready: true, migrationId: "0001_phase0_foundation" }));
+    const response = await readinessResponse(async () => ({ ready: true, migrationId: OAUTH_MIGRATION_ID }));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     await expect(response.json()).resolves.toMatchObject({
       status: "ready",
       service: "rewind",
-      schemaVersion: "0001_phase0_foundation",
+      schemaVersion: OAUTH_MIGRATION_ID,
     });
   });
 
   it("returns a sanitized 503 for a failed invariant", async () => {
-    const response = await readinessResponse(async () => ({ ready: false, migrationId: "0001_phase0_foundation" }));
+    const response = await readinessResponse(async () => ({ ready: false, migrationId: OAUTH_MIGRATION_ID }));
 
     expect(response.status).toBe(503);
     const body = await response.json();

@@ -116,13 +116,13 @@ interface TaskMutationResponse {
 }
 ```
 
-`GET /api/ready` is a dependency-readiness check. It opens the restricted runtime PostgreSQL connection and requires TLS, the expected database and runtime identity, the exact recorded foundation-migration checksum, and the complete expected table/constraint catalog. It returns HTTP `200` only when those checks pass.
+`GET /api/ready` is a dependency-readiness check. It opens the restricted runtime PostgreSQL connection and requires TLS, the expected database and runtime identity, the exact recorded `0001_phase0_foundation` and `0002_oauth_transaction` checksums, and the complete expected foundation/OAuth table and constraint catalogs. It returns HTTP `200` only when those checks pass.
 
 ```json
 {
   "status": "ready",
   "service": "rewind",
-  "schemaVersion": "0001_phase0_foundation",
+  "schemaVersion": "0002_oauth_transaction",
   "requestId": "req_..."
 }
 ```
@@ -469,7 +469,15 @@ Allowed from `correction_pending`, `recovery_ready`, or `attention_required.vali
 
 There is no proof-only rule endpoint. The dashboard panel and MCP both use normal section 3.2 intake. A match returns the standard persisted `clarification_required` resource/read model and candidate payload before lock acquisition. The demo leaves that intake unresolved; it therefore has no plan, action, approval, or external effect.
 
-### 3.16 Mutation response and error matrix
+### 3.16 Google OAuth transaction boundary
+
+`GET /api/v1/oauth/google/start` requires the authenticated dashboard session. It creates a short-lived, single-use transaction bound to a non-reversible hash of that browser's signed session cookie, then returns a `307` redirect to Google's authorization endpoint. The redirect contains only the fixed scopes `openid`, `email`, `calendar.events.owned`, and `gmail.send`, plus high-entropy `state`, OIDC `nonce`, and PKCE `code_challenge`/`S256` parameters. The callback URI is exactly `/api/v1/oauth/google/callback` on the configured public origin; trailing slashes, query strings, alternate hosts, and alternate paths are rejected.
+
+`GET /api/v1/oauth/google/callback` accepts a strict query containing `state` and exactly one of `code` or a provider `error`. The transaction is atomically consumed only when the state hash, browser-session binding, expiry, and configured client/redirect values match. The stored PKCE verifier is encrypted at rest and never returned to the browser. A replay, mismatch, expiry, malformed query, or provider denial stores no credential. S031 stops before token exchange/persistence until S032 adds signed OIDC identity validation; this is surfaced as a safe `503 provider_unavailable`, not a connected-success claim.
+
+The `0002_oauth_transaction` migration stores hashed transaction secrets, encrypted verifier material, and one encrypted Google refresh-token record. Raw OAuth tokens, client secrets, provider error descriptions, and browser-session cookies are never logged, returned, or sent to client bundles. `oauth_credentials` can be written only through the validated-identity persistence boundary; it requires a stable Google subject, normalized email, fixed provider, non-empty scopes, and a `v1` AES-256-GCM ciphertext envelope.
+
+### 3.17 Mutation response and error matrix
 
 Every success/attention response includes `requestId`; task mutations use `TaskMutationResponse` unless a richer shape is shown above. A durable attention outcome is HTTP `200` because the request was recorded and needs operator action; request/precondition conflicts use `409`; validation/clarification uses `422`; auth uses `401/403`.
 

@@ -1,6 +1,6 @@
 import type { QueryResultRow } from "pg";
 import type { DatabaseQuery } from "@/lib/db/catalog";
-import { REWIND_DATABASE_TABLES } from "@/lib/db/schema";
+import { OAUTH_TABLES, REWIND_DATABASE_TABLES } from "@/lib/db/schema";
 
 type TablePrivilegeRow = QueryResultRow & {
   table_name: string;
@@ -17,15 +17,16 @@ type SequencePrivilegeRow = QueryResultRow & {
 const applicationTablePrivileges = new Set(["SELECT", "INSERT", "UPDATE", "DELETE"]);
 
 export async function runtimePrivilegesMatch(query: DatabaseQuery): Promise<boolean> {
+  const runtimeTables = [...REWIND_DATABASE_TABLES, ...OAUTH_TABLES];
   const tableRows = await query<TablePrivilegeRow>(
     `SELECT table_name, privilege,
             has_table_privilege(current_user, format('%I.%I', 'public', table_name), privilege) AS allowed
      FROM unnest($1::text[]) AS tables(table_name)
      CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) AS privileges(privilege)
      ORDER BY table_name, privilege`,
-    [REWIND_DATABASE_TABLES],
+    [runtimeTables],
   );
-  if (tableRows.rows.length !== REWIND_DATABASE_TABLES.length * 8) return false;
+  if (tableRows.rows.length !== runtimeTables.length * 8) return false;
 
   const tablesMatch = tableRows.rows.every((row) => {
     const expected = row.table_name === "rewind_schema_migrations"

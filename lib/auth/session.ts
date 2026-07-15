@@ -46,6 +46,18 @@ export function readDashboardActor(request: NextRequest): AuthenticatedActor | n
   return { actorId, source: "dashboard" };
 }
 
+/**
+ * Return only a non-reversible binding for the signed browser session.  OAuth
+ * transactions use this to prevent a callback from another browser from
+ * consuming the initiating transaction; the raw cookie never enters storage
+ * or a log.
+ */
+export function readDashboardSessionBinding(request: NextRequest): string | null {
+  const value = request.cookies.get(sessionCookie)?.value;
+  if (!value) return null;
+  return `sha256:${createHash("sha256").update(value, "utf8").digest("hex")}`;
+}
+
 export function readMcpActor(request: NextRequest): AuthenticatedActor | null {
   const authorization = request.headers.get("authorization");
   const configuredMcpToken = process.env.MCP_BACKEND_TOKEN;

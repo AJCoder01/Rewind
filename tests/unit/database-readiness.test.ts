@@ -4,8 +4,12 @@ import type { DatabaseQuery } from "@/lib/db/catalog";
 import { evaluateDatabaseReadiness } from "@/lib/db/readiness";
 import {
   FOUNDATION_MIGRATION_CHECKSUM,
-  FOUNDATION_MIGRATION_ID,
   FOUNDATION_TABLES,
+  OAUTH_COLUMN_SIGNATURES,
+  OAUTH_CONSTRAINTS,
+  OAUTH_MIGRATION_CHECKSUM,
+  OAUTH_MIGRATION_ID,
+  OAUTH_TABLES,
   REWIND_COLUMN_SIGNATURES,
   REWIND_CONSTRAINTS,
   REWIND_DATABASE_TABLES,
@@ -16,7 +20,9 @@ function queryWith(overrides: Partial<{
   role_name: string;
   tls_active: boolean;
   checksum: string | null;
+  oauth_checksum: string | null;
   foundation_tables: string[];
+  oauth_tables: string[];
   can_use_schema: boolean;
   can_create_schema: boolean;
   rolsuper: boolean;
@@ -37,7 +43,9 @@ function queryWith(overrides: Partial<{
         role_name: "rewind_app",
         tls_active: true,
         checksum: FOUNDATION_MIGRATION_CHECKSUM,
+        oauth_checksum: OAUTH_MIGRATION_CHECKSUM,
         foundation_tables: [...FOUNDATION_TABLES].sort(),
+        oauth_tables: [...OAUTH_TABLES].sort(),
         can_use_schema: true,
         can_create_schema: false,
         rolsuper: false,
@@ -51,6 +59,15 @@ function queryWith(overrides: Partial<{
       }];
     } else if (text.includes("FROM pg_class c")) {
       rows = [...REWIND_DATABASE_TABLES].sort().map((table_name) => ({ table_name, owner_name: "postgres" }));
+    } else if (text.includes("SELECT table_name, column_name, data_type, is_nullable, column_default")) {
+      rows = Object.entries(OAUTH_COLUMN_SIGNATURES)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .flatMap(([table_name, signatures]) =>
+        signatures.map((signature) => {
+          const [column_name, data_type, is_nullable, defaultKind] = signature.split(":");
+          return { table_name, column_name, data_type, is_nullable, column_default: defaultKind === "none" ? null : "now()" };
+        }),
+        );
     } else if (text.includes("FROM information_schema.columns")) {
       rows = Object.entries(REWIND_COLUMN_SIGNATURES).flatMap(([table_name, signatures]) =>
         signatures.map((signature) => {
@@ -58,6 +75,8 @@ function queryWith(overrides: Partial<{
           return { table_name, column_name, data_type, is_nullable, default_kind };
         }),
       );
+    } else if (text.includes("SELECT conname")) {
+      rows = [...OAUTH_CONSTRAINTS].sort().map((conname) => ({ conname }));
     } else if (text.includes("FROM pg_constraint con")) {
       rows = REWIND_CONSTRAINTS.map((constraint) => ({
         table_name: constraint.table,
@@ -70,7 +89,7 @@ function queryWith(overrides: Partial<{
         delete_action: constraint.type === "FOREIGN KEY" ? "a" : " ",
       }));
     } else if (text.includes("has_table_privilege")) {
-      rows = [...REWIND_DATABASE_TABLES].flatMap((table_name, tableIndex) =>
+      rows = [...REWIND_DATABASE_TABLES, ...OAUTH_TABLES].flatMap((table_name, tableIndex) =>
         ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER", "MAINTAIN"].map((privilege, privilegeIndex) => {
           const expected = table_name === "rewind_schema_migrations"
             ? privilege === "SELECT"
@@ -92,7 +111,7 @@ describe("database readiness", () => {
   it("is ready only for the restricted TLS runtime role with the exact migration and tables", async () => {
     await expect(evaluateDatabaseReadiness(queryWith())).resolves.toEqual({
       ready: true,
-      migrationId: FOUNDATION_MIGRATION_ID,
+      migrationId: OAUTH_MIGRATION_ID,
     });
   });
 
@@ -105,6 +124,8 @@ describe("database readiness", () => {
     { runtime_privileges_valid: false },
     { checksum: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
     { foundation_tables: FOUNDATION_TABLES.slice(1) as unknown as string[] },
+    { oauth_checksum: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+    { oauth_tables: OAUTH_TABLES.slice(1) as unknown as string[] },
   ])("fails closed for a mismatched database invariant", async (overrides) => {
     await expect(evaluateDatabaseReadiness(queryWith(overrides))).resolves.toMatchObject({ ready: false });
   });

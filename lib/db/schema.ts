@@ -16,6 +16,56 @@ export function isKnownFoundationMigrationChecksum(checksum: string): boolean {
 
 export const MIGRATION_LEDGER_TABLE = "rewind_schema_migrations";
 
+export const OAUTH_MIGRATION_ID = "0002_oauth_transaction";
+// Updated only when db/migrations/0002_oauth_transaction.sql changes.
+export const OAUTH_MIGRATION_CHECKSUM = "sha256:ec6579a54aea6500f7fd84f04c1c4f2982783612be4c932eaab89073e456c38d";
+
+export const OAUTH_TABLES = ["oauth_transactions", "oauth_credentials"] as const;
+
+export const OAUTH_COLUMN_SIGNATURES: Readonly<Record<string, readonly string[]>> = {
+  oauth_transactions: [
+    "id:text:NO:none",
+    "provider:text:NO:none",
+    "state_hash:text:NO:none",
+    "session_hash:text:NO:none",
+    "nonce_hash:text:NO:none",
+    "code_verifier_ciphertext:text:NO:none",
+    "redirect_uri:text:NO:none",
+    "client_id:text:NO:none",
+    "created_at:timestamp with time zone:NO:now",
+    "expires_at:timestamp with time zone:NO:none",
+    "consumed_at:timestamp with time zone:YES:none",
+  ],
+  oauth_credentials: [
+    "provider:text:NO:none",
+    "google_sub:text:NO:none",
+    "email:text:NO:none",
+    "refresh_token_ciphertext:text:NO:none",
+    "scopes:ARRAY:NO:none",
+    "created_at:timestamp with time zone:NO:now",
+    "updated_at:timestamp with time zone:NO:now",
+  ],
+} as const;
+
+export const OAUTH_CONSTRAINTS = [
+  "oauth_transactions_pkey",
+  "oauth_transactions_provider_check",
+  "oauth_transactions_state_hash_key",
+  "oauth_transactions_state_hash_check",
+  "oauth_transactions_session_hash_check",
+  "oauth_transactions_nonce_hash_check",
+  "oauth_transactions_ciphertext_check",
+  "oauth_transactions_redirect_uri_check",
+  "oauth_transactions_client_id_check",
+  "oauth_transactions_expiry_check",
+  "oauth_credentials_pkey",
+  "oauth_credentials_provider_check",
+  "oauth_credentials_google_sub_check",
+  "oauth_credentials_email_check",
+  "oauth_credentials_ciphertext_check",
+  "oauth_credentials_scopes_check",
+] as const;
+
 export const FOUNDATION_TABLES = [
   "tasks",
   "scenario_locks",

@@ -5,7 +5,8 @@ import { Pool } from "pg";
 import { requireDatabaseUrl, type StringEnvironment } from "@/lib/db/config";
 import { applyFoundationMigration } from "@/lib/db/migrate";
 import { safeMigrationFailureMessage } from "@/lib/db/migration-output";
-import { FOUNDATION_MIGRATION_ID } from "@/lib/db/schema";
+import { applyOAuthMigration } from "@/lib/db/oauth-migrate";
+import { FOUNDATION_MIGRATION_ID, OAUTH_MIGRATION_ID } from "@/lib/db/schema";
 
 const ephemeralDatabaseName = "rewind_ci";
 const ephemeralDatabaseUser = "postgres";
@@ -43,16 +44,21 @@ export function requireEphemeralMigrationUrl(environment: StringEnvironment = pr
   return assertEphemeralMigrationUrl(requireDatabaseUrl("DATABASE_MIGRATION_URL", environment));
 }
 
-export async function verifyEphemeralMigration(databaseUrl: string): Promise<readonly ["applied" | "already_applied", "applied" | "already_applied"]> {
-  const sql = await readFile(new URL("../db/migrations/0001_phase0_foundation.sql", import.meta.url), "utf8");
+export async function verifyEphemeralMigration(
+  databaseUrl: string,
+): Promise<readonly ["applied" | "already_applied", "already_applied" | "applied", "applied" | "already_applied", "already_applied" | "applied"]> {
+  const foundationSql = await readFile(new URL("../db/migrations/0001_phase0_foundation.sql", import.meta.url), "utf8");
+  const oauthSql = await readFile(new URL("../db/migrations/0002_oauth_transaction.sql", import.meta.url), "utf8");
   const pool = new Pool({ connectionString: assertEphemeralMigrationUrl(databaseUrl), max: 1, connectionTimeoutMillis: 10_000, query_timeout: 30_000 });
   try {
-    const first = await applyFoundationMigration(pool, sql);
-    const second = await applyFoundationMigration(pool, sql);
-    if (first !== "applied" || second !== "already_applied") {
+    const foundationFirst = await applyFoundationMigration(pool, foundationSql);
+    const foundationSecond = await applyFoundationMigration(pool, foundationSql);
+    const oauthFirst = await applyOAuthMigration(pool, oauthSql);
+    const oauthSecond = await applyOAuthMigration(pool, oauthSql);
+    if (foundationFirst !== "applied" || foundationSecond !== "already_applied" || oauthFirst !== "applied" || oauthSecond !== "already_applied") {
       throw new Error(`Ephemeral migration did not prove apply/replay for ${FOUNDATION_MIGRATION_ID}.`);
     }
-    return [first, second];
+    return [foundationFirst, foundationSecond, oauthFirst, oauthSecond];
   } finally {
     await pool.end();
   }
@@ -61,8 +67,13 @@ export async function verifyEphemeralMigration(databaseUrl: string): Promise<rea
 async function main(): Promise<void> {
   try {
     const databaseUrl = requireEphemeralMigrationUrl();
-    const [first, second] = await verifyEphemeralMigration(databaseUrl);
-    process.stdout.write(`${JSON.stringify({ status: "ok", migrationId: FOUNDATION_MIGRATION_ID, first, second })}\n`);
+    const [foundationFirst, foundationSecond, oauthFirst, oauthSecond] = await verifyEphemeralMigration(databaseUrl);
+    process.stdout.write(`${JSON.stringify({
+      status: "ok",
+      migrationIds: [FOUNDATION_MIGRATION_ID, OAUTH_MIGRATION_ID],
+      foundation: { first: foundationFirst, second: foundationSecond },
+      oauth: { first: oauthFirst, second: oauthSecond },
+    })}\n`);
   } catch (error) {
     process.stderr.write(`${safeMigrationFailureMessage(error)}\n`);
     process.exitCode = 1;

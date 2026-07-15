@@ -238,6 +238,14 @@ This file records why a decision was made and which choices remain open. Accepte
 
 **Consequence:** The deployed S028 proof demonstrates durable storage, authentication, idempotency, read-model validation, and review rendering only. It does not close any Calendar, Gmail, OAuth, or model risk gate and cannot be used as live-provider evidence.
 
+### ADR-025 — Stage OAuth transaction consumption before identity/token exchange
+
+**Decision:** S031 owns authorization URL construction, exact redirect validation, browser-session binding, atomic one-use transaction consumption, PKCE verifier protection, and encrypted credential persistence primitives. The callback deliberately stops after consuming and decrypting the verifier until S032 supplies signed OIDC claim validation and the provider token exchange. It returns a safe unavailable response and never stores a refresh token from an unvalidated identity.
+
+**Why:** State/nonce/PKCE replay protection and account binding have separate failure modes. Keeping the transaction gate independently testable prevents a partially implemented callback from turning provider code or an unverified identity into a connected account.
+
+**Consequence:** S031 automated tests can prove no-replay and ciphertext invariants without granting Google consent or calling a live provider. A real callback cannot claim connection success until S032 is complete.
+
 ## Rejected alternatives
 
 | Alternative | Status | Reason |
