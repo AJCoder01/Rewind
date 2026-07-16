@@ -6,9 +6,8 @@ import { GET as startGoogleOAuth } from "@/app/api/v1/oauth/google/start/route";
 import { GET as callbackGoogleOAuth } from "@/app/api/v1/oauth/google/callback/route";
 import { createSessionValue, sessionCookieName } from "@/lib/auth/session";
 import { memoryOAuthStore } from "@/lib/db/index";
-import { GOOGLE_OAUTH_SCOPES, GOOGLE_OAUTH_TOKEN_ENDPOINT } from "@/lib/google/oauth";
+import { decryptOAuthSecret, encryptOAuthSecret, GOOGLE_OAUTH_SCOPES, GOOGLE_OAUTH_TOKEN_ENDPOINT } from "@/lib/google/oauth";
 import { GOOGLE_OIDC_JWKS_URI } from "@/lib/google/oidc";
-import { decryptOAuthSecret } from "@/lib/google/oauth";
 
 const environmentKeys = [
   "NODE_ENV",
@@ -52,6 +51,7 @@ function request(path: string, session: string): NextRequest {
 
 afterEach(() => {
   memoryOAuthStore.clear();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   for (const key of environmentKeys) {
     const value = originalEnvironment[key];
@@ -127,6 +127,9 @@ describe("Google OAuth routes", () => {
 
   it("starts an exact redirect and consumes the callback transaction only once", async () => {
     setOAuthEnvironment();
+    vi.stubGlobal("fetch", async () => {
+      throw new Error("deterministic provider outage");
+    });
     const session = createSessionValue("demo-operator");
     const started = await startGoogleOAuth(request("/api/v1/oauth/google/start", session));
     expect(started.status).toBe(307);
@@ -148,6 +151,96 @@ describe("Google OAuth routes", () => {
     const replay = await callbackGoogleOAuth(request(callbackPath, session));
     expect(replay.status).toBe(422);
     await expect(replay.json()).resolves.toMatchObject({ error: { code: "invalid_request" } });
+  });
+
+  it("rejects missing and mismatched state before contacting a provider", async () => {
+    setOAuthEnvironment();
+    const session = createSessionValue("demo-operator");
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      throw new Error("provider must not be called");
+    });
+
+    const missingState = await callbackGoogleOAuth(request("/api/v1/oauth/google/callback?code=fake-code", session));
+    expect(missingState.status).toBe(422);
+    const mismatchedState = await callbackGoogleOAuth(
+      request("/api/v1/oauth/google/callback?state=not-the-started-state&code=fake-code", session),
+    );
+    expect(mismatchedState.status).toBe(422);
+    expect(calls).toEqual([]);
+    await expect(memoryOAuthStore.getCredential()).resolves.toBeNull();
+  });
+
+  it.each([
+    ["nonce mismatch", { nonce: "wrong-nonce" }],
+    ["wrong issuer", { iss: "https://attacker.example.test" }],
+    ["wrong audience", { aud: "other-client.apps.googleusercontent.com" }],
+    ["expired token", { exp: Math.floor(Date.now() / 1000) - 301 }],
+    ["unverified email", { email_verified: false }],
+    ["wrong stable subject", { sub: "other-subject" }],
+    ["wrong account email", { email: "other@example.test" }],
+  ])("fails closed for callback claim failure: %s", async (_label, overrides) => {
+    setOAuthEnvironment();
+    const session = createSessionValue("demo-operator");
+    const started = await startGoogleOAuth(request("/api/v1/oauth/google/start", session));
+    const location = new URL(started.headers.get("location")!);
+    stubGoogleTokenExchange(makeIdToken(location.searchParams.get("nonce")!, overrides), []);
+
+    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code`;
+    const response = await callbackGoogleOAuth(request(callbackPath, session));
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "forbidden", retryable: false } });
+    await expect(memoryOAuthStore.getCredential()).resolves.toBeNull();
+  });
+
+  it("fails closed for a malformed ID token without saving a credential", async () => {
+    setOAuthEnvironment();
+    const session = createSessionValue("demo-operator");
+    const started = await startGoogleOAuth(request("/api/v1/oauth/google/start", session));
+    const location = new URL(started.headers.get("location")!);
+    stubGoogleTokenExchange("not-a-jwt", []);
+
+    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code`;
+    const response = await callbackGoogleOAuth(request(callbackPath, session));
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "forbidden", retryable: false } });
+    await expect(memoryOAuthStore.getCredential()).resolves.toBeNull();
+  });
+
+  it("does not connect when the provider rejects a mismatched PKCE verifier", async () => {
+    setOAuthEnvironment();
+    const session = createSessionValue("demo-operator");
+    const started = await startGoogleOAuth(request("/api/v1/oauth/google/start", session));
+    const location = new URL(started.headers.get("location")!);
+    const originalConsume = memoryOAuthStore.consumeTransaction.bind(memoryOAuthStore);
+    vi.spyOn(memoryOAuthStore, "consumeTransaction").mockImplementation(async (input) => {
+      const transaction = await originalConsume(input);
+      return transaction
+        ? {
+            ...transaction,
+            codeVerifierCiphertext: encryptOAuthSecret(
+              "mismatched-pkce-verifier",
+              process.env.REWIND_TOKEN_ENCRYPTION_KEY!,
+            ),
+          }
+        : null;
+    });
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe(GOOGLE_OAUTH_TOKEN_ENDPOINT);
+      const body = new URLSearchParams(String(init?.body));
+      expect(body.get("code_verifier")).toBe("mismatched-pkce-verifier");
+      return new Response(JSON.stringify({ error: "invalid_grant" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code`;
+    const response = await callbackGoogleOAuth(request(callbackPath, session));
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "provider_unavailable", retryable: true } });
+    await expect(memoryOAuthStore.getCredential()).resolves.toBeNull();
   });
 
   it("persists an encrypted credential only after signed identity and scope checks", async () => {

@@ -13,7 +13,7 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Field | Value |
 |---|---|
 | Phase | G2 — OAuth, provider, and model risk retirement |
-| Implementation | G1 S019–S030 closed; S031–S032 OAuth boundaries complete; S033 is next |
+| Implementation | G1 S019–S030 closed; S031–S033 OAuth boundaries complete; S034 is next |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-16 |
@@ -162,7 +162,7 @@ The migration command applies `0001_phase0_foundation.sql` and then `0002_oauth_
 
 ## First contributor actions
 
-1. Start at `S033` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): add the required OAuth negative tests under the G2 safety gate.
+1. Start at `S034` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): define explicit provider ports and deterministic fakes under the G2 safety gate.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 

@@ -1,11 +1,11 @@
 # Rewind MVP progress
 
-Current status: master-plan tasks `S001`–`S032` are complete; the first unfinished task is `S033` (add OAuth negative tests). The deployed non-effecting MCP → API → PostgreSQL → dashboard proof passed without provider calls or external effects, the v1 interface packet is frozen, and G1 is closed. Gate G0 and G1 are complete; G2 is now in progress.
+Current status: master-plan tasks `S001`–`S033` are complete; the first unfinished task is `S034` (define explicit provider ports and deterministic fakes). The deployed non-effecting MCP → API → PostgreSQL → dashboard proof passed without provider calls or external effects, the v1 interface packet is frozen, and G1 is closed. Gate G0 and G1 are complete; G2 is now in progress.
 
 | Field | Value |
 |---|---|
 | Status | Live checklist |
-| Current phase | G2 OAuth/provider/model risk retirement; restart at `S033` |
+| Current phase | G2 OAuth/provider/model risk retirement; restart at `S034` |
 | Last updated | 2026-07-16 |
 | Implementation update | One sequential `S001`–`S103` plan replaces the prior person-specific workstreams; no live provider integration is enabled. |
 
@@ -123,7 +123,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 |---|---|---|---|
 | G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | Complete | [S018 G0 report](../artifacts/test-runs/2026-07-15-s018-g0.md); hosted Node 24 CI and ephemeral migration replay passed |
 | G1 | `S019`–`S030`: non-effecting MCP → API → PostgreSQL → dashboard | Complete | [S030 G1 closure report](../artifacts/test-runs/2026-07-16-s030-g1-close.md); S001–S030 complete in sequence |
-| G2 | `S031`–`S045`: OAuth, Calendar/Gmail/artifact/model primitives and live spikes | In progress | S031 transaction and S032 identity boundaries passed; S033 is next; no live provider call has started |
+| G2 | `S031`–`S045`: OAuth, Calendar/Gmail/artifact/model primitives and live spikes | In progress | S031 transaction, S032 identity, and S033 negative-test boundaries passed; S034 is next; no live provider call has started |
 | G3 | `S046`–`S059`: initial World PR, approval, execution, receipts | Not started | TBD |
 | G4 | `S060`–`S074`: late context, Causal Revert, recovery execution/evals | Not started | TBD |
 | G5 | `S075`–`S086`: prevention rule, clarification proof, approved reset | Not started | TBD |
@@ -152,6 +152,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 - [x] `S030` G1 closure: audited replay/auth/browser evidence, deployed screenshots and readiness, fake-mode proof, command outputs, known risks, and requirement links. Evidence: [S030 closure report](../artifacts/test-runs/2026-07-16-s030-g1-close.md). G1 is closed; S031 subsequently completed the OAuth transaction boundary.
 - [x] `S031` OAuth transaction flow: exact Google authorization redirect, state/nonce/PKCE construction, browser-session binding, one-use callback consumption, AES-256-GCM verifier/refresh-token persistence primitives, authenticated routes, and reviewed `0002_oauth_transaction` migration. Evidence: [S031 OAuth transaction report](../artifacts/test-runs/2026-07-16-s031-oauth-transaction.md). No Google consent, token exchange, mailbox/profile read, Calendar call, Gmail call, or external effect was run; S032 subsequently added the identity gate.
 - [x] `S032` connected identity claims: strict signed Google ID-token verification with published JWKS, issuer/audience/azp/time/nonce/email/sub/account checks, exact approved scopes, encrypted refresh-token rotation, provider-failure mapping, and a Postgres consume-parameter regression fix. Evidence: [S032 Google identity report](../artifacts/test-runs/2026-07-16-s032-google-identity.md). Requirement links: SAFE-04, SAFE-05, SAFE-09, SAFE-10, NFR-10. Contract versions: `GoogleOidcClaimsSchema`, `GoogleOidcJwtHeaderSchema`, `GoogleOAuthTokenResponseSchema`, existing OAuth transaction `v1`; no migration changed. No live consent, token exchange, mailbox/profile read, Calendar call, Gmail call, or external effect was run; S033 negative tests are next.
+- [x] `S033` OAuth negative tests: deterministic route and boundary coverage for replay, missing/mismatched state/nonce/PKCE, redirect drift, wrong audience/issuer/subject/account, expiry, unverified email, malformed ID tokens, provider rejection, and no-credential outcomes. Evidence: [S033 OAuth negative-test report](../artifacts/test-runs/2026-07-16-s033-oauth-negative.md). Requirement links: SAFE-04, SAFE-05, SAFE-09, SAFE-10, NFR-10. No live provider call or external effect was run; S034 provider ports/fakes are next.
 
 - [x] G1 adversarial review correction pass: repaired MCP/dashboard controlled-workspace access, PostgreSQL lease/replay and cancellation honesty, production auth/error mapping, strict lifecycle metadata, UI-state honesty, and documentation drift. Evidence: [sanitized adversarial review](../artifacts/test-runs/2026-07-15-g1-adversarial-review.md). Requirement links: FR-01, FR-02, FR-03, FR-07, FR-09, SAFE-03, SAFE-04, SAFE-08, NFR-02, NFR-06, NFR-07, NFR-08, NFR-10. Versions: `v1`, `initial-plan.v1`, `golden-contracts.v1`, `traceability.v1`, `fixture-initial.v1`, `prevention-rule.v1`, `reset-plan.v1`. Local verification passed; deployed proof, fresh disposable migration replay, and recovery evaluation remain unverified for the recorded reasons.
 
@@ -159,10 +160,10 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 
 | Blocker | Impact | Next action | Status |
 |---|---|---|---|
-| OAuth token and live provider ownership are not configured | Calendar/Gmail/model risk cannot be retired | Complete S033–S043 in G2 under the human-only live-effect rules | Open |
+| OAuth token and live provider ownership are not configured | Calendar/Gmail/model risk cannot be retired | Complete S034–S043 in G2 under the human-only live-effect rules | Open |
 | Playwright root-command cleanup on Windows | Critical browser test needed an explicit server/browser lifecycle | Direct smoke runner tears down cleanly; retain conventional spec for CI migration | Resolved |
 
-Supabase is provisioned, the frozen foundation schema is applied, and S009 Vercel health/readiness and cookie checks pass. Google Cloud and OpenAI access prerequisites are configured without live product effects. S012 private environment validation and S013–S018 local and hosted verification passed, including the disposable PostgreSQL migration replay. S019–S032 pass in their documented scopes; G1 is closed and S031's OAuth transaction boundary plus S032's local identity gate are complete. The reviewed `0002_oauth_transaction` migration must be applied before the new readiness check can pass. Provider work remains gated behind G2.
+Supabase is provisioned, the frozen foundation schema is applied, and S009 Vercel health/readiness and cookie checks pass. Google Cloud and OpenAI access prerequisites are configured without live product effects. S012 private environment validation and S013–S018 local and hosted verification passed, including the disposable PostgreSQL migration replay. S019–S033 pass in their documented scopes; G1 is closed and the OAuth transaction, local identity, and negative-test boundaries are complete. The reviewed `0002_oauth_transaction` migration must be applied before the new readiness check can pass. Provider work remains gated behind G2.
 
 ## Verification evidence log
 
@@ -201,6 +202,7 @@ Add entries only after work is actually complete:
 | 2026-07-16 | S030 G1 closure | [S030 closure report](../artifacts/test-runs/2026-07-16-s030-g1-close.md): acceptance audit, command/evidence index, deployed proof, replay/auth results, fake-mode proof, known risks, and requirement links | Passed; G1 closed; S031 subsequently completed the OAuth transaction boundary; no provider or external-effect work started | Codex |
 | 2026-07-16 | S031 OAuth transaction flow | [S031 OAuth transaction report](../artifacts/test-runs/2026-07-16-s031-oauth-transaction.md): state/nonce/PKCE/redirect/session/replay tests, encrypted secret tests, route tests, exact migration/catalog runner, clean install, full unit/build/browser/security/config/interface/traceability checks | Passed locally; `0002_oauth_transaction` has not been applied to Production and Google consent/token exchange remain human/provider-gated; S032 is next | Codex |
 | 2026-07-16 | S032 connected identity claims | [S032 Google identity report](../artifacts/test-runs/2026-07-16-s032-google-identity.md): strict JWT/JWKS claim checks, account-substitution rejection, exact-scope and encrypted-refresh tests, OAuth callback fake-provider tests, Postgres consume-parameter regression, typecheck, lint, and focused 39-test run | Passed locally with deterministic fakes; no live consent/token exchange, mailbox/profile read, Calendar call, Gmail call, or external effect; S033 is next | Codex |
+| 2026-07-16 | S033 OAuth negative tests | [S033 OAuth negative-test report](../artifacts/test-runs/2026-07-16-s033-oauth-negative.md): route and boundary regressions for state/nonce/PKCE/redirect/claim/account/provider failures, focused 38-test run, full suite, typecheck, lint, build, security, fake-production, traceability, and diff checks | Passed locally with deterministic fakes; all negative paths fail closed and no live provider call or external effect occurred; S034 is next | Codex |
 
 ## MVP definition of done
 

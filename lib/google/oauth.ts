@@ -232,7 +232,7 @@ export function buildGoogleTokenExchangeBody(
   transaction: Pick<GoogleOAuthTransaction, "redirectUri" | "codeVerifier">,
   code: string,
 ): URLSearchParams {
-  if (!code || transaction.redirectUri !== configuration.redirectUri) {
+  if (!code || !transaction.codeVerifier || transaction.redirectUri !== configuration.redirectUri) {
     throw new Error("OAuth token exchange inputs are invalid.");
   }
   const body = new URLSearchParams();

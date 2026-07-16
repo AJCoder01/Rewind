@@ -85,6 +85,18 @@ describe("Google OAuth transaction boundary", () => {
     });
   });
 
+  it("rejects missing PKCE verifier and redirect drift before token exchange", () => {
+    const transaction = createGoogleOAuthTransaction(configuration);
+    expect(() => buildGoogleTokenExchangeBody(configuration, { ...transaction, codeVerifier: "" }, "fake-code")).toThrow();
+    expect(() =>
+      buildGoogleTokenExchangeBody(
+        configuration,
+        { ...transaction, redirectUri: "https://attacker.example.test/oauth/callback" },
+        "fake-code",
+      ),
+    ).toThrow();
+  });
+
   it("consumes a session-bound transaction atomically once and keeps mismatches untouched", async () => {
     const store = new MemoryOAuthStore();
     const transaction = createGoogleOAuthTransaction(configuration, new Date("2026-07-16T00:00:00.000Z"));
