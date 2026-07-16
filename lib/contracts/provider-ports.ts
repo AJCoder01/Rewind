@@ -117,20 +117,32 @@ export const GmailApprovedMessageSchema = z
     }
   });
 
-export const GmailSendReceiptSchema = z.discriminatedUnion("status", [
-  z
-    .object({ status: z.literal("sent"), messageId: ProviderIdentifierSchema, threadId: ProviderIdentifierSchema.optional() })
-    .strict(),
-  z
-    .object({ status: z.literal("permanent_failed"), providerCode: z.string().min(1).max(100) })
-    .strict(),
-  z
-    .object({
-      status: z.literal("delivery_uncertain"),
-      reason: z.enum(["transport_timeout", "provider_5xx", "malformed_success", "process_interrupted"]),
-    })
-    .strict(),
-]);
+export const GmailSentReceiptSchema = z
+  .object({ status: z.literal("sent"), messageId: ProviderIdentifierSchema, threadId: ProviderIdentifierSchema.optional() })
+  .strict();
+
+export const GmailPermanentFailureReceiptSchema = z
+  .object({ status: z.literal("permanent_failed"), providerCode: z.string().min(1).max(100) })
+  .strict();
+
+export const GmailUncertainReceiptSchema = z
+  .object({
+    status: z.literal("delivery_uncertain"),
+    reason: z.enum([
+      "transport_timeout",
+      "transport_error",
+      "provider_408",
+      "provider_429",
+      "provider_5xx",
+      "malformed_success",
+      "process_interrupted",
+      "cancellation",
+      "persistence_failure",
+    ]),
+  })
+  .strict();
+
+export const GmailSendReceiptSchema = z.discriminatedUnion("status", [GmailSentReceiptSchema, GmailPermanentFailureReceiptSchema, GmailUncertainReceiptSchema]);
 
 export const AccountBriefArtifactInputSchema = z
   .object({

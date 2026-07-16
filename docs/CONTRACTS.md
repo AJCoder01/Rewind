@@ -483,11 +483,17 @@ The `0002_oauth_transaction` migration stores hashed transaction secrets, encryp
 
 ### 3.17 Explicit provider ports and deterministic fakes
 
-`lib/contracts/provider-ports.ts` is the runtime contract for the provider-risk boundary. `CalendarPort` accepts only the controlled calendar ID/tag query, creates only the exact Acme seed shape, returns typed Acme event snapshots containing ownership/type/recurrence/tag/time/ETag/version facts, and exposes separate get and conditional start/end update operations with `sendUpdates: "none"`. `GmailPort` accepts only an approved sender/recipient/subject/body/hash/run shape and returns a discriminated `sent`, `permanent_failed`, or `delivery_uncertain` receipt; a local preparation error is a typed pre-handoff failure. `ArtifactPort` accepts the exact account-brief bytes/hash/provenance and returns a typed persistence receipt. `ModelProposalPort` has separate initial, recovery, and prevention-rule methods; its raw proposal remains `unknown` until the later versioned model schemas validate it.
+`lib/contracts/provider-ports.ts` is the runtime contract for the provider-risk boundary. `CalendarPort` accepts only the controlled calendar ID/tag query, creates only the exact Acme seed shape, returns typed Acme event snapshots containing ownership/type/recurrence/tag/time/ETag/version facts, and exposes separate get and conditional start/end update operations with `sendUpdates: "none"`. `GmailPort` first exposes synchronous `prepareApprovedMessage` for schema/MIME/token work while the dispatch marker is still null, then accepts only an approved sender/recipient/subject/body/hash/run shape and returns a discriminated `sent`, `permanent_failed`, or `delivery_uncertain` receipt. `ArtifactPort` accepts the exact account-brief bytes/hash/provenance and returns a typed persistence receipt. `ModelProposalPort` has separate initial, recovery, and prevention-rule methods; its raw proposal remains `unknown` until the later versioned model schemas validate it.
 
 `FakeCalendarPort`, `FakeGmailPort`, `FakeArtifactPort`, and `FakeModelPort` implement those interfaces only for deterministic tests and non-production fixture use. Each fake has explicit operation-specific failure injection. The fakes do not retry, read mailboxes, generate artifact content, or turn model output into executable provider fields. No generic `RewindableAction`, compensation, or provider orchestration interface is introduced.
 
-### 3.18 Controlled Calendar seed and preflight boundary
+### 3.18 Gmail delivery and dispatch state boundary
+
+`gmail-delivery.v1` binds one mail action to its opaque action/plan IDs, action key, approved-message digest, and normalized recipient digest. Registered templates are limited to the initial UK notification and the two fixed recovery mail templates. The delivery service rechecks equal approved/current plan digests, the configured Google subject, exact template rendering, the account subject, and the structured `{UK, US}` allowlist before calling the provider.
+
+`MemoryGmailDispatchStore` proves deterministic behavior; `PostgresGmailDispatchStore` updates the existing `action_executions` row and does not add a migration. A new or known-safe retryable row is claimed with `status = in_progress` and `dispatch_started_at` in one database update before the provider handoff. A local preparation error stores `retryable_failed` with a null marker. A sent, permanent, or uncertain provider receipt is stored immediately after the single call. Replaying a terminal row returns its stored outcome and never calls Gmail. An in-progress row with a marker is treated as uncertain rather than redispatched. Provider receipt reasons are bounded to transport timeout/error, 408, 429, 5xx, malformed success, cancellation, process interruption, and persistence failure; provider bodies and message content never enter error output.
+
+### 3.19 Controlled Calendar seed and preflight boundary
 
 `calendar-demo.v1` is the setup-only contract for S035. `CalendarEventCreate` contains one configured calendar ID, the exact Acme UK or Acme US title/region, a timed start/end in `America/New_York`, exactly one allowlisted attendee, the exact private tags `{rewind_demo: "acme-renewal", region}`, and `sendUpdates: "none"`. Unknown properties, wrong duration, mismatched region/tag, duplicate recipients, all-day values, and end-before-start are rejected.
 
@@ -495,7 +501,7 @@ The command must discover the configured tag before any create and must refuse a
 
 `seed:demo` and `preflight:demo` are interactive admin commands only. Their private TTY prompt repeats the exact configured Calendar ID and a unique run ID, which the operator must type in full; command results print only sanitized status/counts/fingerprints. They refresh the already stored account-bound Google credential and use that explicit calendar ID. A provider error, ambiguous create result, partial state, persistence failure, or baseline/version mismatch is an honest failure and is never hidden behind fake output or retried automatically. Automated tests use `FakeCalendarPort`; no live OAuth refresh, Calendar read, Calendar write, or external effect is implied by the command contract.
 
-### 3.19 Calendar move/restore primitive boundary
+### 3.20 Calendar move/restore primitive boundary
 
 S036 extends the protected `demo_event_state.last_receipt` contract with a typed Calendar operation record. Each `move` or `restore` record contains the operation/run ID, the complete typed `before` snapshot, the exact `desired` start/end/duration/time-zone/`sendUpdates: "none"` fields, and one of these outcomes:
 
@@ -508,7 +514,7 @@ The service refetches the configured event, rechecks calendar/event identity, ow
 
 Automated proof uses `FakeCalendarPort` and verifies pre-write persistence, move/restore state transitions, duration/time-zone retention, static-field preservation, stale-state refusal, provider-conflict refusal, unavailable/uncertain handling, and no-rebase behavior. Product approval/action-ledger integration remains S046/S052 work.
 
-### 3.20 Mutation response and error matrix
+### 3.21 Mutation response and error matrix
 
 Every success/attention response includes `requestId`; task mutations use `TaskMutationResponse` unless a richer shape is shown above. A durable attention outcome is HTTP `200` because the request was recorded and needs operator action; request/precondition conflicts use `409`; validation/clarification uses `422`; auth uses `401/403`.
 

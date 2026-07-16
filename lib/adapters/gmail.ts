@@ -19,6 +19,8 @@ export class GmailProviderError extends Error {
 }
 
 export interface GmailPort {
+  /** Complete local schema/MIME/token preparation before dispatch is claimed. */
+  prepareApprovedMessage(input: GmailApprovedMessage): void;
   sendApprovedMessage(input: GmailApprovedMessage): Promise<GmailSendReceipt>;
 }
 
@@ -38,6 +40,12 @@ export class FakeGmailPort implements GmailPort {
   constructor(options: FakeGmailOptions = {}) {
     this.failure = options.failure;
     this.messageIdPrefix = options.messageIdPrefix ?? "fake-gmail-message";
+  }
+
+  prepareApprovedMessage(input: GmailApprovedMessage): void {
+    const message = GmailApprovedMessageSchema.parse(input);
+    if (sha256Text(message.bodyText) !== message.bodyHash) throw new GmailProviderError();
+    if (this.failure?.kind === "local_failure") throw new GmailProviderError();
   }
 
   async sendApprovedMessage(input: GmailApprovedMessage): Promise<GmailSendReceipt> {
