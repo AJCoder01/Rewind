@@ -43,6 +43,9 @@ This file records why a decision was made and which choices remain open. Accepte
 | ADR-022 | Use npm scripts in the single root package | Accepted |
 | ADR-023 | Use same-origin plus double-submit CSRF for dashboard mutations | Accepted |
 | ADR-024 | Permit the deployed G1 PostgreSQL contract slice without provider effects | Accepted |
+| ADR-025 | Stage OAuth transaction consumption before identity/token exchange | Accepted |
+| ADR-026 | Verify Google identity locally and bind the configured account | Accepted |
+| ADR-027 | Freeze explicit provider ports and deterministic fakes | Accepted |
 
 ## Accepted decisions
 
@@ -253,6 +256,14 @@ This file records why a decision was made and which choices remain open. Accepte
 **Why:** A provider-returned email or profile lookup is not an adequate substitute for a signed, transaction-bound identity assertion. Local claim validation keeps account substitution fail-closed, preserves the locked narrow scope, and avoids requesting mailbox access that the MVP does not need.
 
 **Consequence:** Automated tests can exercise signature, claim, scope, refresh, and substitution failures with deterministic keys and token responses. Live consent, token exchange, provider refresh, and account ownership remain unverified until the explicit G2 human/provider gates.
+
+### ADR-027 — Freeze explicit provider ports and deterministic fakes
+
+**Decision:** S034 defines separate Calendar, Gmail, artifact, and model ports for the locked Acme scenario. Each port has a typed contract and a deterministic fake with operation-specific failure injection. Calendar exposes conditional start/end updates and rolling fake versions; Gmail exposes one-send outcomes including permanent and uncertain delivery; the artifact port persists supplied bytes only; and the model port keeps raw proposal output untrusted and names each proposal operation separately.
+
+**Why:** Later application services need stable boundaries that can be tested for ordering, stale state, partial failure, and honest outcomes without coupling scenario-specific semantics to a generic action or compensation framework.
+
+**Consequence:** Automated suites can exercise provider failures and call counts without live credentials or external effects. The fakes are not production adapters, do not retry or read mailboxes, and do not replace the later live provider implementations or S035–S043 gates.
 
 ## Rejected alternatives
 

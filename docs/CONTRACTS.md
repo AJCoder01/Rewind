@@ -479,7 +479,13 @@ Refresh decrypts the stored refresh token only on the server, posts the fixed `r
 
 The `0002_oauth_transaction` migration stores hashed transaction secrets, encrypted verifier material, and one encrypted Google refresh-token record. Raw OAuth tokens, client secrets, provider error descriptions, and browser-session cookies are never logged, returned, or sent to client bundles. `oauth_credentials` can be written only through the validated-identity persistence boundary; it requires a stable Google subject, normalized email, fixed provider, non-empty scopes, and a `v1` AES-256-GCM ciphertext envelope.
 
-### 3.17 Mutation response and error matrix
+### 3.17 Explicit provider ports and deterministic fakes
+
+`lib/contracts/provider-ports.ts` is the runtime contract for the provider-risk boundary. `CalendarPort` accepts only the controlled calendar ID/tag query, returns typed Acme event snapshots containing ownership/type/recurrence/tag/time/ETag/version facts, and exposes separate get and conditional start/end update operations with `sendUpdates: "none"`. `GmailPort` accepts only an approved sender/recipient/subject/body/hash/run shape and returns a discriminated `sent`, `permanent_failed`, or `delivery_uncertain` receipt; a local preparation error is a typed pre-handoff failure. `ArtifactPort` accepts the exact account-brief bytes/hash/provenance and returns a typed persistence receipt. `ModelProposalPort` has separate initial, recovery, and prevention-rule methods; its raw proposal remains `unknown` until the later versioned model schemas validate it.
+
+`FakeCalendarPort`, `FakeGmailPort`, `FakeArtifactPort`, and `FakeModelPort` implement those interfaces only for deterministic tests and non-production fixture use. Each fake has explicit operation-specific failure injection. The fakes do not retry, read mailboxes, generate artifact content, or turn model output into executable provider fields. No generic `RewindableAction`, compensation, or provider orchestration interface is introduced.
+
+### 3.18 Mutation response and error matrix
 
 Every success/attention response includes `requestId`; task mutations use `TaskMutationResponse` unless a richer shape is shown above. A durable attention outcome is HTTP `200` because the request was recorded and needs operator action; request/precondition conflicts use `409`; validation/clarification uses `422`; auth uses `401/403`.
 

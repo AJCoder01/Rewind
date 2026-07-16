@@ -44,7 +44,7 @@ Local Codex clients support stdio MCP servers; a future remote transport is not 
 
 The implemented G1 slice keeps route handlers thin: they authorize the dashboard session or scoped MCP bearer, validate the v1 request, invoke one application service, and map a safe response. The service delegates lifecycle ordering to the store. PostgreSQL claims idempotency before planning, persists the analyzing task and planning lease transactionally, evaluates the typed fixture rule before the effect-bearing lock, and parses stored read models through the v1 schemas. The scoped MCP principal and authenticated demo operator share the one controlled workspace, so an MCP-created review URL is readable by that operator but never by an unrelated actor. A rule match persists a clarification-only task with no plan, action, run, or lock. The dashboard's cancel mutation uses the same service and releases only the lock owned by that task; an in-progress cancellation replays the current durable state rather than a speculative success. The status endpoint exposes an MCP-safe projection.
 
-The deterministic Calendar/Gmail/model provider adapters are limited to development and tests. Production configuration rejects `memory_fixture` and any fake provider selection before a provider-backed success can be produced. The deployed G1 path is different: it uses the real PostgreSQL repository to persist the deterministic, contract-valid non-effecting plan fixture, makes no Calendar, Gmail, or model call, and labels the review as non-effecting. S028 proves the deployed durable path; S029 freezes its interfaces and evidence; S030 closes the G1 audit. G2 starts at S031 and must preserve this boundary.
+S034 freezes four explicit provider boundaries: the Calendar port lists tagged events, reads controlled snapshots, and performs conditional start/end updates; the Gmail port accepts one approved message and returns sent, permanent-failure, or delivery-uncertain outcomes; the artifact port persists supplied account-brief bytes and hashes; and the model port exposes separately named initial, recovery, and prevention-rule proposals with raw output still untrusted. Deterministic fakes implement those ports with controlled failure injection for tests and non-production fixture use. Production configuration rejects `memory_fixture` and any fake provider selection before a provider-backed success can be produced. The deployed G1 path is different: it uses the real PostgreSQL repository to persist the deterministic, contract-valid non-effecting plan fixture, makes no Calendar, Gmail, or model call, and labels the review as non-effecting. S028 proves the deployed durable path; S029 freezes its interfaces and evidence; S030 closes the G1 audit. G2 starts at S031 and must preserve this boundary.
 
 ## 3. Intended source layout
 
@@ -60,9 +60,11 @@ components/
   prevention/
 lib/
   contracts/       # Zod schemas, DTOs, error codes, template registry
+    provider-ports.ts
   domain/          # State machine, plan hashing, validators, policies
   services/        # create, approve, execute, recover, rule, reset use cases
   ai/              # Prompt/schema versions and Responses API client
+    model.ts        # Explicit initial/recovery/rule model port and fake
   adapters/
     calendar.ts
     gmail.ts
