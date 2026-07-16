@@ -208,7 +208,11 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 
 `tests/unit/initial-calendar-execution.test.ts` covers exact plan/approval binding, artifact dependency ordering, complete before-state persistence before the provider call, start/end-only conditional input with `sendUpdates: "none"`, new-ETag verification, succeeded replay without a second update, stale ETag, allowlist drift, pre-write unavailability/retry, ambiguous update conflict, before-state persistence failure, and post-write verification failure. The tests use deterministic candidate resolution/plan expansion and `FakeCalendarPort`; no live database/provider or external effect is claimed.
 
-### 4.15 Integration tests with deterministic adapters
+### 4.15 S055 exact approved Gmail execution
+
+`tests/unit/initial-gmail-execution.test.ts` covers exact approved message reconstruction, approval and artifact/Calendar dependency ordering, local preparation before dispatch claim, marker/before-state ordering before send, sent receipt persistence, explicit permanent rejection, all uncertainty/transport failure handling, local retry without a marker, allowlist/sender drift conflict, duplicate-click busy behavior, before-state persistence failure with zero sends, terminal replay, and MCP refusal. Existing Gmail delivery/Google wire tests retain the lower-level MIME, provider-status, and standalone at-most-once proof; no live database/provider or external effect is claimed.
+
+### 4.16 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.
