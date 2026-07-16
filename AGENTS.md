@@ -108,6 +108,7 @@ npm run seed:demo
 npm run preflight:demo
 npm run reset:demo
 npm run verify:g1-interface
+npm run verify:g2-closure
 ```
 
 `package.json` is canonical once created. Update this section only after each command runs successfully.

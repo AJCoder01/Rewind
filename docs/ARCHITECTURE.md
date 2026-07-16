@@ -64,6 +64,8 @@ S043 adds `OpenAIModelPort`, `OllamaModelPort`, and the versioned synthetic spik
 
 S044 adds the authenticated `GET /api/v1/connection/status` read model and a dashboard panel over it. The service parses configuration into safe field/code gaps, checks the restricted database readiness boundary when PostgreSQL is selected, and reads only the stored account-bound OAuth metadata. It does not refresh credentials or call Calendar, Gmail, OpenAI, or Ollama. The response distinguishes fixture, live-capable, and blocked runtime state; reports Calendar preflight as failed or not run; and permanently labels product execution/reset as disabled. This is a prerequisite/status surface, not a product workflow success signal.
 
+S045 closes the risk-gate bookkeeping without expanding the runtime effect surface. `buildG2ClosureReport` evaluates a versioned, redacted evidence manifest for OAuth/account binding, Calendar ETag/versioning, Gmail uncertainty, strict model output, secret redaction, and fake-provider production refusal. Its report is safe to persist or print, and `assertG3Admission` is the explicit fail-closed boundary future G3 services must satisfy before work begins. The verifier does not call providers or PostgreSQL and cannot turn fixture output into live evidence; the selected model evidence remains explicitly `local_model`.
+
 ## 3. Intended source layout
 
 ```text
