@@ -31,7 +31,7 @@ The command then:
 
 The Calendar move and restore are the only external effects in this command. The stale US request is intended to produce no Calendar mutation. Model calls have no external effect and use `store: false`.
 
-Do not rerun the command after a timeout or uncertain provider result. Stop and report the sanitized failure code; a Calendar `uncertain` outcome requires review before any further action.
+Do not rerun the command after a timeout or uncertain provider result. Stop and report the sanitized failure code; a Calendar `uncertain` outcome requires review before any further action. Known safe diagnostic codes include `credential_unavailable`, `oauth_*`, `provider_unavailable`, `preflight_failed`, `openai_*`, and `model_*`; they never contain provider text. Do not retry until the code has been reviewed.
 
 ## Gmail evidence
 

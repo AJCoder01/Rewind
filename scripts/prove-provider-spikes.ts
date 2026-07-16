@@ -28,12 +28,15 @@ import {
   providerSpikeConfirmationPhrase,
   providerSpikeTargetFingerprint,
   runControlledCalendarProviderSpike,
+  ProviderSpikeFailureError,
   safeProviderSpikeFailureCode,
 } from "@/lib/services/provider-spike";
 import { assertTtyGatedDemoEnvironment, calendarDemoConfigurationFromEnvironment } from "@/lib/services/calendar-demo-command";
 
 function modelSummary(result: Readonly<{ metadata: ModelMetadata; attempts: number }>) {
-  if (result.metadata.provider !== "openai" || !result.metadata.responseId) throw new Error("Live model response metadata was incomplete.");
+  if (result.metadata.provider !== "openai" || !result.metadata.responseId) {
+    throw new ProviderSpikeFailureError("model_metadata_incomplete");
+  }
   return {
     status: "validated" as const,
     schemaVersion: result.metadata.schemaVersion,
@@ -76,7 +79,7 @@ async function main(): Promise<void> {
       credential.googleSub !== environment.REWIND_GOOGLE_EXPECTED_SUB ||
       credential.email !== environment.REWIND_GOOGLE_EXPECTED_EMAIL
     ) {
-      throw new Error("Connected Google identity is unavailable or does not match the configured account.");
+      throw new ProviderSpikeFailureError("credential_unavailable");
     }
     const accessToken = await refreshGoogleAccessToken(
       { clientId: environment.GOOGLE_CLIENT_ID, clientSecret: environment.GOOGLE_CLIENT_SECRET },

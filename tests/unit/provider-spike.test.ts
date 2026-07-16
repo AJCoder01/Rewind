@@ -7,9 +7,14 @@ import { seedControlledCalendar } from "@/lib/services/calendar-demo";
 import {
   assertProviderSpikeExecutionDisabled,
   ProviderSpikeGuardError,
+  ProviderSpikeFailureError,
   providerSpikeConfirmationPhrase,
   runControlledCalendarProviderSpike,
+  safeProviderSpikeFailureCode,
 } from "@/lib/services/provider-spike";
+import { OpenAIResponsesError } from "@/lib/ai/openai-responses";
+import { ModelSafetyError } from "@/lib/ai/model-safety";
+import { GoogleOAuthProviderError } from "@/lib/google/oauth";
 import type { CalendarDemoConfiguration } from "@/lib/domain/calendar-demo";
 
 const configuration: CalendarDemoConfiguration = {
@@ -94,5 +99,12 @@ describe("controlled provider spike boundary", () => {
     expect(ProviderSpikeReportSchema.parse(report)).toEqual(report);
     expect(ProviderSpikeReportSchema.safeParse({ ...report, model: { operations: report.model.operations.map((item, index) => index === 0 ? { ...item, schemaVersion: "recovery-proposal.v1" } : item) } }).success).toBe(false);
     expect(ProviderSpikeReportSchema.safeParse({ ...report, rawProviderResponse: "forbidden" }).success).toBe(false);
+  });
+
+  it("maps known provider/model failures to safe diagnostic codes", () => {
+    expect(safeProviderSpikeFailureCode(new ProviderSpikeFailureError("credential_unavailable"))).toBe("credential_unavailable");
+    expect(safeProviderSpikeFailureCode(new GoogleOAuthProviderError("response_invalid"))).toBe("oauth_response_invalid");
+    expect(safeProviderSpikeFailureCode(new OpenAIResponsesError("invalid_output", 2))).toBe("openai_invalid_output");
+    expect(safeProviderSpikeFailureCode(new ModelSafetyError("recovery", "semantic_invalid", 2))).toBe("model_recovery_semantic_invalid");
   });
 });

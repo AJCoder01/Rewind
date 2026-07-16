@@ -14,11 +14,20 @@ import { DemoCommandGuardError } from "@/lib/services/calendar-demo-command";
 import { EnvironmentConfigError } from "@/lib/config/environment";
 import { CalendarProviderError } from "@/lib/adapters/calendar";
 import { sha256Text } from "@/lib/domain/digest";
+import { OpenAIResponsesError } from "@/lib/ai/openai-responses";
+import { ModelSafetyError } from "@/lib/ai/model-safety";
+import { GoogleOAuthProviderError } from "@/lib/google/oauth";
 
 export type ProviderSpikeGuardKind =
   | "live_flag_required"
   | "execution_enabled"
   | "reset_enabled";
+
+export type ProviderSpikeFailureKind =
+  | "credential_unavailable"
+  | "calendar_configuration_invalid"
+  | "calendar_unexpected_receipt"
+  | "model_metadata_incomplete";
 
 export class ProviderSpikeGuardError extends Error {
   readonly kind: ProviderSpikeGuardKind;
@@ -26,6 +35,16 @@ export class ProviderSpikeGuardError extends Error {
   constructor(kind: ProviderSpikeGuardKind) {
     super("The controlled provider/model spike is not permitted in this environment.");
     this.name = "ProviderSpikeGuardError";
+    this.kind = kind;
+  }
+}
+
+export class ProviderSpikeFailureError extends Error {
+  readonly kind: ProviderSpikeFailureKind;
+
+  constructor(kind: ProviderSpikeFailureKind) {
+    super("The controlled provider/model spike failed safely.");
+    this.name = "ProviderSpikeFailureError";
     this.kind = kind;
   }
 }
@@ -53,11 +72,15 @@ export function providerSpikeConfirmationPhrase(runId: string, calendarId: strin
 
 export function safeProviderSpikeFailureCode(error: unknown): string {
   if (error instanceof ProviderSpikeGuardError) return error.kind;
+  if (error instanceof ProviderSpikeFailureError) return error.kind;
   if (error instanceof DemoCommandGuardError) return error.kind;
   if (error instanceof CalendarDemoSetupError) return error.kind;
   if (error instanceof CalendarDemoValidationError) return error.kind;
   if (error instanceof CalendarPrimitiveError) return error.kind;
   if (error instanceof CalendarProviderError) return "provider_unavailable";
+  if (error instanceof GoogleOAuthProviderError) return `oauth_${error.reason}`;
+  if (error instanceof OpenAIResponsesError) return `openai_${error.kind}`;
+  if (error instanceof ModelSafetyError) return `model_${error.operation}_${error.kind}`;
   if (error instanceof EnvironmentConfigError) return "invalid_environment";
   return "failed_safely";
 }
@@ -90,7 +113,7 @@ export class StaleIfMatchCalendarPort implements CalendarPort {
 function shiftedDesired(configuration: CalendarDemoConfiguration, candidateId: ControlledCalendarCandidateId) {
   const region = candidateId.endsWith("_uk") ? "UK" : "US";
   const seed = buildControlledCalendarSeeds(configuration).find((candidate) => candidate.region === region);
-  if (!seed) throw new Error("Controlled Calendar seed was unavailable.");
+  if (!seed) throw new ProviderSpikeFailureError("calendar_configuration_invalid");
   const start = new Date(Date.parse(seed.start.instant) - 60 * 60_000).toISOString();
   const end = new Date(Date.parse(start) + 30 * 60_000).toISOString();
   return CalendarOperationDesiredSchema.parse({
@@ -106,7 +129,7 @@ function receiptSummary(receipt: CalendarOperationReceipt): { status: "succeeded
   if (receipt.status === "conflict" && receipt.reason === "provider_conflict") {
     return { status: "conflict", reason: "provider_conflict" };
   }
-  throw new Error("Calendar provider spike did not produce the expected controlled receipt.");
+  throw new ProviderSpikeFailureError("calendar_unexpected_receipt");
 }
 
 /**
