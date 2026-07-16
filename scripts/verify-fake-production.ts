@@ -16,6 +16,7 @@ const productionFixtureEnvironment = {
   GOOGLE_REDIRECT_URI: "https://rewind.example.test/api/v1/oauth/google/callback",
   REWIND_TOKEN_ENCRYPTION_KEY: "fixture-encryption-0123456789abcdef012345",
   REWIND_GOOGLE_EXPECTED_EMAIL: "fixture@example.test",
+  REWIND_GOOGLE_EXPECTED_SUB: "fixture-google-subject",
   REWIND_RECIPIENT_ALLOWLIST: JSON.stringify({ UK: ["uk@example.test"], US: ["us@example.test"] }),
   REWIND_DEMO_DATE: "2026-08-20",
 } as const;

@@ -4,7 +4,7 @@
 |---|---|
 | Status | Active |
 | Format | Lightweight ADRs |
-| Last updated | 2026-07-15 |
+| Last updated | 2026-07-16 |
 
 This file records why a decision was made and which choices remain open. Accepted behavior must also appear in the canonical PRD, Safety, Architecture, or Contracts document; this log alone does not define runtime behavior.
 
@@ -245,6 +245,14 @@ This file records why a decision was made and which choices remain open. Accepte
 **Why:** State/nonce/PKCE replay protection and account binding have separate failure modes. Keeping the transaction gate independently testable prevents a partially implemented callback from turning provider code or an unverified identity into a connected account.
 
 **Consequence:** S031 automated tests can prove no-replay and ciphertext invariants without granting Google consent or calling a live provider. A real callback cannot claim connection success until S032 is complete.
+
+### ADR-026 — Verify Google identity locally and bind the configured account
+
+**Decision:** S032 verifies the Google ID token locally with the published Google JWKS and an RS256-only JWT header. The accepted issuer, configured OAuth audience and `azp`, time bounds, transaction nonce, `email_verified`, configured stable subject, and configured email are all required before a credential is stored. The authorization response must contain exactly the approved Calendar/Gmail/identity scopes. Refresh uses the OAuth token endpoint; a rotated refresh token is encrypted before persistence, while access tokens remain server-only and short-lived. Rewind never calls Gmail profile or mailbox endpoints to establish identity.
+
+**Why:** A provider-returned email or profile lookup is not an adequate substitute for a signed, transaction-bound identity assertion. Local claim validation keeps account substitution fail-closed, preserves the locked narrow scope, and avoids requesting mailbox access that the MVP does not need.
+
+**Consequence:** Automated tests can exercise signature, claim, scope, refresh, and substitution failures with deterministic keys and token responses. Live consent, token exchange, provider refresh, and account ownership remain unverified until the explicit G2 human/provider gates.
 
 ## Rejected alternatives
 

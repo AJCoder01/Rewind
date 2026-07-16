@@ -86,10 +86,10 @@ const rawApplicationEnvironmentSchema = z
     GOOGLE_REDIRECT_URI: z.string({ required_error: "GOOGLE_REDIRECT_URI is required" }).min(1, "GOOGLE_REDIRECT_URI is required"),
     REWIND_TOKEN_ENCRYPTION_KEY: privateSecretSchema(32, "REWIND_TOKEN_ENCRYPTION_KEY"),
     REWIND_GOOGLE_EXPECTED_EMAIL: emailSchema,
-    // These provider-discovered bindings are intentionally optional until the
-    // OAuth grant/calendar ownership tasks obtain them.  If supplied, they are
-    // still validated strictly and are never logged by this module.
-    REWIND_GOOGLE_EXPECTED_SUB: identifierSchema("REWIND_GOOGLE_EXPECTED_SUB", 255).optional(),
+    // The stable Google subject is required before an OAuth credential can be
+    // accepted.  The calendar binding remains deferred until Calendar
+    // discovery obtains it.  Neither value is ever logged by this module.
+    REWIND_GOOGLE_EXPECTED_SUB: identifierSchema("REWIND_GOOGLE_EXPECTED_SUB", 255),
     REWIND_GOOGLE_CALENDAR_ID: identifierSchema("REWIND_GOOGLE_CALENDAR_ID").optional(),
     GOOGLE_REFRESH_TOKEN_CIPHERTEXT: privateSecretSchema(32, "GOOGLE_REFRESH_TOKEN_CIPHERTEXT").optional(),
     REWIND_RECIPIENT_ALLOWLIST: z
@@ -130,7 +130,7 @@ export type ApplicationEnvironment = Readonly<{
   GOOGLE_REDIRECT_URI: string;
   REWIND_TOKEN_ENCRYPTION_KEY: string;
   REWIND_GOOGLE_EXPECTED_EMAIL: string;
-  REWIND_GOOGLE_EXPECTED_SUB?: string;
+  REWIND_GOOGLE_EXPECTED_SUB: string;
   REWIND_GOOGLE_CALENDAR_ID?: string;
   GOOGLE_REFRESH_TOKEN_CIPHERTEXT?: string;
   REWIND_RECIPIENT_ALLOWLIST: RecipientAllowlist;
@@ -333,7 +333,7 @@ export function parseApplicationEnvironment(environment: Environment): Applicati
     GOOGLE_REDIRECT_URI: value.GOOGLE_REDIRECT_URI,
     REWIND_TOKEN_ENCRYPTION_KEY: value.REWIND_TOKEN_ENCRYPTION_KEY,
     REWIND_GOOGLE_EXPECTED_EMAIL: value.REWIND_GOOGLE_EXPECTED_EMAIL,
-    ...(value.REWIND_GOOGLE_EXPECTED_SUB ? { REWIND_GOOGLE_EXPECTED_SUB: value.REWIND_GOOGLE_EXPECTED_SUB } : {}),
+    REWIND_GOOGLE_EXPECTED_SUB: value.REWIND_GOOGLE_EXPECTED_SUB,
     ...(value.REWIND_GOOGLE_CALENDAR_ID ? { REWIND_GOOGLE_CALENDAR_ID: value.REWIND_GOOGLE_CALENDAR_ID } : {}),
     ...(value.GOOGLE_REFRESH_TOKEN_CIPHERTEXT
       ? { GOOGLE_REFRESH_TOKEN_CIPHERTEXT: value.GOOGLE_REFRESH_TOKEN_CIPHERTEXT }

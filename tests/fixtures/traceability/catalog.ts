@@ -15,7 +15,11 @@ const g1Evidence = [
   "artifacts/test-runs/2026-07-16-s029-interface-freeze.md",
   "artifacts/test-runs/2026-07-16-s030-g1-close.md",
 ];
-const oauthEvidence = [...g1Evidence, "artifacts/test-runs/2026-07-16-s031-oauth-transaction.md"];
+const oauthEvidence = [
+  ...g1Evidence,
+  "artifacts/test-runs/2026-07-16-s031-oauth-transaction.md",
+  "artifacts/test-runs/2026-07-16-s032-google-identity.md",
+];
 const initialFixtures: TraceabilityFixtureId[] = ["fixture-initial.v1", "controlled-content.v1", "artifact-independence.v1"];
 const intakeCode = ["app/page.tsx", "app/api/v1/world-prs/route.ts", "lib/services/world-pr.ts", "mcp/server.ts"];
 const intakeTests = ["tests/unit/world-pr.test.ts", "tests/unit/g1-routes-auth.test.ts", "tests/unit/g1-mcp.test.ts", "scripts/test-e2e.ts"];
@@ -134,7 +138,13 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     codePaths: ["lib/auth/session.ts", "app/api/v1/auth/session/route.ts", "app/api/v1/world-prs/route.ts", "app/api/v1/world-prs/[worldPrId]/route.ts"], testPaths: ["tests/unit/auth.test.ts", "tests/unit/g1-routes-auth.test.ts", "scripts/test-e2e.ts"], fixtureIds: ["fixture-initial.v1"], evidencePaths: g1Evidence,
     note: "Dashboard sessions, origin checks, and scoped bearer authentication are covered for the fixture slice.",
   }),
-  planned("SAFE-05", "SAFE", "Controlled account/calendar/recipient boundary", ["S010", "S032", "S035", "S037"], "Live identity, event ownership, and allowlist enforcement are provider-gate work."),
+  current({
+    id: "SAFE-05", kind: "SAFE", title: "Controlled account/calendar/recipient boundary", planTasks: ["S010", "S032", "S035", "S037"],
+    codePaths: ["lib/config/environment.ts", "lib/contracts/oauth.ts", "lib/google/oauth.ts", "lib/google/oidc.ts", "lib/google/credentials.ts", "lib/db/oauth-store.ts"],
+    testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/google-identity.test.ts", "tests/unit/oauth-routes.test.ts", "tests/unit/oauth-transaction.test.ts", "tests/unit/oauth-store.test.ts"],
+    fixtureIds: ["traceability.v1"], evidencePaths: oauthEvidence, status: "partial",
+    note: "S032 verifies the signed configured Google subject/email and exact identity scope boundary with deterministic provider responses; Calendar ownership and recipient allowlist proof remain S035/S037 provider-gate work.",
+  }),
   planned("SAFE-06", "SAFE", "Calendar ETag conflict protection", ["S036", "S054", "S067"], "Calendar conditional execution is future work."),
   planned("SAFE-07", "SAFE", "Ambiguous Gmail delivery is not retried", ["S037", "S055", "S069"], "Gmail delivery semantics are future work."),
   current({
@@ -143,14 +153,14 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     note: "Strict fixture lifecycle, plan/action, prevention-rule, and reset-plan contracts reject unknown fields; live model schemas and semantic validators are planned.",
   }),
   current({
-    id: "SAFE-09", kind: "SAFE", title: "Server-only private environment boundary", planTasks: ["S003", "S012", "S013", "S031"],
-    codePaths: ["lib/config/environment.ts", "lib/db/config.ts", "lib/google/oauth.ts", "lib/google/credentials.ts", "lib/db/oauth-store.ts", "db/migrations/0002_oauth_transaction.sql", "scripts/security-scan.ts"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/db-config.test.ts", "tests/unit/oauth-transaction.test.ts", "tests/unit/oauth-migration.test.ts", "tests/unit/oauth-routes.test.ts", "tests/unit/security-scan.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: [...oauthEvidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
-    note: "Configuration validation, exact redirect/session binding, encrypted verifier/refresh-token storage, migration grants, and tracked-file scanning are covered; signed identity validation and live provider refresh remain S032/S043 work.",
+    id: "SAFE-09", kind: "SAFE", title: "Server-only private environment boundary", planTasks: ["S003", "S012", "S013", "S031", "S032"],
+    codePaths: ["lib/config/environment.ts", "lib/db/config.ts", "lib/google/oauth.ts", "lib/google/oidc.ts", "lib/google/credentials.ts", "lib/db/oauth-store.ts", "db/migrations/0002_oauth_transaction.sql", "scripts/security-scan.ts"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/db-config.test.ts", "tests/unit/google-identity.test.ts", "tests/unit/oauth-transaction.test.ts", "tests/unit/oauth-migration.test.ts", "tests/unit/oauth-routes.test.ts", "tests/unit/oauth-store.test.ts", "tests/unit/security-scan.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: [...oauthEvidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
+    note: "Configuration validation, exact redirect/session binding, local signed identity checks, encrypted verifier/refresh-token storage, migration grants, and tracked-file scanning are covered; live provider refresh remains S043 work.",
   }),
   current({
-    id: "SAFE-10", kind: "SAFE", title: "Controlled data minimization and redaction", planTasks: ["S003", "S012", "S013", "S089"],
-    codePaths: ["lib/config/environment.ts", "lib/db/migration-output.ts", "scripts/security-scan.ts"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/migration-output.test.ts", "tests/unit/security-scan.test.ts"], fixtureIds: ["controlled-content.v1", "traceability.v1"], evidencePaths: [...fixtureEvidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
-    note: "Synthetic fixture boundaries and safe environment/migration errors are covered; complete provider/log redaction remains planned.",
+    id: "SAFE-10", kind: "SAFE", title: "Controlled data minimization and redaction", planTasks: ["S003", "S012", "S013", "S032", "S089"],
+    codePaths: ["lib/config/environment.ts", "lib/google/oidc.ts", "lib/google/credentials.ts", "lib/db/migration-output.ts", "scripts/security-scan.ts"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/google-identity.test.ts", "tests/unit/oauth-routes.test.ts", "tests/unit/oauth-transaction.test.ts", "tests/unit/migration-output.test.ts", "tests/unit/security-scan.test.ts"], fixtureIds: ["controlled-content.v1", "traceability.v1"], evidencePaths: [...oauthEvidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
+    note: "Synthetic fixture boundaries, no-mailbox identity validation, encrypted secret handling, and safe environment/migration/provider errors are covered; complete provider receipt/log redaction remains planned.",
   }),
 
   planned("NFR-01", "NFR", "Five consecutive live runs", ["S093", "S096"], "Live rehearsal is a final release gate."),
@@ -183,9 +193,9 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   }),
   planned("NFR-09", "NFR", "Reset returns baselines and retains mail", ["S080", "S082", "S085", "S093"], "Reset is future work."),
   current({
-    id: "NFR-10", kind: "NFR", title: "No secret or production-data leakage", planTasks: ["S003", "S012", "S013", "S089"],
-    codePaths: ["lib/config/environment.ts", "lib/auth/session.ts", "lib/api/errors.ts", "scripts/security-scan.ts", "docs/CONTROLLED_CONTENT_UI_INVENTORY.md"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/security-scan.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/g1-mcp.test.ts"], fixtureIds: ["controlled-content.v1", "traceability.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
-    note: "Tracked secret scanning, synthetic-content rules, redacted error/status projections, and production fake-mode refusal are covered; complete provider/log/client leakage checks remain planned.",
+    id: "NFR-10", kind: "NFR", title: "No secret or production-data leakage", planTasks: ["S003", "S012", "S013", "S032", "S089"],
+    codePaths: ["lib/config/environment.ts", "lib/auth/session.ts", "lib/api/errors.ts", "lib/google/oidc.ts", "lib/google/credentials.ts", "scripts/security-scan.ts", "docs/CONTROLLED_CONTENT_UI_INVENTORY.md"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/google-identity.test.ts", "tests/unit/oauth-routes.test.ts", "tests/unit/oauth-transaction.test.ts", "tests/unit/security-scan.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/g1-mcp.test.ts"], fixtureIds: ["controlled-content.v1", "traceability.v1"], evidencePaths: [...oauthEvidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
+    note: "Tracked secret scanning, synthetic-content rules, redacted error/status projections, server-only configuration, no-mailbox identity validation, and encrypted refresh-token handling are covered; complete provider/log/client leakage checks remain planned.",
   }),
 ] as const;
 

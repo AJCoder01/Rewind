@@ -1,6 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { encryptedGoogleCredential } from "@/lib/google/credentials";
+import {
+  encryptedGoogleCredential,
+  parseGrantedGoogleScopes,
+  refreshGoogleAccessToken,
+} from "@/lib/google/credentials";
 import {
   buildGoogleAuthorizationUrl,
   buildGoogleTokenExchangeBody,
@@ -8,6 +12,7 @@ import {
   createGoogleOAuthTransaction,
   decryptOAuthSecret,
   encryptOAuthSecret,
+  GOOGLE_OAUTH_SCOPES,
   hashOAuthSecret,
   recoverCodeVerifier,
   type GoogleOAuthConfiguration,
@@ -21,6 +26,8 @@ const configuration: GoogleOAuthConfiguration = {
   clientId: "123456789-rewind.apps.googleusercontent.com",
   clientSecret: "fake-google-client-secret-that-is-never-live",
   tokenEncryptionKey: "fake-token-encryption-key-that-is-long-enough",
+  expectedEmail: "rewind-demo@example.test",
+  expectedSub: "google-subject",
 };
 
 describe("Google OAuth transaction boundary", () => {
@@ -111,7 +118,7 @@ describe("Google OAuth transaction boundary", () => {
   it("encrypts refresh-token persistence only after a validated identity is supplied", async () => {
     const store = new MemoryOAuthStore();
     const credential = encryptedGoogleCredential(
-      { googleSub: "google-subject", email: "rewind-demo@example.test", scopes: ["openid", "email"] },
+      { googleSub: "google-subject", email: "rewind-demo@example.test", scopes: [...GOOGLE_OAUTH_SCOPES] },
       {
         access_token: "fake-access-token",
         token_type: "Bearer",
@@ -126,6 +133,68 @@ describe("Google OAuth transaction boundary", () => {
     expect(stored?.refreshTokenCiphertext).not.toContain("fake-refresh-token");
     expect(decryptOAuthSecret(stored!.refreshTokenCiphertext, configuration.tokenEncryptionKey)).toBe("fake-refresh-token");
     expect(stored?.email).toBe("rewind-demo@example.test");
+  });
+
+  it("accepts only the exact approved scope set", () => {
+    expect(parseGrantedGoogleScopes(GOOGLE_OAUTH_SCOPES.join(" "))).toEqual([...GOOGLE_OAUTH_SCOPES]);
+    expect(() => parseGrantedGoogleScopes("openid email")).toThrow();
+    expect(() => parseGrantedGoogleScopes(`${GOOGLE_OAUTH_SCOPES.join(" ")} https://www.googleapis.com/auth/drive`)).toThrow();
+  });
+
+  it("refreshes an account-bound credential and encrypts a rotated refresh token", async () => {
+    const store = new MemoryOAuthStore();
+    await store.saveCredential(
+      encryptedGoogleCredential(
+        {
+          googleSub: configuration.expectedSub,
+          email: configuration.expectedEmail,
+          scopes: [...GOOGLE_OAUTH_SCOPES],
+        },
+        {
+          access_token: "fake-access-token",
+          token_type: "Bearer",
+          expires_in: 3600,
+          refresh_token: "fake-refresh-token",
+        },
+        configuration.tokenEncryptionKey,
+      ),
+    );
+    const credential = await store.getCredential();
+    if (!credential) throw new Error("expected fake credential");
+
+    const fetchImpl: typeof fetch = async (input, init) => {
+      expect(String(input)).toBe("https://oauth2.googleapis.com/token");
+      const body = new URLSearchParams(String(init?.body));
+      expect(body.get("grant_type")).toBe("refresh_token");
+      expect(body.get("refresh_token")).toBe("fake-refresh-token");
+      return new Response(
+        JSON.stringify({
+          access_token: "rotated-access-token",
+          token_type: "Bearer",
+          expires_in: 1800,
+          refresh_token: "rotated-refresh-token",
+          scope: GOOGLE_OAUTH_SCOPES.join(" "),
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    };
+
+    const refreshed = await refreshGoogleAccessToken(
+      configuration,
+      credential,
+      configuration.tokenEncryptionKey,
+      store,
+      fetchImpl,
+      new Date("2026-07-16T02:00:00.000Z"),
+    );
+    expect(refreshed).toEqual({
+      accessToken: "rotated-access-token",
+      tokenType: "Bearer",
+      expiresAt: new Date("2026-07-16T02:30:00.000Z"),
+    });
+    const rotated = await store.getCredential();
+    expect(rotated?.refreshTokenCiphertext).not.toContain("rotated-refresh-token");
+    expect(decryptOAuthSecret(rotated!.refreshTokenCiphertext, configuration.tokenEncryptionKey)).toBe("rotated-refresh-token");
   });
 
   it("keeps the migration source and checksum test fixture server-side", async () => {

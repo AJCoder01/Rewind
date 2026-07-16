@@ -8,7 +8,7 @@ describe("fixture E2E server environment", () => {
     expect(parsed.NODE_ENV).toBe("test");
     expect(parsed.REWIND_STORAGE_MODE).toBe("memory_fixture");
     expect(parsed.DATABASE_URL).toBeUndefined();
-    expect(parsed.REWIND_GOOGLE_EXPECTED_SUB).toBeUndefined();
+    expect(parsed.REWIND_GOOGLE_EXPECTED_SUB).toBe("fixture-google-subject");
     expect(parsed.REWIND_GOOGLE_CALENDAR_ID).toBeUndefined();
     expect(parsed.GOOGLE_REFRESH_TOKEN_CIPHERTEXT).toBeUndefined();
   });

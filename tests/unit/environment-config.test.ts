@@ -21,6 +21,7 @@ const validEnvironment = {
   GOOGLE_REDIRECT_URI: "http://localhost:3000/api/v1/oauth/google/callback",
   REWIND_TOKEN_ENCRYPTION_KEY: "encryption-key-012345678901234567890123",
   REWIND_GOOGLE_EXPECTED_EMAIL: "rewind-demo@example.com",
+  REWIND_GOOGLE_EXPECTED_SUB: "google-subject",
   REWIND_RECIPIENT_ALLOWLIST: JSON.stringify({ UK: ["uk-team@example.com"], US: ["us-team@example.com"] }),
   REWIND_DEMO_DATE: "2026-08-20",
 } as const;
@@ -136,8 +137,11 @@ describe("private environment contract", () => {
     );
   });
 
-  it("keeps deferred Google subject/calendar values optional but validates them when present", () => {
-    expect(parseApplicationEnvironment(validEnvironment).REWIND_GOOGLE_EXPECTED_SUB).toBeUndefined();
+  it("requires a stable Google subject and validates the deferred calendar value", () => {
+    expect(parseApplicationEnvironment(validEnvironment).REWIND_GOOGLE_EXPECTED_SUB).toBe("google-subject");
+    expectConfigError(() => parseApplicationEnvironment(withEnvironment({ REWIND_GOOGLE_EXPECTED_SUB: undefined })), [
+      "REWIND_GOOGLE_EXPECTED_SUB",
+    ]);
     expectConfigError(() => parseApplicationEnvironment(withEnvironment({ REWIND_GOOGLE_EXPECTED_SUB: "has whitespace" })), [
       "REWIND_GOOGLE_EXPECTED_SUB",
     ]);

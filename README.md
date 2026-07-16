@@ -13,12 +13,12 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Field | Value |
 |---|---|
 | Phase | G2 — OAuth, provider, and model risk retirement |
-| Implementation | G1 S019–S030 closed; S031 OAuth transaction boundary complete; S032 is next |
+| Implementation | G1 S019–S030 closed; S031–S032 OAuth boundaries complete; S033 is next |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-16 |
 
-The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. S031 adds the fail-closed Google OAuth transaction boundary and the numbered `0002_oauth_transaction` migration; Google identity validation, token exchange, and all provider effects remain disabled until later G2 tasks. S013 adds locked CI coverage, reachable-history secret scanning, dependency auditing, production fake-mode rejection, and an isolated ephemeral-migration replay job; S014–S017 freeze controlled content, executable traceability, golden contracts, and current-surface accessibility/testability. Verified locally with Node 24: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm audit --audit-level=moderate`, `npm run security:scan`, `npm run traceability:check`, and `npm run verify:fake-production`.
+The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. S031 adds the fail-closed Google OAuth transaction boundary and the numbered `0002_oauth_transaction` migration; S032 adds local signed-identity, exact-scope, account-binding, and encrypted-refresh validation. Live consent, provider token exchange/refresh, and all Calendar/Gmail effects remain gated behind later G2 tasks. S013 adds locked CI coverage, reachable-history secret scanning, dependency auditing, production fake-mode rejection, and an isolated ephemeral-migration replay job; S014–S017 freeze controlled content, executable traceability, golden contracts, and current-surface accessibility/testability. Verified locally with Node 24: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm audit --audit-level=moderate`, `npm run security:scan`, `npm run traceability:check`, and `npm run verify:fake-production`.
 
 S019–S027 extend this slice with session expiry, CSRF/origin and resource scope checks, transactional idempotency and planning leases, rule-first clarification, thin status/cancel routes, a read-only MCP status tool, safe loading/error/empty UI states, and a tested cancel/back flow. The fixture path remains visibly non-effecting and production rejects fake-provider mode.
 
@@ -158,11 +158,11 @@ npm run db:migrate
 npm run db:verify
 ```
 
-The migration command applies `0001_phase0_foundation.sql` and then `0002_oauth_transaction.sql` atomically/repeatably; each reviewed checksum and catalog must match. The database verification command performs read-only catalog/privilege checks plus constraint probes inside a transaction that always rolls back. `GET /api/health` is process liveness; `GET /api/ready` returns a sanitized `200` only when the restricted TLS runtime connection and exact foundation/OAuth schemas are ready. Google OAuth start/callback routes remain fail-closed until S032 identity validation is complete.
+The migration command applies `0001_phase0_foundation.sql` and then `0002_oauth_transaction.sql` atomically/repeatably; each reviewed checksum and catalog must match. The database verification command performs read-only catalog/privilege checks plus constraint probes inside a transaction that always rolls back. `GET /api/health` is process liveness; `GET /api/ready` returns a sanitized `200` only when the restricted TLS runtime connection and exact foundation/OAuth schemas are ready. Google OAuth start/callback routes remain fail-closed unless configuration, transaction, signed-identity, exact-scope, and provider response checks pass.
 
 ## First contributor actions
 
-1. Start at `S032` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): validate connected Google identity claims under the G2 safety gate.
+1. Start at `S033` in the [master implementation plan](docs/IMPLEMENTATION_PLAN.md): add the required OAuth negative tests under the G2 safety gate.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 
