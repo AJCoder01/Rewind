@@ -216,7 +216,11 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 
 `tests/unit/execution-timeline.test.ts` covers the dashboard read boundary for awaiting approval, fixed action order, planned/in-progress timestamps, typed artifact and Calendar receipts, partial conflict, delivery uncertainty, completed-only-after-all-receipts, cancellation, and dashboard-only access. `tests/unit/accessibility-contract.test.ts` freezes the execution selector, and `scripts/test-e2e.ts` checks the unapproved review renders “Awaiting approval” and never claims an action ledger success. The browser view renders only safe action metadata, typed receipts, redacted errors, and explicit loading/error/empty/partial/attention/cancelled states; no live database/provider or external effect is claimed.
 
-### 4.17 Integration tests with deterministic adapters
+### 4.17 S057 initial-workflow verification
+
+`tests/unit/initial-workflow.test.ts` composes deterministic candidate resolution, bounded reasoning, exact plan expansion, immutable approval, action-row preparation, `FakeArtifactPort`, `FakeCalendarPort`, and a recording Gmail port. It covers one exact artifact → Calendar → Gmail run, byte/provenance equality, fixed order, approval/digest/MCP refusal, retry/resume, duplicate-click busy leases, Gmail uncertainty after an expired dispatch lease, Calendar reconciliation after process death, stale ETag, allowlist drift, and replay with one provider effect per action. Together with the S052–S056 executor/timeline suites, this is the complete no-effect initial-workflow proof; no live database/provider or external effect is claimed.
+
+### 4.18 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.
