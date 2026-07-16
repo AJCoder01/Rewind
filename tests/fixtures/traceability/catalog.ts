@@ -31,6 +31,7 @@ const modelEvidence = [
   "artifacts/test-runs/2026-07-16-s041-model-schemas.md",
   "artifacts/test-runs/2026-07-16-s042-model-safety.md",
   "artifacts/test-runs/2026-07-16-s043-model-transport-correction.md",
+  "artifacts/test-runs/2026-07-16-s043-openai-rate-limit-blocker.md",
 ];
 const initialFixtures: TraceabilityFixtureId[] = ["fixture-initial.v1", "controlled-content.v1", "artifact-independence.v1"];
 const modelSafetyFixtures: TraceabilityFixtureId[] = ["traceability.v1", "model-safety.v1"];

@@ -33,6 +33,8 @@ The Calendar move and restore are the only external effects in this command. The
 
 Do not rerun the command after a timeout or uncertain provider result. Stop and report the sanitized failure code; a Calendar `uncertain` outcome requires review before any further action. Known safe diagnostic codes include `credential_unavailable`, `oauth_*`, `provider_unavailable`, `preflight_failed`, and `model_<operation>_<kind>`. Model kinds distinguish `invalid_request`, `unauthorized`, `forbidden`, `not_found`, `rate_limited`, `timeout`, `unavailable`, `refusal`, `truncated`, and `invalid_output`; they never contain provider text. Deterministic request/auth/permission/model-lookup failures are not retried. A model failure occurs before any Calendar mutation.
 
+For `model_*_rate_limited`, stop rather than repeatedly rerunning the combined spike. A project/organization owner must privately check the OpenAI Platform Billing and Limits pages: HTTP 429 can mean either request pacing or exhausted credits/monthly spend, and Rewind intentionally does not read the provider error body to distinguish them. After the external limit is available, run this command only once and return its final sanitized JSON.
+
 ## Gmail evidence
 
 The one allowlisted Gmail success and no-redispatch replay are already closed by the human S038 proof. Do not send a second message for S043. Link [the S038 live-proof report](../artifacts/test-runs/2026-07-16-s038-gmail-live-proof.md) when recording S043 evidence.

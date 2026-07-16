@@ -10,7 +10,7 @@
 ## Human live evidence received
 
 - The separate TTY Calendar preflight returned `status: ok`, `candidateCount: 2`, `baselineCount: 2`, and `expectedVersionCount: 2`.
-- Three combined human attempts failed closed with sanitized codes: `failed_safely`, `model_initial_invalid_output`, and `model_initial_unavailable`.
+- Three combined human attempts before the correction failed closed with sanitized codes: `failed_safely`, `model_initial_invalid_output`, and `model_initial_unavailable`.
 - The latter two attempts reached the initial model phase only after the old command completed its Calendar phase. Those reversible Calendar operations returned to baseline but do not count as final combined evidence because the report was not emitted.
 - No Gmail message, product execution, product reset, seed, deployment, migration, or live provider command was run by Codex.
 
@@ -67,5 +67,7 @@ git diff --check
 ## Remaining risk and next action
 
 S043 remains incomplete. A human must run the corrected TTY command once and return only its final sanitized JSON. If it fails, the new code will identify the safe transport/configuration class without provider body text and, because the model phase runs first, will perform no Calendar writes.
+
+The first corrected human attempt subsequently identified `model_initial_rate_limited` before Calendar opened. See the [rate-limit blocker report](2026-07-16-s043-openai-rate-limit-blocker.md).
 
 References: [GPT-5.6 model guidance](https://developers.openai.com/api/docs/guides/latest-model), [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Responses API migration differences](https://developers.openai.com/api/docs/guides/migrate-to-responses#additional-differences).
