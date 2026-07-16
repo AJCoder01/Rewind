@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Task | S035 — controlled Calendar discovery and seeding; OAuth callback unblock |
-| Status | Provider hardening implemented locally; Production redeploy and one fresh live retry pending |
+| Status | Provider hardening deployed to Production at `4541706`; one fresh live OAuth retry pending |
 | Requirements | SAFE-04, SAFE-05, SAFE-09, SAFE-10, NFR-10 |
 | Contract | Existing OAuth transaction `v1`; Google callback query boundary |
 
@@ -41,5 +41,7 @@ The audit found a concrete contract mismatch capable of producing that exact `50
 | `npm run traceability:check` | Passed after host IPC rerun: `traceability.v1`, 52 requirements |
 | `npm run verify:fake-production` | Passed after host IPC rerun: production fixture rejected |
 | `git diff --check` | Passed |
+| GitHub/Vercel deployment status | Passed: `4541706`, `Deployment has completed` |
+| `GET https://rewind-eta-jet.vercel.app/api/ready` | Passed: `ready`, schema `0002_oauth_transaction` |
 
-No live Google consent, token exchange, refresh, Calendar call, Gmail call, mailbox/profile read, or external effect was performed by this correction. Production must be redeployed before the human OAuth attempt is repeated.
+No live Google consent, token exchange, refresh, Calendar call, Gmail call, mailbox/profile read, or external effect was performed by this correction. Production is deployed and ready; the human operator must now start one fresh OAuth flow because prior authorization codes and consumed transactions cannot be reused.
