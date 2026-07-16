@@ -20,9 +20,11 @@ function contrastRatio(foreground: string, background: string): number {
 describe("S017 accessibility and testability contract", () => {
   it("keeps the frozen stable selectors on the three current screens", () => {
     const composer = read("app/page.tsx");
+    const connection = read("app/components/connection-preflight-panel.tsx");
     const login = read("app/login/page.tsx");
     const review = read("app/pr/[worldPrId]/page.tsx");
     for (const selector of ["composer-screen", "composer-request", "create-world-pr", "fixture-status"]) expect(composer).toContain(`data-testid=\"${selector}\"`);
+    for (const selector of ["connection-preflight", "connection-summary", "preflight-summary"]) expect(connection).toContain(`data-testid=\"${selector}\"`);
     for (const selector of ["login-screen", "dashboard-passcode", "login-submit"]) expect(login).toContain(`data-testid=\"${selector}\"`);
     for (const selector of ["review-screen", "assumption-panel", "planned-actions", "review-timeline", "fixture-mode-notice", "clarification-panel"]) expect(review).toContain(`data-testid=\"${selector}\"`);
     expect(composer).toContain("G1 non-effecting mode");
