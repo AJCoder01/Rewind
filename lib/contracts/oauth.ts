@@ -12,6 +12,13 @@ export const GoogleOAuthCallbackQuerySchema = z
     error: z.string().min(1).max(200).optional(),
     error_description: z.string().min(1).max(1000).optional(),
     error_uri: z.string().url().max(2000).optional(),
+    // Google includes bounded response metadata alongside `code` and `state`.
+    // These values are informational only; authorization remains bound to the
+    // stored state, redirect, client, PKCE verifier, and returned token.
+    scope: z.string().min(1).max(4096).optional(),
+    authuser: z.string().regex(/^\d+$/).max(8).optional(),
+    hd: z.string().min(1).max(255).optional(),
+    prompt: z.string().min(1).max(100).optional(),
   })
   .strict()
   .superRefine((value, context) => {
