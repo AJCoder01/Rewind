@@ -17,7 +17,7 @@ describe("executable requirement traceability", () => {
 
   it("validates all referenced repository paths and reports honest coverage counts", () => {
     expect(TRACEABILITY_CATALOG_VERSION).toBe("traceability.v1");
-    expect(verifyTraceability()).toEqual({ total: 52, covered: 3, partial: 18, planned: 31 });
+    expect(verifyTraceability()).toEqual({ total: 52, covered: 3, partial: 20, planned: 29 });
   });
 
   it("rejects unknown fixture IDs and paths that could escape the repository", () => {

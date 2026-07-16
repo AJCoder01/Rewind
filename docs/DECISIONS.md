@@ -4,7 +4,7 @@
 |---|---|
 | Status | Active |
 | Format | Lightweight ADRs |
-| Last updated | 2026-07-15 |
+| Last updated | 2026-07-16 |
 
 This file records why a decision was made and which choices remain open. Accepted behavior must also appear in the canonical PRD, Safety, Architecture, or Contracts document; this log alone does not define runtime behavior.
 
@@ -43,6 +43,10 @@ This file records why a decision was made and which choices remain open. Accepte
 | ADR-022 | Use npm scripts in the single root package | Accepted |
 | ADR-023 | Use same-origin plus double-submit CSRF for dashboard mutations | Accepted |
 | ADR-024 | Permit the deployed G1 PostgreSQL contract slice without provider effects | Accepted |
+| ADR-025 | Stage OAuth transaction consumption before identity/token exchange | Accepted |
+| ADR-026 | Verify Google identity locally and bind the configured account | Accepted |
+| ADR-027 | Freeze explicit provider ports and deterministic fakes | Accepted |
+| ADR-028 | Keep Calendar setup live-only, TTY-gated, and baseline-first | Accepted |
 
 ## Accepted decisions
 
@@ -245,6 +249,30 @@ This file records why a decision was made and which choices remain open. Accepte
 **Why:** State/nonce/PKCE replay protection and account binding have separate failure modes. Keeping the transaction gate independently testable prevents a partially implemented callback from turning provider code or an unverified identity into a connected account.
 
 **Consequence:** S031 automated tests can prove no-replay and ciphertext invariants without granting Google consent or calling a live provider. A real callback cannot claim connection success until S032 is complete.
+
+### ADR-026 — Verify Google identity locally and bind the configured account
+
+**Decision:** S032 verifies the Google ID token locally with the published Google JWKS and an RS256-only JWT header. The accepted issuer, configured OAuth audience and `azp`, time bounds, transaction nonce, `email_verified`, configured stable subject, and configured email are all required before a credential is stored. The authorization response must contain exactly the approved Calendar/Gmail/identity scopes. Refresh uses the OAuth token endpoint; a rotated refresh token is encrypted before persistence, while access tokens remain server-only and short-lived. Rewind never calls Gmail profile or mailbox endpoints to establish identity.
+
+**Why:** A provider-returned email or profile lookup is not an adequate substitute for a signed, transaction-bound identity assertion. Local claim validation keeps account substitution fail-closed, preserves the locked narrow scope, and avoids requesting mailbox access that the MVP does not need.
+
+**Consequence:** Automated tests can exercise signature, claim, scope, refresh, and substitution failures with deterministic keys and token responses. Live consent, token exchange, provider refresh, and account ownership remain unverified until the explicit G2 human/provider gates.
+
+### ADR-027 — Freeze explicit provider ports and deterministic fakes
+
+**Decision:** S034 defines separate Calendar, Gmail, artifact, and model ports for the locked Acme scenario. Each port has a typed contract and a deterministic fake with operation-specific failure injection. Calendar exposes conditional start/end updates and rolling fake versions; Gmail exposes one-send outcomes including permanent and uncertain delivery; the artifact port persists supplied bytes only; and the model port keeps raw proposal output untrusted and names each proposal operation separately.
+
+**Why:** Later application services need stable boundaries that can be tested for ordering, stale state, partial failure, and honest outcomes without coupling scenario-specific semantics to a generic action or compensation framework.
+
+**Consequence:** Automated suites can exercise provider failures and call counts without live credentials or external effects. The fakes are not production adapters, do not retry or read mailboxes, and do not replace the later live provider implementations or S035–S043 gates.
+
+### ADR-028 — Keep Calendar setup live-only, TTY-gated, and baseline-first
+
+**Decision:** S035 uses a scenario-specific Google Calendar wire adapter and two explicit admin commands, `seed:demo` and `preflight:demo`. They require a real TTY, non-production PostgreSQL mode, a non-CI environment, an explicit configured calendar ID, and an interactive confirmation containing a unique run ID. Seeding discovers the exact private demo tag before creating anything, refuses existing tagged events or persisted baselines, persists a redacted audit marker before each create, stores immutable semantic baselines without ETags, and updates the rolling expected provider version only from verified responses. Automated tests use deterministic fakes and never invoke the commands.
+
+**Why:** Calendar setup is the first boundary where provider identity, account ownership, calendar targeting, database state, and real writes meet. A command that could run from CI, production, an implicit `primary` calendar, or a fixture store could create uncontrolled state or make a partial seed look successful.
+
+**Consequence:** The safe code and negative tests can land before live access exists, while the human owner must still configure the private environment and run the TTY-confirmed OAuth refresh/Calendar seed/preflight. Partial, ambiguous, stale, or persistence-failed setup remains visible and requires deliberate human recovery; the command never silently retries or substitutes fixture output.
 
 ## Rejected alternatives
 

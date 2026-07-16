@@ -152,11 +152,19 @@ The post-implementation adversarial review repaired MCP/dashboard controlled-wor
 
 S019–S027 currently have deterministic unit/route/MCP coverage for strict unknown-field rejection, identical/conflicting/in-progress/failed replay, rule-first clarification without a plan/action/lock, planning-lease expiry, scenario-busy serialization, session expiry, CSRF/origin and resource scope, fake-provider production refusal, malformed read models, cancel/back, and the non-effecting browser flow. The sanitized command results and remaining deployed/database risk are recorded in [the S019–S027 G1 report](../artifacts/test-runs/2026-07-15-s019-s027-g1.md). No live provider or external-effect test is claimed here.
 
-### 4.3 S031 OAuth transaction evidence
+### 4.3 S031–S032 OAuth transaction and identity evidence
 
-S031 adds deterministic coverage for authorization URL scope/redirect/nonce/state/PKCE construction, strict callback query parsing, signed-session binding, replay and cross-session rejection, ten-minute expiry, atomic memory/PostgreSQL consumption, AES-256-GCM tamper/wrong-key failure, encrypted refresh-token persistence after a validated-identity boundary, and the numbered `0002_oauth_transaction` migration apply/replay/checksum/catalog checks. The callback intentionally returns safe `provider_unavailable` until S032 supplies signed OIDC claim validation; no Google consent, token exchange, mailbox read, Calendar call, or external effect is claimed.
+S031 adds deterministic coverage for authorization URL scope/redirect/nonce/state/PKCE construction, strict callback query parsing, signed-session binding, replay and cross-session rejection, ten-minute expiry, atomic memory/PostgreSQL consumption, AES-256-GCM tamper/wrong-key failure, encrypted refresh-token persistence primitives, and the numbered `0002_oauth_transaction` migration apply/replay/checksum/catalog checks. S032 adds strict JWT-header/payload parsing, RS256 signature verification against a fake Google JWKS, accepted issuer and audience/`azp`, expiry/issued-at, nonce, verified-email, stable-subject, expected-email, exact-scope, account-substitution, malformed-provider, and refresh/rotation coverage. S033 adds callback-level fail-closed cases for missing/mismatched state, replay, nonce, PKCE, redirect, issuer, audience, subject, account, expiry, unverified email, malformed token, and provider rejection, asserting that no credential is saved. S034 adds provider-port contract tests for tagged Calendar listing/conditional version updates, Gmail sent/permanent/uncertain outcomes, exact artifact persistence, raw-untrusted model output, strict input rejection, and operation-specific failure injection. S035 adds exact-two-event seed construction, DST-aware time conversion, immutable-baseline/rolling-version validation, partial/provider failure audit coverage, Google wire-response mapping, narrow `If-Match`/`sendUpdates=none` requests, and TTY/CI/production/target guards. All provider interactions are deterministic fakes in automation; no Google consent, live token exchange/refresh, mailbox read, Calendar call, Gmail call, model call, or external effect is claimed.
 
-### 4.4 Integration tests with deterministic adapters
+### 4.4 S034 provider-port evidence
+
+The [S034 provider-port report](../artifacts/test-runs/2026-07-16-s034-provider-ports.md) records the strict `provider-ports.v1` contracts, deterministic fake outcomes, operation-specific failure injection, and the no-live-effect verification boundary.
+
+### 4.5 S035 controlled Calendar setup evidence
+
+The [S035 Calendar setup report](../artifacts/test-runs/2026-07-16-s035-calendar-setup.md) records the `calendar-demo.v1` seed/preflight contracts, deterministic fake proof, strict Google wire mapping, and the human-only boundary. The TTY commands, OAuth refresh, live Calendar discovery, and Calendar writes remain intentionally unrun.
+
+### 4.6 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.
@@ -169,7 +177,7 @@ S031 adds deterministic coverage for authorization URL scope/redirect/nonce/stat
 - Gmail adapter: success, local pre-handoff failure, explicit 4xx rejection, every post-handoff uncertainty class, allowlist failure.
 - Reset: approved digest, two-event preflight, success, zero-write conflict, second-write race/partial result, rolling ETags, in-progress rejection, archive/rule/artifact/lock semantics.
 
-### 4.5 Browser E2E with deterministic adapters
+### 4.7 Browser E2E with deterministic adapters
 
 The mandatory Playwright path covers:
 
@@ -197,7 +205,7 @@ Also cover:
 - keyboard navigation and reduced motion;
 - no browser-tab switching in the main flow.
 
-### 4.5 Live integration tests
+### 4.8 Live integration tests
 
 Run locally or in the protected demo environment only:
 

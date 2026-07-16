@@ -26,6 +26,7 @@ export function createFixtureE2EServerEnvironment(baseUrl: string) {
   GOOGLE_REDIRECT_URI: `${baseUrl}/api/v1/oauth/google/callback`,
   REWIND_TOKEN_ENCRYPTION_KEY: "playwright-token-encryption-key-000001",
   REWIND_GOOGLE_EXPECTED_EMAIL: "fixture-team@example.test",
+  REWIND_GOOGLE_EXPECTED_SUB: "fixture-google-subject",
   REWIND_RECIPIENT_ALLOWLIST: JSON.stringify({ UK: ["uk-ops@example.test"], US: ["us-ops@example.test"] }),
   REWIND_DEMO_DATE: "2026-08-20",
   } as const;

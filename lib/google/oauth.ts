@@ -22,7 +22,7 @@ export const GOOGLE_OAUTH_SCOPES = [
 export const GoogleOAuthTokenResponseSchema = z
   .object({
     access_token: z.string().min(1).max(8192),
-    token_type: z.string().min(1).max(50),
+    token_type: z.literal("Bearer"),
     expires_in: z.number().int().positive().max(86_400),
     refresh_token: z.string().min(1).max(8192).optional(),
     scope: z.string().min(1).max(2000).optional(),
@@ -38,7 +38,16 @@ export type GoogleOAuthConfiguration = Readonly<{
   clientId: string;
   clientSecret: string;
   tokenEncryptionKey: string;
+  expectedEmail: string;
+  expectedSub: string;
 }>;
+
+export class GoogleOAuthProviderError extends Error {
+  constructor(message = "Google OAuth provider response was not usable safely.") {
+    super(message);
+    this.name = "GoogleOAuthProviderError";
+  }
+}
 
 export type GoogleOAuthTransaction = Readonly<{
   id: string;
@@ -223,7 +232,7 @@ export function buildGoogleTokenExchangeBody(
   transaction: Pick<GoogleOAuthTransaction, "redirectUri" | "codeVerifier">,
   code: string,
 ): URLSearchParams {
-  if (!code || transaction.redirectUri !== configuration.redirectUri) {
+  if (!code || !transaction.codeVerifier || transaction.redirectUri !== configuration.redirectUri) {
     throw new Error("OAuth token exchange inputs are invalid.");
   }
   const body = new URLSearchParams();
@@ -234,6 +243,64 @@ export function buildGoogleTokenExchangeBody(
   body.set("grant_type", "authorization_code");
   body.set("redirect_uri", configuration.redirectUri);
   return body;
+}
+
+export function buildGoogleRefreshTokenBody(
+  configuration: Pick<GoogleOAuthConfiguration, "clientId" | "clientSecret">,
+  refreshToken: string,
+): URLSearchParams {
+  if (!refreshToken) throw new GoogleOAuthProviderError("Google refresh token is unavailable.");
+  const body = new URLSearchParams();
+  body.set("client_id", configuration.clientId);
+  body.set("client_secret", configuration.clientSecret);
+  body.set("grant_type", "refresh_token");
+  body.set("refresh_token", refreshToken);
+  return body;
+}
+
+export async function requestGoogleToken(
+  body: URLSearchParams,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GoogleOAuthTokenResponse> {
+  let response: Response;
+  try {
+    response = await fetchImpl(GOOGLE_OAUTH_TOKEN_ENDPOINT, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: body.toString(),
+      redirect: "error",
+    });
+  } catch {
+    throw new GoogleOAuthProviderError();
+  }
+
+  if (!response.ok) throw new GoogleOAuthProviderError();
+
+  let decoded: unknown;
+  try {
+    decoded = await response.json();
+  } catch {
+    throw new GoogleOAuthProviderError();
+  }
+  const parsed = GoogleOAuthTokenResponseSchema.safeParse(decoded);
+  if (!parsed.success) throw new GoogleOAuthProviderError();
+  return parsed.data;
+}
+
+export async function exchangeGoogleAuthorizationCode(
+  configuration: Pick<GoogleOAuthConfiguration, "clientId" | "clientSecret" | "redirectUri">,
+  transaction: Pick<GoogleOAuthTransaction, "redirectUri" | "codeVerifier">,
+  code: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GoogleOAuthTokenResponse & { id_token: string; refresh_token: string }> {
+  const response = await requestGoogleToken(buildGoogleTokenExchangeBody(configuration, transaction, code), fetchImpl);
+  if (!response.id_token || !response.refresh_token) {
+    throw new GoogleOAuthProviderError("Google did not return the required identity and offline-access tokens.");
+  }
+  return response as GoogleOAuthTokenResponse & { id_token: string; refresh_token: string };
 }
 
 export function configuredGoogleOAuthRedirect(environment: Readonly<Record<string, string | undefined>> = process.env): string {
@@ -252,7 +319,9 @@ export function requireGoogleOAuthConfiguration(
   const clientId = environment.GOOGLE_CLIENT_ID;
   const clientSecret = environment.GOOGLE_CLIENT_SECRET;
   const tokenEncryptionKey = environment.REWIND_TOKEN_ENCRYPTION_KEY;
-  if (!appBaseUrl || !redirectUri || !clientId || !clientSecret || !tokenEncryptionKey) {
+  const expectedEmail = environment.REWIND_GOOGLE_EXPECTED_EMAIL;
+  const expectedSub = environment.REWIND_GOOGLE_EXPECTED_SUB;
+  if (!appBaseUrl || !redirectUri || !clientId || !clientSecret || !tokenEncryptionKey || !expectedEmail || !expectedSub) {
     throw new Error("Google OAuth private configuration is incomplete.");
   }
   if (!/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(clientId)) {
@@ -261,6 +330,19 @@ export function requireGoogleOAuthConfiguration(
   if (clientSecret.trim() !== clientSecret || /\s/.test(clientSecret) || clientSecret.length < 16) {
     throw new Error("Google OAuth client secret is invalid.");
   }
+  const parsedExpectedEmail = z.string().email().safeParse(expectedEmail);
+  if (!parsedExpectedEmail.success) throw new Error("Google OAuth expected email is invalid.");
+  if (expectedSub.trim() !== expectedSub || /\s/.test(expectedSub) || expectedSub.length > 255) {
+    throw new Error("Google OAuth expected subject is invalid.");
+  }
   validateGoogleRedirectUri(appBaseUrl, redirectUri);
-  return { appBaseUrl, redirectUri, clientId, clientSecret, tokenEncryptionKey };
+  return {
+    appBaseUrl,
+    redirectUri,
+    clientId,
+    clientSecret,
+    tokenEncryptionKey,
+    expectedEmail: parsedExpectedEmail.data.toLowerCase(),
+    expectedSub,
+  };
 }

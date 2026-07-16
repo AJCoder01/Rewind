@@ -44,7 +44,9 @@ Local Codex clients support stdio MCP servers; a future remote transport is not 
 
 The implemented G1 slice keeps route handlers thin: they authorize the dashboard session or scoped MCP bearer, validate the v1 request, invoke one application service, and map a safe response. The service delegates lifecycle ordering to the store. PostgreSQL claims idempotency before planning, persists the analyzing task and planning lease transactionally, evaluates the typed fixture rule before the effect-bearing lock, and parses stored read models through the v1 schemas. The scoped MCP principal and authenticated demo operator share the one controlled workspace, so an MCP-created review URL is readable by that operator but never by an unrelated actor. A rule match persists a clarification-only task with no plan, action, run, or lock. The dashboard's cancel mutation uses the same service and releases only the lock owned by that task; an in-progress cancellation replays the current durable state rather than a speculative success. The status endpoint exposes an MCP-safe projection.
 
-The deterministic Calendar/Gmail/model provider adapters are limited to development and tests. Production configuration rejects `memory_fixture` and any fake provider selection before a provider-backed success can be produced. The deployed G1 path is different: it uses the real PostgreSQL repository to persist the deterministic, contract-valid non-effecting plan fixture, makes no Calendar, Gmail, or model call, and labels the review as non-effecting. S028 proves the deployed durable path; S029 freezes its interfaces and evidence; S030 closes the G1 audit. G2 starts at S031 and must preserve this boundary.
+S034 freezes four explicit provider boundaries: the Calendar port lists tagged events, reads controlled snapshots, and performs conditional start/end updates; the Gmail port accepts one approved message and returns sent, permanent-failure, or delivery-uncertain outcomes; the artifact port persists supplied account-brief bytes and hashes; and the model port exposes separately named initial, recovery, and prevention-rule proposals with raw output still untrusted. Deterministic fakes implement those ports with controlled failure injection for tests and non-production fixture use. Production configuration rejects `memory_fixture` and any fake provider selection before a provider-backed success can be produced. The deployed G1 path is different: it uses the real PostgreSQL repository to persist the deterministic, contract-valid non-effecting plan fixture, makes no Calendar, Gmail, or model call, and labels the review as non-effecting. S028 proves the deployed durable path; S029 freezes its interfaces and evidence; S030 closes the G1 audit. G2 starts at S031 and must preserve this boundary.
+
+S035 adds the first live Calendar wire boundary without enabling a product action path. `GoogleCalendarPort` maps only the exact Google event fields needed by the controlled Acme scenario, refuses primary/unknown calendar targets, rejects all-day/recurring/untagged/malformed events, sends `sendUpdates=none`, and uses `If-Match` for narrow updates. The scenario-specific seed service discovers the configured tag before creating anything, persists a redacted start audit before each create, stores immutable semantic baselines separately from rolling ETags/updated timestamps, and fails closed on existing, partial, stale, or unowned state. `seed:demo` and `preflight:demo` require a real TTY, non-production PostgreSQL mode, a non-CI environment, an explicit configured calendar, and an interactive target confirmation. Automated tests use only the deterministic fake Calendar; the TTY commands and live OAuth/Calendar calls remain human-only.
 
 ## 3. Intended source layout
 
@@ -60,15 +62,22 @@ components/
   prevention/
 lib/
   contracts/       # Zod schemas, DTOs, error codes, template registry
+    provider-ports.ts
+    calendar-demo.ts
   domain/          # State machine, plan hashing, validators, policies
+    calendar-demo.ts
   services/        # create, approve, execute, recover, rule, reset use cases
+    calendar-demo.ts
   ai/              # Prompt/schema versions and Responses API client
+    model.ts        # Explicit initial/recovery/rule model port and fake
   adapters/
     calendar.ts
     gmail.ts
     artifact.ts
   google/             # Exact Google redirect, OAuth transaction, and secret boundaries
+    calendar.ts        # Strict Google Calendar wire adapter
   db/              # Queries and migrations
+    demo-event-state.ts
   auth/             # Dashboard session, CSRF, MCP bearer auth
 mcp/server.ts
 db/migrations/
@@ -91,10 +100,11 @@ Do not add a generic `RewindableAction` interface. Calendar restoration and mail
 | Domain | State transitions, plan digest, dependency and recovery validation, allowlist policy | Network calls |
 | PostgreSQL | Tasks, immutable plans, approvals, action ledger, artifacts, rules, audit events, scenario lock | Provider truth beyond stored snapshots/receipts |
 | AI service | Propose bounded assumptions/dependency edges, account-brief content, correction intent, recovery classifications/templates, and typed rule copy | Recipient selection, arbitrary IDs, deterministic semantic validation, provider payloads, code |
-| Calendar adapter | Fetch tagged candidates, typed snapshots, conditional start/end changes, verification | Gmail notifications or conflict rebasing |
+| Calendar adapter | Fetch/create tagged candidates, typed snapshots, conditional start/end changes, verification | Gmail notifications or conflict rebasing |
 | Gmail adapter | Build deterministic MIME from approved template, one send attempt, typed receipt | Reading/searching mailboxes, deleting/undoing mail, automatic retry after ambiguity |
 | Artifact adapter | Store the exact approved account-brief bytes/hash/provenance and return a typed receipt | Generating/regenerating content or accepting event/region input |
 | MCP process | Expose minimal tools and call backend with auth/idempotency | Approval, execution, Google credentials, database access |
+| Seed/preflight commands | TTY-gated controlled Calendar discovery, seed receipts, baselines, and preflight checks | HTTP/MCP access, production targets, fixture success claims |
 
 ## 5. Core flows
 
@@ -286,7 +296,7 @@ The foundation migration is applied through one migration-owner connection in a 
 
 The application runtime connects only as `rewind_app` over TLS. That role has `SELECT`, `INSERT`, `UPDATE`, and `DELETE` on the ten foundation application tables plus the two S031 OAuth tables, `SELECT` on the migration ledger, and `SELECT`/`USAGE` on the audit sequence. `PUBLIC` and the unused Supabase API roles have no effective table or sequence access. These grants do not by themselves enforce every later domain immutability rule; application services and the later persistence gate must still enforce plan, approval, identity, and audit semantics.
 
-S031's `0002_oauth_transaction` migration is numbered separately from the frozen foundation migration. Its runner reuses the migration ledger lock, verifies the prior foundation row, validates the exact OAuth column/constraint catalog on apply and replay, grants only the runtime CRUD surface, and records its own SHA-256 checksum. The callback consumes the transaction before the S032 identity/token exchange gate; a missing OAuth migration or missing claim gate cannot produce a connected-success state.
+S031's `0002_oauth_transaction` migration is numbered separately from the frozen foundation migration. Its runner reuses the migration ledger lock, verifies the prior foundation row, validates the exact OAuth column/constraint catalog on apply and replay, grants only the runtime CRUD surface, and records its own SHA-256 checksum. S032 consumes the transaction before exchanging the authorization code, then verifies the signed ID token locally against Google's published JWKS, binds the configured email and stable subject, requires the exact approved scope set, and stores only encrypted refresh-token material. Refresh uses Google's token endpoint and may encrypt a rotated refresh token; access tokens are short-lived server values and are never persisted or exposed to the browser. The callback never reads a Gmail profile or mailbox, and a missing OAuth migration, claim failure, scope drift, or provider failure cannot produce a connected-success state.
 
 `GET /api/health` proves only that the process can answer HTTP. `GET /api/ready` additionally proves the restricted runtime connection, TLS, recorded migration checksum, and exact table/constraint catalog. Readiness failures are sanitized and return `503`; provider details remain server-side.
 

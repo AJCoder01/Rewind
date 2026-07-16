@@ -202,7 +202,7 @@ export class PostgresOAuthStore implements OAuthStore {
     const result = await this.pool.query<OAuthTransactionRow>(
       `WITH consumed AS (
          UPDATE oauth_transactions
-            SET consumed_at = $3
+            SET consumed_at = $5
           WHERE provider = 'google'
             AND state_hash = $1
             AND session_hash = $2
