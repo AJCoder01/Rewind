@@ -38,6 +38,7 @@ npm run db:migrate
 npm run db:verify
 npm run test:integration:live
 npm run eval:recovery
+npm run eval:model-safety
 npm run seed:demo
 npm run preflight:demo
 npm run prove:gmail
@@ -169,7 +170,11 @@ The [S035 Calendar setup report](../artifacts/test-runs/2026-07-16-s035-calendar
 
 ### 4.6 S039–S041 artifact, Responses, and model-schema boundaries
 
-S039 covers versioned source binding, exact source/content hashes, independent-artifact leakage rejection, and byte-for-byte persistence without regeneration. S040 covers the server-only Responses request shape, `store: false`, strict JSON Schema request construction, response ID/model/usage capture, refusal/truncation/malformed/provider failures, safe one-retry behavior, API-key/header redaction, and final typed failure. S041 covers strict initial, recovery, and prevention-rule proposal shapes; supplied candidate/executed-action/template universes; recursive unknown-field rejection; exclusion of executable provider fields; and compatibility with the S040 Responses request boundary. Automated tests use fake inputs/HTTP responses only; no live OpenAI call is claimed here. Cross-field semantic/adversarial evaluation remains S042.
+S039 covers versioned source binding, exact source/content hashes, independent-artifact leakage rejection, and byte-for-byte persistence without regeneration. S040 covers the server-only Responses request shape, `store: false`, strict JSON Schema request construction, response ID/model/usage capture, refusal/truncation/malformed/provider failures, safe one-retry behavior, API-key/header redaction, and final typed failure. S041 covers strict initial, recovery, and prevention-rule proposal shapes; supplied candidate/executed-action/template universes; recursive unknown-field rejection; exclusion of executable provider fields; and compatibility with the S040 Responses request boundary. Automated tests use fake inputs/HTTP responses only; no live OpenAI call is claimed here.
+
+### 4.7 S042 model safety and evaluation harnesses
+
+`lib/ai/model-safety.ts` parses each S041 proposal through its strict operation schema, then validates deterministic ranking/dependency semantics, explicit trusted recovery targets, exact succeeded-action decision coverage, compatible `restore`/`correct`/`preserve` outcomes, fixed new-action templates, independent artifact content, source-bound rule proposals, and server-owned recipient expansion. `requestValidated*Proposal` makes at most two model-port attempts, rejects fallback metadata, and has no deterministic success path after the second failure. `tests/unit/model-safety.test.ts` and `npm run eval:model-safety` cover valid output, malformed/unknown fields and IDs/templates/recipient injection, semantic rejection, unsafe preserve, prompt-injection-like context, refusal/truncation, retry bounds, redacted errors, and zero adapter/live-effect calls. The complete 25-paraphrase recovery gate remains S070/S091.
 
 ### 4.7 Integration tests with deterministic adapters
 

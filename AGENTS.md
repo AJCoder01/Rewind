@@ -102,6 +102,7 @@ npm run test:e2e
 npm run db:migrate
 npm run db:verify
 npm run eval:recovery
+npm run eval:model-safety
 npm run seed:demo
 npm run preflight:demo
 npm run reset:demo

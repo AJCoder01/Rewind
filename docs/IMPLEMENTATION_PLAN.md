@@ -5,7 +5,7 @@
 | Status | Active canonical execution queue |
 | Execution model | One sequential task at a time |
 | Current gate | G2 — OAuth, provider, and model risk retirement |
-| Current restart point | `S042` — build model safety and evaluation harnesses |
+| Current restart point | `S043` — run the controlled provider/model spikes |
 | Last updated | 2026-07-16 |
 
 This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
@@ -93,7 +93,7 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 - [x] **S039 — Implement the artifact boundary.** Added the planning-only versioned parent-account source boundary, exact source/content/version hash binding, region/event/attendee/meeting-time/provider-detail leakage rejection, and approved-byte persistence without regeneration. Evidence: [S039 artifact-boundary report](../artifacts/test-runs/2026-07-16-s039-artifact-boundary.md).
 - [x] **S040 — Implement the OpenAI Responses client.** Added the server-only Responses boundary with configured-model requests, `store: false`, strict Structured Outputs, refusal/truncation/malformed/provider handling, response metadata capture, one bounded retry, redacted errors, and deterministic HTTP tests. Evidence: [S040 OpenAI Responses report](../artifacts/test-runs/2026-07-16-s040-openai-responses.md). No live model call was run; S043 owns the provider spike.
 - [x] **S041 — Define versioned model-only schemas.** Added strict runtime and Responses JSON Schemas for `initial-reasoning.v1`, `recovery-proposal.v1`, and `prevention-rule-proposal.v1`; each closes dynamic IDs/templates over its validated supplied universe and excludes executable provider fields. Evidence: [S041 model-schema report](../artifacts/test-runs/2026-07-16-s041-model-schemas.md). No model inference, provider mutation, or external effect was run.
-- [ ] **S042 — Build model safety and evaluation harnesses.** Cover valid schema output, malformed output, refusal, truncation, unknown IDs/templates/recipients, semantic rejection, prompt injection, and no hidden deterministic success fallback.
+- [x] **S042 — Build model safety and evaluation harnesses.** Added strict cross-field validators for initial/recovery/prevention proposals, trusted explicit-target/action-ledger context, server-owned recipient expansion, bounded two-attempt validation with no fallback, adversarial fixtures/tests, and the sanitized `eval:model-safety` command. Evidence: [S042 model-safety report](../artifacts/test-runs/2026-07-16-s042-model-safety.md). No live model inference, provider mutation, or external effect was run.
 - [ ] **S043 — Run the controlled provider/model spikes.** Prove live OAuth refresh, exact Calendar lookup, conditional move/restore/conflict, low-level two-event preflight/partial receipts, one allowlisted Gmail success, and live strict model output; keep product reset and product execution disabled.
 - [ ] **S044 — Build honest connection/preflight UI.** Show connected identity, configuration gaps, preflight failures, and fake/live state without implying that the product workflow has passed.
 - [ ] **S045 — Close G2.** Store redacted receipts and negative-test evidence; block G3 while any OAuth, ETag, Gmail uncertainty, strict-output, secret, or fake-in-live risk is red.

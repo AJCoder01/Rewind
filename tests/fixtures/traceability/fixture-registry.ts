@@ -8,6 +8,7 @@ export const TRACEABILITY_FIXTURE_IDS = [
   "initial-plan.v1",
   "traceability.v1",
   "golden-contracts.v1",
+  "model-safety.v1",
 ] as const;
 
 export const TraceabilityFixtureIdSchema = z.enum(TRACEABILITY_FIXTURE_IDS);
@@ -21,4 +22,5 @@ export const TRACEABILITY_FIXTURE_REGISTRY: Readonly<Record<TraceabilityFixtureI
   "initial-plan.v1": { sourcePaths: ["lib/contracts/v1.ts"] },
   "traceability.v1": { sourcePaths: ["tests/fixtures/traceability/catalog.ts"] },
   "golden-contracts.v1": { sourcePaths: ["tests/fixtures/contracts/golden.ts"] },
+  "model-safety.v1": { sourcePaths: ["tests/fixtures/model-safety.ts"] },
 };
