@@ -1072,6 +1072,34 @@ The model proposes this one closed rule shape as the fourth reasoning task. Vali
 
 ## 12. Model metadata
 
+### S040 Responses client request/result boundary
+
+```typescript
+interface OpenAIResponsesRequestV1 {
+  model: string;
+  input: string | Array<{ role: "developer" | "system" | "user"; content: string }>;
+  schemaName: string;
+  jsonSchema: object; // root object, required keys, additionalProperties: false
+  promptVersion: string;
+  schemaVersion: string;
+  reasoningEffort?: string;
+  maxOutputTokens: number;
+}
+
+interface OpenAIResponsesMetadataV1 {
+  provider: "openai";
+  model: string;
+  promptVersion: string;
+  schemaVersion: string;
+  reasoningEffort: string;
+  responseId: string;
+  attempts: number;
+  usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+}
+```
+
+The client sends `store: false` and `text.format: { type: "json_schema", strict: true, ... }`. It returns parsed JSON only after finding an output-text item, and maps refusal, incomplete/truncated, malformed, and provider failures to a safe typed error. It retries once at most; no operation-specific model proposal is accepted until S041 schemas and semantic validators parse it.
+
 ```typescript
 interface ModelMetadata {
   provider: "openai";

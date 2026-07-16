@@ -167,7 +167,11 @@ The [S034 provider-port report](../artifacts/test-runs/2026-07-16-s034-provider-
 
 The [S035 Calendar setup report](../artifacts/test-runs/2026-07-16-s035-calendar-setup.md) records the `calendar-demo.v1` seed/preflight contracts, deterministic fake proof, strict Google wire mapping, and the human-only boundary. The TTY commands, OAuth refresh, live Calendar discovery, and Calendar writes remain intentionally unrun.
 
-### 4.6 Integration tests with deterministic adapters
+### 4.6 S039–S040 artifact and Responses boundaries
+
+S039 covers versioned source binding, exact source/content hashes, independent-artifact leakage rejection, and byte-for-byte persistence without regeneration. S040 covers the server-only Responses request shape, `store: false`, strict JSON Schema request construction, response ID/model/usage capture, refusal/truncation/malformed/provider failures, safe one-retry behavior, API-key/header redaction, and final typed failure. Automated tests use fake HTTP responses only; no live OpenAI call is claimed here.
+
+### 4.7 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.

@@ -54,6 +54,8 @@ S038 adds a TTY-only low-level proof command, not a product execution route. It 
 
 S039 adds the scenario-specific account-brief boundary. `generateAccountBriefForPlanning` accepts only the versioned `acme_parent_account_notes` source during the planning phase, derives the fixed brief bytes, and binds the source version/digest, content digest, excluded dimensions, and validator version. The service rejects source drift and region/event/attendee/meeting-time leakage before any provider call. `persistApprovedAccountBrief` validates the immutable approved bytes and delegates them to the artifact port without regenerating content; the existing artifact adapter remains a persistence boundary only.
 
+S040 adds `OpenAIResponsesClient`, a server-only raw Responses API boundary. It sends the configured model, `store: false`, and strict `text.format` JSON Schema requests, parses only the response ID/model/usage and structured output, maps refusal/truncation/malformed/provider failures to redacted typed errors, and performs at most one retry with a safe validation instruction. It never logs or returns the API key, raw prompt, refusal text, or raw provider response; operation-specific model schemas and semantic validation remain S041 work.
+
 ## 3. Intended source layout
 
 ```text
