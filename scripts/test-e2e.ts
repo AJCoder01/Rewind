@@ -134,6 +134,9 @@ async function main(): Promise<void> {
     await page.getByTestId("assumption-panel").waitFor({ state: "visible" });
     await page.getByTestId("planned-actions").waitFor({ state: "visible" });
     await page.getByTestId("review-timeline").waitFor({ state: "visible" });
+    await page.getByTestId("execution-timeline").waitFor({ state: "visible" });
+    await expect(page.getByTestId("execution-summary")).toHaveText("Awaiting approval");
+    await page.getByText("No action ledger exists", { exact: false }).waitFor({ state: "visible" });
     await page.getByTestId("fixture-mode-notice").waitFor({ state: "visible" });
     if (!(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth))) {
       throw new Error("Responsive review viewport has horizontal overflow.");

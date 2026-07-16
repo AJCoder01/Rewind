@@ -11,6 +11,7 @@ import {
   type WorldPrView,
 } from "@/lib/contracts/v1";
 import { newIdempotencyKey, readCsrfToken } from "@/lib/client/request";
+import { ExecutionTimeline } from "@/app/components/execution-timeline";
 
 type PlannedAction = InitialPlanView["actions"][number];
 
@@ -218,15 +219,15 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
   if (!view) return <main className="shell" data-testid="review-screen"><div className="content loading-state"><p className="eyebrow">Loading review</p><p className="loading-copy" aria-live="polite">Loading the immutable review record...</p></div></main>;
 
   if (cancelled || view.status === "cancelled") {
-    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Review closed</p><h1>This World PR was cancelled.</h1><p className="lede">No Calendar, Gmail, or artifact effect was approved or executed.</p><Link href="/" className="primary-button button-link">Back to composer</Link></div></main>;
+    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Review closed</p><h1>This World PR was cancelled.</h1><p className="lede">No Calendar, Gmail, or artifact effect was approved or executed.</p><ExecutionTimeline worldPrId={worldPrId} /><Link href="/" className="primary-button button-link">Back to composer</Link></div></main>;
   }
 
   if (view.status === "failed") {
-    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Planning stopped</p><h1>This review could not be prepared.</h1><p className="lede">Planning stopped before approval or any external action. No reviewable plan is available and this screen will not retry automatically.</p><Link href="/" className="primary-button button-link">Back to composer</Link><FixtureNotice /></div></main>;
+    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Planning stopped</p><h1>This review could not be prepared.</h1><p className="lede">Planning stopped before approval or any external action. No reviewable plan is available and this screen will not retry automatically.</p><ExecutionTimeline worldPrId={worldPrId} /><Link href="/" className="primary-button button-link">Back to composer</Link><FixtureNotice /></div></main>;
   }
 
   if (view.status === "attention_required") {
-    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Operator attention</p><h1>This World PR needs attention.</h1><p className="lede">The recorded state is visible, but this G1 screen will not retry or approve it automatically.</p><div className="notice" role="alert">Attention reason: {view.attention?.kind ?? "recorded failure"}.</div><Link href="/" className="secondary-button button-link">Back to composer</Link><FixtureNotice /></div></main>;
+    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Operator attention</p><h1>This World PR needs attention.</h1><p className="lede">The recorded state is visible, but this G1 screen will not retry or approve it automatically.</p><div className="notice" role="alert">Attention reason: {view.attention?.kind ?? "recorded failure"}.</div><ExecutionTimeline worldPrId={worldPrId} /><Link href="/" className="secondary-button button-link">Back to composer</Link><FixtureNotice /></div></main>;
   }
 
   if (view.status === "clarification_required") {
@@ -238,6 +239,7 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
           <div className="review-grid">
             <section className="panel panel-wide" data-testid="clarification-panel"><div className="panel-inner"><h2>{view.clarification?.question}</h2><div className="candidate-grid">{view.clarification?.candidates.map((candidate) => <div className="candidate-choice" key={candidate.candidateId}><strong>{candidate.label}</strong><span>Known controlled candidate</span></div>)}</div><p className="muted">This proof record owns no plan, action ledger, or effect-bearing scenario lock.</p></div></section>
             <Timeline view={view} />
+            <ExecutionTimeline worldPrId={worldPrId} />
           </div>
           <div className="review-actions"><button className="secondary-button" type="button" onClick={() => void cancel()} disabled={canceling}>{canceling ? "Cancelling..." : "Cancel intake"}</button><Link href="/" className="secondary-button">Back to composer</Link></div>
           {message ? <div className="notice" role="alert">{message}</div> : null}
@@ -248,7 +250,7 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
   }
 
   if (view.status === "analyzing" || !view.activePlan) {
-    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">World PR status</p><h1>Rewind is still preparing this review.</h1><p className="lede">The planning lease is active. Refresh to read the durable state; no external action has been attempted.</p><button className="secondary-button" type="button" onClick={() => window.location.reload()}>Refresh review</button><FixtureNotice /></div></main>;
+    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">World PR status</p><h1>Rewind is still preparing this review.</h1><p className="lede">The planning lease is active. Refresh to read the durable state; no external action has been attempted.</p><ExecutionTimeline worldPrId={worldPrId} /><button className="secondary-button" type="button" onClick={() => window.location.reload()}>Refresh review</button><FixtureNotice /></div></main>;
   }
 
   const activePlan = view.activePlan;
@@ -272,6 +274,7 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
           <section className="panel panel-wide" data-testid="planned-actions"><div className="panel-inner"><div className="panel-kicker">Exact approved payload</div><h2>Planned actions</h2><div className="action-list">{plan.actions.map((action) => <article className="action" key={action.actionKey}><div className="action-top"><span className="action-name">{actionLabel(action)}</span><span className="action-type">{action.externalEffect ? "External effect" : "Recorded artifact"}</span></div><div className="action-key">{action.actionKey}</div><ActionDetails action={action} /></article>)}</div></div></section>
           <section className="panel"><div className="panel-inner"><div className="panel-kicker">Immutable identity</div><h2>Plan identity</h2><p className="muted">Version {plan.pointer.version}</p><p className="digest">{plan.pointer.digest}</p></div></section>
           <Timeline view={view} />
+          <ExecutionTimeline worldPrId={worldPrId} />
         </div>
         <div className="review-actions">
           {canCancel ? <button className="secondary-button" type="button" onClick={() => void cancel()} disabled={canceling}>{canceling ? "Cancelling..." : "Cancel review"}</button> : null}

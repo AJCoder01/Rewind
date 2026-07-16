@@ -1,19 +1,15 @@
 import { z } from "zod";
-import { GmailSendReceiptSchema, ArtifactReceiptSchema } from "@/lib/contracts/provider-ports";
+import {
+  ExecutionActionTypeSchema,
+  ExecutionReceiptSchema,
+  RedactedActionErrorSchema,
+} from "@/lib/contracts/execution-shared";
 import { ActionStatusSchema, OpaqueIdSchema, Rfc3339Schema, Sha256DigestSchema, VersionSchema } from "@/lib/contracts/v1";
 import { sha256Digest } from "@/lib/domain/digest";
 
 export const EXECUTION_PERSISTENCE_CONTRACT_VERSION = "execution-persistence.v1" as const;
 
 export const PlanKindSchema = z.enum(["initial", "recovery", "reset"]);
-export const ExecutionActionTypeSchema = z.enum([
-  "artifact.account_brief",
-  "calendar.move",
-  "calendar.restore",
-  "mail.notify",
-  "mail.correct",
-]);
-
 export const ExecutionPlanCoreSchema = z
   .object({
     planId: OpaqueIdSchema,
@@ -51,29 +47,7 @@ export const ApprovalRecordSchema = z
   })
   .strict();
 
-export const RedactedActionErrorSchema = z
-  .object({
-    code: z.string().min(1).max(100),
-    retryable: z.boolean(),
-    safeMessage: z.string().min(1).max(500),
-  })
-  .strict();
-
-export const CalendarExecutionReceiptSchema = z
-  .object({
-    provider: z.literal("google_calendar"),
-    operation: z.enum(["move", "restore"]),
-    providerEventId: z.string().min(1).max(512),
-    resultingEtag: z.string().min(1).max(200),
-    verified: z.literal(true),
-  })
-  .strict();
-
-export const ExecutionReceiptSchema = z.union([
-  CalendarExecutionReceiptSchema,
-  GmailSendReceiptSchema,
-  ArtifactReceiptSchema,
-]);
+export { CalendarExecutionReceiptSchema, ExecutionActionTypeSchema, ExecutionReceiptSchema, RedactedActionErrorSchema } from "@/lib/contracts/execution-shared";
 
 export const ActionExecutionRecordSchema = z
   .object({

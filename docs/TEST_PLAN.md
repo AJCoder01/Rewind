@@ -212,7 +212,11 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 
 `tests/unit/initial-gmail-execution.test.ts` covers exact approved message reconstruction, approval and artifact/Calendar dependency ordering, local preparation before dispatch claim, marker/before-state ordering before send, sent receipt persistence, explicit permanent rejection, all uncertainty/transport failure handling, local retry without a marker, allowlist/sender drift conflict, duplicate-click busy behavior, before-state persistence failure with zero sends, terminal replay, and MCP refusal. Existing Gmail delivery/Google wire tests retain the lower-level MIME, provider-status, and standalone at-most-once proof; no live database/provider or external effect is claimed.
 
-### 4.16 Integration tests with deterministic adapters
+### 4.16 S056 execution/timeline UX
+
+`tests/unit/execution-timeline.test.ts` covers the dashboard read boundary for awaiting approval, fixed action order, planned/in-progress timestamps, typed artifact and Calendar receipts, partial conflict, delivery uncertainty, completed-only-after-all-receipts, cancellation, and dashboard-only access. `tests/unit/accessibility-contract.test.ts` freezes the execution selector, and `scripts/test-e2e.ts` checks the unapproved review renders “Awaiting approval” and never claims an action ledger success. The browser view renders only safe action metadata, typed receipts, redacted errors, and explicit loading/error/empty/partial/attention/cancelled states; no live database/provider or external effect is claimed.
+
+### 4.17 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.

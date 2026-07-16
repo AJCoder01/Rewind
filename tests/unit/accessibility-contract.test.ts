@@ -23,10 +23,12 @@ describe("S017 accessibility and testability contract", () => {
     const connection = read("app/components/connection-preflight-panel.tsx");
     const login = read("app/login/page.tsx");
     const review = read("app/pr/[worldPrId]/page.tsx");
+    const execution = read("app/components/execution-timeline.tsx");
     for (const selector of ["composer-screen", "composer-request", "create-world-pr", "fixture-status"]) expect(composer).toContain(`data-testid=\"${selector}\"`);
     for (const selector of ["connection-preflight", "connection-summary", "preflight-summary"]) expect(connection).toContain(`data-testid=\"${selector}\"`);
     for (const selector of ["login-screen", "dashboard-passcode", "login-submit"]) expect(login).toContain(`data-testid=\"${selector}\"`);
     for (const selector of ["review-screen", "assumption-panel", "planned-actions", "review-timeline", "fixture-mode-notice", "clarification-panel"]) expect(review).toContain(`data-testid=\"${selector}\"`);
+    expect(execution).toContain('data-testid="execution-timeline"');
     expect(composer).toContain("G1 non-effecting mode");
     expect(review).toContain("not live-provider evidence");
   });
