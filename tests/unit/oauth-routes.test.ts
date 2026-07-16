@@ -99,8 +99,10 @@ function stubGoogleTokenExchange(idToken: string, calls: string[]): void {
           token_type: "Bearer",
           expires_in: 3600,
           refresh_token: "fake-refresh-token",
+          refresh_token_expires_in: 604800,
           id_token: idToken,
           scope: `${GOOGLE_OAUTH_SCOPES.join(" ")} https://www.googleapis.com/auth/userinfo.email`,
+          future_google_metadata: "ignored-by-projection",
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
@@ -226,11 +228,12 @@ describe("Google OAuth routes", () => {
           }
         : null;
     });
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe(GOOGLE_OAUTH_TOKEN_ENDPOINT);
       const body = new URLSearchParams(String(init?.body));
       expect(body.get("code_verifier")).toBe("mismatched-pkce-verifier");
-      return new Response(JSON.stringify({ error: "invalid_grant" }), {
+      return new Response(JSON.stringify({ error: "invalid_grant", error_description: "sensitive provider detail" }), {
         status: 400,
         headers: { "content-type": "application/json" },
       });
@@ -239,7 +242,14 @@ describe("Google OAuth routes", () => {
     const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code`;
     const response = await callbackGoogleOAuth(request(callbackPath, session));
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toMatchObject({ error: { code: "provider_unavailable", retryable: true } });
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: "provider_unavailable",
+        retryable: true,
+        details: { failureStage: "token_exchange", failureReason: "grant_rejected" },
+      },
+    });
+    expect(JSON.stringify(warning.mock.calls)).not.toContain("sensitive provider detail");
     await expect(memoryOAuthStore.getCredential()).resolves.toBeNull();
   });
 
@@ -302,13 +312,58 @@ describe("Google OAuth routes", () => {
     await expect(response.json()).resolves.toMatchObject({ error: { code: "invalid_request" } });
   });
 
-  it("rejects unknown callback metadata while accepting Google's documented fields", async () => {
+  it("ignores bounded unknown callback metadata while still consuming state exactly once", async () => {
     setOAuthEnvironment();
     const session = createSessionValue("demo-operator");
+    const started = await startGoogleOAuth(request("/api/v1/oauth/google/start", session));
+    const state = new URL(started.headers.get("location")!).searchParams.get("state")!;
+    vi.stubGlobal("fetch", async () => {
+      throw new Error("deterministic provider outage");
+    });
     const response = await callbackGoogleOAuth(
-      request("/api/v1/oauth/google/callback?state=one&code=fake-code&unexpected=metadata", session),
+      request(`/api/v1/oauth/google/callback?state=${encodeURIComponent(state)}&code=fake-code&future_google_metadata=ignored`, session),
+    );
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { details: { failureStage: "token_exchange", failureReason: "endpoint_unreachable" } },
+    });
+
+    const replay = await callbackGoogleOAuth(
+      request(`/api/v1/oauth/google/callback?state=${encodeURIComponent(state)}&code=fake-code`, session),
+    );
+    expect(replay.status).toBe(422);
+  });
+
+  it("rejects an oversized unknown callback parameter before transaction lookup", async () => {
+    setOAuthEnvironment();
+    const session = createSessionValue("demo-operator");
+    const consume = vi.spyOn(memoryOAuthStore, "consumeTransaction");
+    const response = await callbackGoogleOAuth(
+      request(`/api/v1/oauth/google/callback?state=one&code=fake-code&future=${"x".repeat(8193)}`, session),
     );
     expect(response.status).toBe(422);
-    await expect(response.json()).resolves.toMatchObject({ error: { code: "invalid_request" } });
+    expect(consume).not.toHaveBeenCalled();
+  });
+
+  it("rejects a partial front-channel scope grant before token exchange", async () => {
+    setOAuthEnvironment();
+    const session = createSessionValue("demo-operator");
+    const started = await startGoogleOAuth(request("/api/v1/oauth/google/start", session));
+    const state = new URL(started.headers.get("location")!).searchParams.get("state")!;
+    const provider = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", provider);
+    const response = await callbackGoogleOAuth(
+      request(`/api/v1/oauth/google/callback?state=${encodeURIComponent(state)}&code=fake-code&scope=openid%20email`, session),
+    );
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: "forbidden",
+        retryable: false,
+        details: { failureStage: "callback_scope", failureReason: "scope_outside_approved_set" },
+      },
+    });
+    expect(provider).not.toHaveBeenCalled();
+    await expect(memoryOAuthStore.getCredential()).resolves.toBeNull();
   });
 });

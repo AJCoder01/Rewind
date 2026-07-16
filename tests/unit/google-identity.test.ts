@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { hashOAuthSecret } from "@/lib/google/oauth";
 import {
   GoogleIdentityValidationError,
+  parseGoogleJwks,
   type GoogleJwk,
   verifyGoogleIdToken,
 } from "@/lib/google/oidc";
@@ -101,9 +102,19 @@ describe("Google signed identity validation", () => {
     ).rejects.toBeInstanceOf(GoogleIdentityValidationError);
   });
 
-  it("rejects an unrecognized provider claim at the strict token boundary", async () => {
-    await expect(verifyGoogleIdToken(makeIdToken({ unexpected: "data" }), validationOptions())).rejects.toBeInstanceOf(
-      GoogleIdentityValidationError,
-    );
+  it("projects unknown provider claims out while validating every consumed claim", async () => {
+    await expect(verifyGoogleIdToken(makeIdToken({ unexpected: "data" }), validationOptions())).resolves.toEqual({
+      googleSub: "google-subject",
+      email: "rewind-demo@example.test",
+    });
+  });
+
+  it("projects unknown JWKS metadata out while retaining an RSA verification key", () => {
+    expect(
+      parseGoogleJwks({
+        keys: [{ ...jwk, alg: undefined, future_key_metadata: "ignored" }],
+        future_set_metadata: "ignored",
+      }),
+    ).toEqual({ keys: [{ ...jwk, alg: undefined }] });
   });
 });

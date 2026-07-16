@@ -13,8 +13,10 @@ import {
   decryptOAuthSecret,
   encryptOAuthSecret,
   GOOGLE_OAUTH_SCOPES,
+  GoogleOAuthProviderError,
   hashOAuthSecret,
   recoverCodeVerifier,
+  requestGoogleToken,
   type GoogleOAuthConfiguration,
   toStoredGoogleOAuthTransaction,
 } from "@/lib/google/oauth";
@@ -95,6 +97,73 @@ describe("Google OAuth transaction boundary", () => {
         "fake-code",
       ),
     ).toThrow();
+  });
+
+  it("projects documented time-limited and future token metadata out safely", async () => {
+    const response = await requestGoogleToken(new URLSearchParams({ grant_type: "authorization_code" }), async () =>
+      new Response(
+        JSON.stringify({
+          access_token: "fake-access-token",
+          token_type: "Bearer",
+          expires_in: 3600,
+          refresh_token: "fake-refresh-token",
+          refresh_token_expires_in: 604800,
+          scope: GOOGLE_OAUTH_SCOPES.join(" "),
+          id_token: "fake-id-token",
+          future_google_metadata: { ignored: true },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    expect(response).toEqual({
+      access_token: "fake-access-token",
+      token_type: "Bearer",
+      expires_in: 3600,
+      refresh_token: "fake-refresh-token",
+      refresh_token_expires_in: 604800,
+      scope: GOOGLE_OAUTH_SCOPES.join(" "),
+      id_token: "fake-id-token",
+    });
+    expect(response).not.toHaveProperty("future_google_metadata");
+  });
+
+  it.each([
+    ["invalid_grant", "grant_rejected", true],
+    ["invalid_client", "client_rejected", false],
+    ["unauthorized_client", "client_rejected", false],
+    ["redirect_uri_mismatch", "redirect_rejected", false],
+    ["invalid_scope", "scope_rejected", false],
+    ["invalid_request", "request_rejected", false],
+    ["temporarily_unavailable", "provider_temporarily_unavailable", true],
+    ["server_error", "provider_temporarily_unavailable", true],
+  ] as const)("classifies the safe Google token error %s", async (providerCode, reason, retryable) => {
+    const caught = await requestGoogleToken(new URLSearchParams(), async () =>
+      new Response(JSON.stringify({ error: providerCode, error_description: "must-not-escape" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      }),
+    ).catch((error: unknown) => error);
+
+    expect(caught).toBeInstanceOf(GoogleOAuthProviderError);
+    expect(caught).toMatchObject({ reason, retryable });
+    expect(String(caught)).not.toContain("must-not-escape");
+  });
+
+  it("rejects oversized and unreachable token responses with safe classifications", async () => {
+    const oversized = await requestGoogleToken(new URLSearchParams(), async () =>
+      new Response(JSON.stringify({ padding: "x".repeat(65 * 1024) }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ).catch((error: unknown) => error);
+    expect(oversized).toMatchObject({ reason: "response_invalid", retryable: true });
+
+    const unreachable = await requestGoogleToken(new URLSearchParams(), async () => {
+      throw new Error("sensitive network detail");
+    }).catch((error: unknown) => error);
+    expect(unreachable).toMatchObject({ reason: "endpoint_unreachable", retryable: true });
+    expect(String(unreachable)).not.toContain("sensitive network detail");
   });
 
   it("consumes a session-bound transaction atomically once and keeps mismatches untouched", async () => {

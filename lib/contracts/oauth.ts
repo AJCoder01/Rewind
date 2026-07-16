@@ -21,7 +21,9 @@ export const GoogleOAuthCallbackQuerySchema = z
     prompt: z.string().min(1).max(100).optional(),
     iss: z.union([z.literal("https://accounts.google.com"), z.literal("accounts.google.com")]).optional(),
   })
-  .strict()
+  // OAuth requires clients to ignore unrecognized response parameters. Zod
+  // strips them so only the bounded fields above cross this boundary.
+  .strip()
   .superRefine((value, context) => {
     if (Boolean(value.code) === Boolean(value.error)) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["code"], message: "OAuth callback must contain exactly one code or provider error" });
@@ -43,10 +45,9 @@ const GoogleOidcAudienceSchema = z.union([
 ]);
 
 /**
- * Google ID-token payload boundary.  The schema is strict so an unexpected
- * provider claim cannot silently become application input.  Optional fields
- * are the documented Google/OIDC claims that may accompany the fields this
- * application actually validates.
+ * Google ID-token payload boundary. Unknown provider claims are projected out;
+ * every security-relevant claim consumed by Rewind remains explicit and is
+ * validated after signature verification.
  */
 export const GoogleOidcClaimsSchema = z
   .object({
@@ -72,7 +73,7 @@ export const GoogleOidcClaimsSchema = z
     locale: z.string().max(32).optional(),
     hd: z.string().max(255).optional(),
   })
-  .strict();
+  .strip();
 
 export type GoogleOidcClaims = z.infer<typeof GoogleOidcClaimsSchema>;
 
@@ -82,6 +83,6 @@ export const GoogleOidcJwtHeaderSchema = z
     kid: z.string().min(1).max(255),
     typ: z.literal("JWT").optional(),
   })
-  .strict();
+  .strip();
 
 export type GoogleOidcJwtHeader = z.infer<typeof GoogleOidcJwtHeaderSchema>;

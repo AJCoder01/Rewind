@@ -12,6 +12,8 @@ import { buildGoogleRedirectUri, validateGoogleRedirectUri } from "@/lib/google/
 export const GOOGLE_OAUTH_AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth" as const;
 export const GOOGLE_OAUTH_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token" as const;
 export const GOOGLE_OAUTH_TRANSACTION_TTL_MS = 10 * 60 * 1000;
+export const GOOGLE_OAUTH_PROVIDER_TIMEOUT_MS = 10_000;
+const GOOGLE_OAUTH_MAX_RESPONSE_BYTES = 64 * 1024;
 export const GOOGLE_OAUTH_SCOPES = [
   "openid",
   "email",
@@ -25,10 +27,14 @@ export const GoogleOAuthTokenResponseSchema = z
     token_type: z.literal("Bearer"),
     expires_in: z.number().int().positive().max(86_400),
     refresh_token: z.string().min(1).max(8192).optional(),
+    refresh_token_expires_in: z.number().int().positive().max(315_576_000).optional(),
     scope: z.string().min(1).max(2000).optional(),
     id_token: z.string().min(1).max(32_000).optional(),
   })
-  .strict();
+  // OAuth requires clients to ignore unrecognized response members. Project
+  // only the bounded fields Rewind consumes so provider additions can never
+  // become application input or break an otherwise valid grant.
+  .strip();
 
 export type GoogleOAuthTokenResponse = z.infer<typeof GoogleOAuthTokenResponseSchema>;
 
@@ -42,10 +48,82 @@ export type GoogleOAuthConfiguration = Readonly<{
   expectedSub: string;
 }>;
 
+export type GoogleOAuthProviderFailureReason =
+  | "endpoint_unreachable"
+  | "grant_rejected"
+  | "client_rejected"
+  | "redirect_rejected"
+  | "scope_rejected"
+  | "request_rejected"
+  | "provider_temporarily_unavailable"
+  | "response_invalid"
+  | "required_token_missing";
+
 export class GoogleOAuthProviderError extends Error {
-  constructor(message = "Google OAuth provider response was not usable safely.") {
-    super(message);
+  readonly reason: GoogleOAuthProviderFailureReason;
+  readonly retryable: boolean;
+
+  constructor(reason: GoogleOAuthProviderFailureReason = "response_invalid", retryable = true) {
+    super("Google OAuth provider response was not usable safely.");
     this.name = "GoogleOAuthProviderError";
+    this.reason = reason;
+    this.retryable = retryable;
+  }
+}
+
+const GoogleOAuthErrorResponseSchema = z
+  .object({
+    error: z.enum([
+      "invalid_grant",
+      "invalid_client",
+      "redirect_uri_mismatch",
+      "invalid_scope",
+      "invalid_request",
+      "unauthorized_client",
+      "temporarily_unavailable",
+      "server_error",
+    ]),
+  })
+  .strip();
+
+function rejectedGoogleTokenError(value: unknown): GoogleOAuthProviderError {
+  const parsed = GoogleOAuthErrorResponseSchema.safeParse(value);
+  if (!parsed.success) return new GoogleOAuthProviderError("response_invalid", true);
+  if (parsed.data.error === "invalid_grant") return new GoogleOAuthProviderError("grant_rejected", true);
+  if (parsed.data.error === "invalid_client" || parsed.data.error === "unauthorized_client") {
+    return new GoogleOAuthProviderError("client_rejected", false);
+  }
+  if (parsed.data.error === "redirect_uri_mismatch") return new GoogleOAuthProviderError("redirect_rejected", false);
+  if (parsed.data.error === "invalid_scope") return new GoogleOAuthProviderError("scope_rejected", false);
+  if (parsed.data.error === "invalid_request") return new GoogleOAuthProviderError("request_rejected", false);
+  return new GoogleOAuthProviderError("provider_temporarily_unavailable", true);
+}
+
+async function readBoundedGoogleJson(response: Response): Promise<unknown> {
+  if (!response.body) throw new GoogleOAuthProviderError("response_invalid", true);
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      byteLength += chunk.value.byteLength;
+      if (byteLength > GOOGLE_OAUTH_MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new GoogleOAuthProviderError("response_invalid", true);
+      }
+      chunks.push(chunk.value);
+    }
+  } catch (error) {
+    if (error instanceof GoogleOAuthProviderError) throw error;
+    throw new GoogleOAuthProviderError("response_invalid", true);
+  }
+  if (byteLength === 0) throw new GoogleOAuthProviderError("response_invalid", true);
+  try {
+    return JSON.parse(Buffer.concat(chunks, byteLength).toString("utf8")) as unknown;
+  } catch {
+    throw new GoogleOAuthProviderError("response_invalid", true);
   }
 }
 
@@ -249,7 +327,7 @@ export function buildGoogleRefreshTokenBody(
   configuration: Pick<GoogleOAuthConfiguration, "clientId" | "clientSecret">,
   refreshToken: string,
 ): URLSearchParams {
-  if (!refreshToken) throw new GoogleOAuthProviderError("Google refresh token is unavailable.");
+  if (!refreshToken) throw new GoogleOAuthProviderError("required_token_missing", true);
   const body = new URLSearchParams();
   body.set("client_id", configuration.clientId);
   body.set("client_secret", configuration.clientSecret);
@@ -272,21 +350,24 @@ export async function requestGoogleToken(
       },
       body: body.toString(),
       redirect: "error",
+      signal: AbortSignal.timeout(GOOGLE_OAUTH_PROVIDER_TIMEOUT_MS),
     });
   } catch {
-    throw new GoogleOAuthProviderError();
+    throw new GoogleOAuthProviderError("endpoint_unreachable", true);
   }
 
-  if (!response.ok) throw new GoogleOAuthProviderError();
-
-  let decoded: unknown;
-  try {
-    decoded = await response.json();
-  } catch {
-    throw new GoogleOAuthProviderError();
+  if (!response.ok) {
+    let decoded: unknown;
+    try {
+      decoded = await readBoundedGoogleJson(response);
+    } catch {
+      throw new GoogleOAuthProviderError("response_invalid", true);
+    }
+    throw rejectedGoogleTokenError(decoded);
   }
+  const decoded = await readBoundedGoogleJson(response);
   const parsed = GoogleOAuthTokenResponseSchema.safeParse(decoded);
-  if (!parsed.success) throw new GoogleOAuthProviderError();
+  if (!parsed.success) throw new GoogleOAuthProviderError("response_invalid", true);
   return parsed.data;
 }
 
@@ -298,7 +379,7 @@ export async function exchangeGoogleAuthorizationCode(
 ): Promise<GoogleOAuthTokenResponse & { id_token: string; refresh_token: string }> {
   const response = await requestGoogleToken(buildGoogleTokenExchangeBody(configuration, transaction, code), fetchImpl);
   if (!response.id_token || !response.refresh_token) {
-    throw new GoogleOAuthProviderError("Google did not return the required identity and offline-access tokens.");
+    throw new GoogleOAuthProviderError("required_token_missing", true);
   }
   return response as GoogleOAuthTokenResponse & { id_token: string; refresh_token: string };
 }

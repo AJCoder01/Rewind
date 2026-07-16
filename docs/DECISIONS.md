@@ -252,11 +252,11 @@ This file records why a decision was made and which choices remain open. Accepte
 
 ### ADR-026 — Verify Google identity locally and bind the configured account
 
-**Decision:** S032 verifies the Google ID token locally with the published Google JWKS and an RS256-only JWT header. The accepted issuer, configured OAuth audience and `azp`, time bounds, transaction nonce, `email_verified`, configured stable subject, and configured email are all required before a credential is stored. The authorization response must contain exactly the approved Calendar/Gmail/identity scopes. Refresh uses the OAuth token endpoint; a rotated refresh token is encrypted before persistence, while access tokens remain server-only and short-lived. Rewind never calls Gmail profile or mailbox endpoints to establish identity.
+**Decision:** S032 verifies the Google ID token locally with the published Google JWKS and an RS256-only JWT header. The accepted issuer, configured OAuth audience and `azp`, time bounds, transaction nonce, `email_verified`, configured stable subject, and configured email are all required before a credential is stored. The authorization response must contain exactly the approved Calendar/Gmail/identity scopes. Callback, token, claim/header, and JWKS objects are bounded projections: recognized fields are validated and unrecognized provider additions are discarded in accordance with OAuth response rules. Refresh uses the OAuth token endpoint; a rotated refresh token is encrypted before persistence, while access tokens remain server-only and short-lived. Rewind never calls Gmail profile or mailbox endpoints to establish identity.
 
 **Why:** A provider-returned email or profile lookup is not an adequate substitute for a signed, transaction-bound identity assertion. Local claim validation keeps account substitution fail-closed, preserves the locked narrow scope, and avoids requesting mailbox access that the MVP does not need.
 
-**Consequence:** Automated tests can exercise signature, claim, scope, refresh, and substitution failures with deterministic keys and token responses. Live consent, token exchange, provider refresh, and account ownership remain unverified until the explicit G2 human/provider gates.
+**Consequence:** Automated tests can exercise signature, claim, scope, refresh, substitution, additive-provider-metadata, time-limited-refresh, and redacted-diagnostic paths with deterministic keys and token responses. Live consent, token exchange, provider refresh, and account ownership remain unverified until the explicit G2 human/provider gates.
 
 ### ADR-027 — Freeze explicit provider ports and deterministic fakes
 

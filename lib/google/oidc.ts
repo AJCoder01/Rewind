@@ -5,7 +5,11 @@ import {
   GoogleOidcJwtHeaderSchema,
   type GoogleOidcClaims,
 } from "@/lib/contracts/oauth";
-import { constantTimeSecretEqual, hashOAuthSecret } from "@/lib/google/oauth";
+import {
+  constantTimeSecretEqual,
+  GOOGLE_OAUTH_PROVIDER_TIMEOUT_MS,
+  hashOAuthSecret,
+} from "@/lib/google/oauth";
 
 export const GOOGLE_OIDC_JWKS_URI = "https://www.googleapis.com/oauth2/v3/certs" as const;
 export const GOOGLE_OIDC_CLOCK_SKEW_SECONDS = 300;
@@ -14,19 +18,19 @@ const GoogleJwkSchema = z
   .object({
     kty: z.literal("RSA"),
     kid: z.string().min(1).max(255),
-    n: z.string().regex(/^[A-Za-z0-9_-]+$/),
-    e: z.string().regex(/^[A-Za-z0-9_-]+$/),
-    alg: z.literal("RS256"),
+    n: z.string().min(1).max(8192).regex(/^[A-Za-z0-9_-]+$/),
+    e: z.string().min(1).max(32).regex(/^[A-Za-z0-9_-]+$/),
+    alg: z.literal("RS256").optional(),
     use: z.literal("sig").optional(),
     key_ops: z.array(z.string().min(1).max(32)).max(4).optional(),
     x5t: z.string().min(1).max(255).optional(),
     x5c: z.array(z.string().min(1).max(8192)).max(4).optional(),
   })
-  .strict();
+  .strip();
 
 const GoogleJwkSetSchema = z
   .object({ keys: z.array(GoogleJwkSchema).min(1).max(20) })
-  .strict();
+  .strip();
 
 export type GoogleJwk = z.infer<typeof GoogleJwkSchema>;
 export type GoogleJwkSet = z.infer<typeof GoogleJwkSetSchema>;
@@ -89,6 +93,7 @@ export async function fetchGoogleJwks(fetchImpl: typeof fetch = fetch): Promise<
       headers: { accept: "application/json" },
       cache: "no-store",
       redirect: "error",
+      signal: AbortSignal.timeout(GOOGLE_OAUTH_PROVIDER_TIMEOUT_MS),
     });
   } catch {
     throw new GoogleIdentityProviderError();
