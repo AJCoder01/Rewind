@@ -13,7 +13,7 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Field | Value |
 |---|---|
 | Phase | G2 — OAuth, provider, and model risk retirement |
-| Implementation | G1 closed; S031–S042 complete; S043 zero-cost local model proof passed and one human combined Calendar receipt remains |
+| Implementation | G1 closed; S031–S043 complete; S044 honest connection/preflight UI is next |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-16 |
@@ -162,7 +162,7 @@ The migration command applies `0001_phase0_foundation.sql` and then `0002_oauth_
 
 ## First contributor actions
 
-1. Continue with S043, the human-gated provider/model spike task.
+1. Continue with S044, the honest connection/preflight UI task.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 

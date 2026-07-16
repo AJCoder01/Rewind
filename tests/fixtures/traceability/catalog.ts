@@ -33,6 +33,7 @@ const modelEvidence = [
   "artifacts/test-runs/2026-07-16-s043-model-transport-correction.md",
   "artifacts/test-runs/2026-07-16-s043-openai-rate-limit-blocker.md",
   "artifacts/test-runs/2026-07-16-s043-local-model-runtime.md",
+  "artifacts/test-runs/2026-07-16-s043-provider-model-spike-success.md",
 ];
 const initialFixtures: TraceabilityFixtureId[] = ["fixture-initial.v1", "controlled-content.v1", "artifact-independence.v1"];
 const modelSafetyFixtures: TraceabilityFixtureId[] = ["traceability.v1", "model-safety.v1"];
@@ -207,12 +208,12 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   current({
     id: "SAFE-08", kind: "SAFE", title: "Closed strict model/action boundary", planTasks: ["S004", "S006", "S034", "S040", "S041", "S042", "S043"],
     codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/contracts/provider-spike.ts", "lib/domain/fixture-world-pr.ts", "lib/ai/model.ts", "lib/ai/model-trusted-facts.ts", "lib/ai/openai-responses.ts", "lib/ai/openai-model.ts", "lib/ai/ollama-chat.ts", "lib/ai/ollama-model.ts", "lib/ai/model-schemas.ts", "lib/ai/model-safety.ts", "lib/services/provider-spike.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/openai-model.test.ts", "tests/unit/ollama-chat.test.ts", "tests/unit/ollama-model.test.ts", "tests/unit/model-schemas.test.ts", "tests/unit/model-safety.test.ts", "tests/unit/provider-spike.test.ts"], fixtureIds: [...initialFixtures, "model-safety.v1"], evidencePaths: modelEvidence, status: "partial",
-    note: "Strict lifecycle/plan/provider contracts, OpenAI and loopback-only Ollama transports, closed proposal schemas, cross-field validators, and the shared two-attempt budget reject unknown fields/IDs/templates, unsafe dependencies, recipient injection, ambiguous targets, fallback success, cloud-local substitution, and retry amplification; one combined S043 receipt and product action integration remain open.",
+    note: "Strict lifecycle/plan/provider contracts, OpenAI and loopback-only Ollama transports, closed proposal schemas, cross-field validators, and the shared two-attempt budget reject unknown fields/IDs/templates, unsafe dependencies, recipient injection, ambiguous targets, fallback success, cloud-local substitution, and retry amplification; the combined S043 receipt proves the selected local runtime, while product action integration remains future work.",
   }),
   current({
     id: "SAFE-09", kind: "SAFE", title: "Server-only private environment boundary", planTasks: ["S003", "S012", "S013", "S031", "S032", "S033"],
     codePaths: ["lib/config/environment.ts", "lib/db/config.ts", "lib/google/oauth.ts", "lib/google/oidc.ts", "lib/google/credentials.ts", "lib/db/oauth-store.ts", "db/migrations/0002_oauth_transaction.sql", "scripts/security-scan.ts"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/db-config.test.ts", "tests/unit/google-identity.test.ts", "tests/unit/oauth-transaction.test.ts", "tests/unit/oauth-migration.test.ts", "tests/unit/oauth-routes.test.ts", "tests/unit/oauth-store.test.ts", "tests/unit/security-scan.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: [...oauthEvidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
-    note: "Configuration validation, exact redirect/session binding, local signed identity checks, encrypted verifier/refresh-token storage, migration grants, and tracked-file scanning are covered; live provider refresh remains S043 work.",
+    note: "Configuration validation, exact redirect/session binding, local signed identity checks, encrypted verifier/refresh-token storage, migration grants, tracked-file scanning, and the human S035/S043 provider refresh path are covered; the connection/preflight UI remains S044 work.",
   }),
   current({
     id: "SAFE-10", kind: "SAFE", title: "Controlled data minimization and redaction", planTasks: ["S003", "S012", "S013", "S032", "S033", "S035", "S089"],
