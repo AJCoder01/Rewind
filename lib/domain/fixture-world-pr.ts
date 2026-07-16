@@ -162,6 +162,14 @@ export function buildFixtureWorldPrRecord(request: string, now = new Date()): Fi
     pointer: { planId, kind: "initial", version: 1, digest },
     selectedCandidate: uk,
     alternatives: [us],
+    candidateEvidence: planPayload.candidateSet.map((candidate) => ({
+      candidateId: candidate.candidateId,
+      label: candidate.title,
+      region: candidate.region,
+      start: candidate.start,
+      end: candidate.end,
+      rankingEvidence: candidate.rankingEvidence,
+    })) as InitialPlanView["candidateEvidence"],
     assumptions: planPayload.assumptions,
     actions,
   });

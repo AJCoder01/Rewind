@@ -437,6 +437,14 @@ function assertStoredRecordConsistency(record: StoredWorldPrRecord): void {
     activePlan.selectedCandidate.label !== selected.title ||
     activePlan.alternatives[0].candidateId !== alternativeId ||
     activePlan.alternatives[0].label !== alternative.title ||
+    canonicalJson(activePlan.candidateEvidence) !== canonicalJson(payload.candidateSet.map((candidate) => ({
+      candidateId: candidate.candidateId,
+      label: candidate.title,
+      region: candidate.region,
+      start: candidate.start,
+      end: candidate.end,
+      rankingEvidence: candidate.rankingEvidence,
+    }))) ||
     record.view.runId !== payload.actions[2].desired.runId ||
     canonicalJson(activePlan.assumptions) !== canonicalJson(payload.assumptions) ||
     canonicalJson(activePlan.actions) !== canonicalJson(payload.actions)

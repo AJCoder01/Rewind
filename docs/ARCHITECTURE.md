@@ -72,6 +72,8 @@ S048 adds `initial-reasoning-record.v1` and routes the candidate snapshot throug
 
 S049 adds the deterministic initial-plan expander. It verifies request/resolution/reasoning identity, generates the exact account-brief bytes and provenance, maps the validated selected snapshot to Calendar preconditions, converts the fixed 15:00 ET target without relying on model output, resolves the UK recipient only from the server allowlist, validates the registered mail template, and builds the immutable artifact → Calendar → Gmail tuple. The full payload is parsed through `VerifiedInitialPlanPayloadSchema` after canonical SHA-256 hashing, and the read-model plan pointer uses the same digest. Tests mutate recipient, target, dependency, order, time, and hash inputs without invoking an external provider.
 
+S050 makes the exact plan/view pair explicit. `InitialPlanViewSchema` now carries a redacted candidate-evidence tuple with region, start/end, and ranking evidence so the dashboard can show both the selected UK entity and US alternative without exposing provider ETags/recipient internals in that panel. The fixture and PostgreSQL repository paths validate view-to-payload consistency, including candidate evidence, full action bytes, dependencies, effect labels, and the shared immutable digest. The review page renders the request, candidate evidence, assumption/evidence, exact artifact/Calendar/mail actions, provenance and hashes, version, digest, and durable timeline; it remains non-approving until S051.
+
 ## 3. Intended source layout
 
 ```text

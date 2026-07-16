@@ -275,6 +275,7 @@ interface InitialPlanView {
   pointer: PlanPointer;
   selectedCandidate: { candidateId: string; label: string };
   alternatives: [{ candidateId: string; label: string }];
+  candidateEvidence: [{ candidateId: string; label: string; region: "UK" | "US"; start: ZonedDateTime; end: ZonedDateTime; rankingEvidence: string[] }, { ... }];
   assumptions: [Assumption];
   actions: [
     AccountBriefAction,

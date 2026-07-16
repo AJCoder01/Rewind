@@ -87,6 +87,19 @@ function ActionDetails({ action }: { action: PlannedAction }) {
   );
 }
 
+function CandidateEvidenceRow({ candidate, selected }: { candidate: InitialPlanView["candidateEvidence"][number]; selected: boolean }) {
+  return (
+    <div className="candidate-row">
+      <div>
+        <div className="candidate-label">{candidate.label}</div>
+        <div className="candidate-meta">{candidate.region} · {formatTime(candidate.start.instant, candidate.start.timeZone)}–{formatTime(candidate.end.instant, candidate.end.timeZone)}</div>
+        <div className="candidate-meta">{candidate.rankingEvidence.join(" ")}</div>
+      </div>
+      <span className={selected ? "tag" : "tag alt"}>{selected ? "Selected" : "Alternative"}</span>
+    </div>
+  );
+}
+
 function Timeline({ view }: { view: WorldPrView }) {
   return (
     <section className="panel" aria-labelledby="timeline-title">
@@ -254,7 +267,7 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
         </div>
         <div className="review-grid">
           <section className="panel panel-wide"><div className="panel-inner"><div className="panel-kicker">Request</div><h2>Original request</h2><p>{view.request}</p></div></section>
-          <section className="panel" data-testid="candidate-panel"><div className="panel-inner"><div className="panel-kicker">Target resolution</div><h2>Candidate resolution</h2><div className="candidate-row"><div><div className="candidate-label">{plan.selectedCandidate.label}</div><div className="candidate-meta">Nearest upcoming tagged candidate on the configured demo date.</div></div><span className="tag">Selected</span></div><div className="candidate-row"><div><div className="candidate-label">{plan.alternatives[0].label}</div><div className="candidate-meta">Visible later alternative; not selected by the fixture rank.</div></div><span className="tag alt">Alternative</span></div></div></section>
+          <section className="panel" data-testid="candidate-panel"><div className="panel-inner"><div className="panel-kicker">Target resolution</div><h2>Candidate resolution</h2>{plan.candidateEvidence.map((candidate) => <CandidateEvidenceRow key={candidate.candidateId} candidate={candidate} selected={candidate.candidateId === plan.selectedCandidate.candidateId} />)}</div></section>
           <section className="panel" data-testid="assumption-panel"><div className="panel-inner"><div className="panel-kicker">Dependency lineage</div><h2>Recorded assumption</h2><div className="assumption"><strong>{assumption.statement}</strong><p>This is the decision a later recovery flow can revisit. Recorded confidence: {Math.round(assumption.confidence * 100)}%.</p></div><ul className="evidence">{assumption.evidence.map((item) => <li key={item}>{item}</li>)}</ul></div></section>
           <section className="panel panel-wide" data-testid="planned-actions"><div className="panel-inner"><div className="panel-kicker">Exact approved payload</div><h2>Planned actions</h2><div className="action-list">{plan.actions.map((action) => <article className="action" key={action.actionKey}><div className="action-top"><span className="action-name">{actionLabel(action)}</span><span className="action-type">{action.externalEffect ? "External effect" : "Recorded artifact"}</span></div><div className="action-key">{action.actionKey}</div><ActionDetails action={action} /></article>)}</div></div></section>
           <section className="panel"><div className="panel-inner"><div className="panel-kicker">Immutable identity</div><h2>Plan identity</h2><p className="muted">Version {plan.pointer.version}</p><p className="digest">{plan.pointer.digest}</p></div></section>
