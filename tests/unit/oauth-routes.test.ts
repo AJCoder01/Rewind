@@ -187,7 +187,7 @@ describe("Google OAuth routes", () => {
     const location = new URL(started.headers.get("location")!);
     stubGoogleTokenExchange(makeIdToken(location.searchParams.get("nonce")!, overrides), []);
 
-    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code`;
+    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code&scope=${encodeURIComponent(GOOGLE_OAUTH_SCOPES.join(" "))}&authuser=0&hd=example.test&prompt=consent`;
     const response = await callbackGoogleOAuth(request(callbackPath, session));
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ error: { code: "forbidden", retryable: false } });
@@ -251,7 +251,7 @@ describe("Google OAuth routes", () => {
     const calls: string[] = [];
     stubGoogleTokenExchange(makeIdToken(location.searchParams.get("nonce")!), calls);
 
-    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code`;
+    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code&scope=${encodeURIComponent(GOOGLE_OAUTH_SCOPES.join(" "))}&authuser=0&hd=example.test&prompt=consent`;
     const response = await callbackGoogleOAuth(request(callbackPath, session));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ status: "connected", provider: "google" });
@@ -297,6 +297,16 @@ describe("Google OAuth routes", () => {
     const session = createSessionValue("demo-operator");
     const response = await callbackGoogleOAuth(
       request("/api/v1/oauth/google/callback?state=one&state=two&code=fake-code", session),
+    );
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "invalid_request" } });
+  });
+
+  it("rejects unknown callback metadata while accepting Google's documented fields", async () => {
+    setOAuthEnvironment();
+    const session = createSessionValue("demo-operator");
+    const response = await callbackGoogleOAuth(
+      request("/api/v1/oauth/google/callback?state=one&code=fake-code&unexpected=metadata", session),
     );
     expect(response.status).toBe(422);
     await expect(response.json()).resolves.toMatchObject({ error: { code: "invalid_request" } });
