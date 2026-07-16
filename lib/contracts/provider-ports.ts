@@ -8,7 +8,11 @@ import {
 
 export const PROVIDER_PORTS_CONTRACT_VERSION = "provider-ports.v1" as const;
 
-const ProviderIdentifierSchema = z.string().min(1).max(512);
+const ProviderIdentifierSchema = z
+  .string()
+  .min(1)
+  .max(512)
+  .refine((value) => value === value.trim() && !/\s/.test(value), "Provider identifiers must not contain whitespace");
 
 export const CalendarEventSnapshotSchema = z
   .object({
@@ -43,6 +47,39 @@ export const CalendarEventSnapshotSchema = z
 export const CalendarCandidateQuerySchema = z
   .object({ calendarId: ProviderIdentifierSchema, tag: z.literal("acme-renewal") })
   .strict();
+
+export const CalendarEventCreateSchema = z
+  .object({
+    calendarId: ProviderIdentifierSchema,
+    title: z.string().min(1).max(200),
+    company: z.literal("Acme"),
+    region: z.enum(["UK", "US"]),
+    start: ZonedDateTimeSchema,
+    end: ZonedDateTimeSchema,
+    attendeeEmails: z.array(z.string().email().max(320)).length(1),
+    privateTags: z
+      .object({ rewind_demo: z.literal("acme-renewal"), region: z.enum(["UK", "US"]) })
+      .strict(),
+    sendUpdates: z.literal("none"),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (Date.parse(value.end.instant) <= Date.parse(value.start.instant)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["end"], message: "Calendar event end must be after start" });
+    }
+    if (value.title !== `Acme ${value.region} renewal`) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["title"], message: "Calendar event title must match its controlled region" });
+    }
+    if (value.start.timeZone !== "America/New_York" || value.end.timeZone !== "America/New_York") {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["start", "timeZone"], message: "Calendar seed events must use America/New_York" });
+    }
+    if (Date.parse(value.end.instant) - Date.parse(value.start.instant) !== 30 * 60_000) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["end"], message: "Calendar seed events must last 30 minutes" });
+    }
+    if (value.privateTags.region !== value.region) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["privateTags", "region"], message: "Calendar tag region must match event" });
+    }
+  });
 
 export const CalendarEventReferenceSchema = z
   .object({ calendarId: ProviderIdentifierSchema, providerEventId: ProviderIdentifierSchema })
@@ -152,6 +189,7 @@ export const ModelProposalResponseSchema = z
 
 export type CalendarEventSnapshot = z.infer<typeof CalendarEventSnapshotSchema>;
 export type CalendarCandidateQuery = z.infer<typeof CalendarCandidateQuerySchema>;
+export type CalendarEventCreate = z.infer<typeof CalendarEventCreateSchema>;
 export type CalendarEventReference = z.infer<typeof CalendarEventReferenceSchema>;
 export type CalendarConditionalTimeUpdate = z.infer<typeof CalendarConditionalTimeUpdateSchema>;
 export type GmailApprovedMessage = z.infer<typeof GmailApprovedMessageSchema>;

@@ -46,6 +46,7 @@ This file records why a decision was made and which choices remain open. Accepte
 | ADR-025 | Stage OAuth transaction consumption before identity/token exchange | Accepted |
 | ADR-026 | Verify Google identity locally and bind the configured account | Accepted |
 | ADR-027 | Freeze explicit provider ports and deterministic fakes | Accepted |
+| ADR-028 | Keep Calendar setup live-only, TTY-gated, and baseline-first | Accepted |
 
 ## Accepted decisions
 
@@ -264,6 +265,14 @@ This file records why a decision was made and which choices remain open. Accepte
 **Why:** Later application services need stable boundaries that can be tested for ordering, stale state, partial failure, and honest outcomes without coupling scenario-specific semantics to a generic action or compensation framework.
 
 **Consequence:** Automated suites can exercise provider failures and call counts without live credentials or external effects. The fakes are not production adapters, do not retry or read mailboxes, and do not replace the later live provider implementations or S035–S043 gates.
+
+### ADR-028 — Keep Calendar setup live-only, TTY-gated, and baseline-first
+
+**Decision:** S035 uses a scenario-specific Google Calendar wire adapter and two explicit admin commands, `seed:demo` and `preflight:demo`. They require a real TTY, non-production PostgreSQL mode, a non-CI environment, an explicit configured calendar ID, and an interactive confirmation containing a unique run ID. Seeding discovers the exact private demo tag before creating anything, refuses existing tagged events or persisted baselines, persists a redacted audit marker before each create, stores immutable semantic baselines without ETags, and updates the rolling expected provider version only from verified responses. Automated tests use deterministic fakes and never invoke the commands.
+
+**Why:** Calendar setup is the first boundary where provider identity, account ownership, calendar targeting, database state, and real writes meet. A command that could run from CI, production, an implicit `primary` calendar, or a fixture store could create uncontrolled state or make a partial seed look successful.
+
+**Consequence:** The safe code and negative tests can land before live access exists, while the human owner must still configure the private environment and run the TTY-confirmed OAuth refresh/Calendar seed/preflight. Partial, ambiguous, stale, or persistence-failed setup remains visible and requires deliberate human recovery; the command never silently retries or substitutes fixture output.
 
 ## Rejected alternatives
 

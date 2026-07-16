@@ -46,6 +46,8 @@ The implemented G1 slice keeps route handlers thin: they authorize the dashboard
 
 S034 freezes four explicit provider boundaries: the Calendar port lists tagged events, reads controlled snapshots, and performs conditional start/end updates; the Gmail port accepts one approved message and returns sent, permanent-failure, or delivery-uncertain outcomes; the artifact port persists supplied account-brief bytes and hashes; and the model port exposes separately named initial, recovery, and prevention-rule proposals with raw output still untrusted. Deterministic fakes implement those ports with controlled failure injection for tests and non-production fixture use. Production configuration rejects `memory_fixture` and any fake provider selection before a provider-backed success can be produced. The deployed G1 path is different: it uses the real PostgreSQL repository to persist the deterministic, contract-valid non-effecting plan fixture, makes no Calendar, Gmail, or model call, and labels the review as non-effecting. S028 proves the deployed durable path; S029 freezes its interfaces and evidence; S030 closes the G1 audit. G2 starts at S031 and must preserve this boundary.
 
+S035 adds the first live Calendar wire boundary without enabling a product action path. `GoogleCalendarPort` maps only the exact Google event fields needed by the controlled Acme scenario, refuses primary/unknown calendar targets, rejects all-day/recurring/untagged/malformed events, sends `sendUpdates=none`, and uses `If-Match` for narrow updates. The scenario-specific seed service discovers the configured tag before creating anything, persists a redacted start audit before each create, stores immutable semantic baselines separately from rolling ETags/updated timestamps, and fails closed on existing, partial, stale, or unowned state. `seed:demo` and `preflight:demo` require a real TTY, non-production PostgreSQL mode, a non-CI environment, an explicit configured calendar, and an interactive target confirmation. Automated tests use only the deterministic fake Calendar; the TTY commands and live OAuth/Calendar calls remain human-only.
+
 ## 3. Intended source layout
 
 ```text
@@ -61,8 +63,11 @@ components/
 lib/
   contracts/       # Zod schemas, DTOs, error codes, template registry
     provider-ports.ts
+    calendar-demo.ts
   domain/          # State machine, plan hashing, validators, policies
+    calendar-demo.ts
   services/        # create, approve, execute, recover, rule, reset use cases
+    calendar-demo.ts
   ai/              # Prompt/schema versions and Responses API client
     model.ts        # Explicit initial/recovery/rule model port and fake
   adapters/
@@ -70,7 +75,9 @@ lib/
     gmail.ts
     artifact.ts
   google/             # Exact Google redirect, OAuth transaction, and secret boundaries
+    calendar.ts        # Strict Google Calendar wire adapter
   db/              # Queries and migrations
+    demo-event-state.ts
   auth/             # Dashboard session, CSRF, MCP bearer auth
 mcp/server.ts
 db/migrations/
@@ -93,10 +100,11 @@ Do not add a generic `RewindableAction` interface. Calendar restoration and mail
 | Domain | State transitions, plan digest, dependency and recovery validation, allowlist policy | Network calls |
 | PostgreSQL | Tasks, immutable plans, approvals, action ledger, artifacts, rules, audit events, scenario lock | Provider truth beyond stored snapshots/receipts |
 | AI service | Propose bounded assumptions/dependency edges, account-brief content, correction intent, recovery classifications/templates, and typed rule copy | Recipient selection, arbitrary IDs, deterministic semantic validation, provider payloads, code |
-| Calendar adapter | Fetch tagged candidates, typed snapshots, conditional start/end changes, verification | Gmail notifications or conflict rebasing |
+| Calendar adapter | Fetch/create tagged candidates, typed snapshots, conditional start/end changes, verification | Gmail notifications or conflict rebasing |
 | Gmail adapter | Build deterministic MIME from approved template, one send attempt, typed receipt | Reading/searching mailboxes, deleting/undoing mail, automatic retry after ambiguity |
 | Artifact adapter | Store the exact approved account-brief bytes/hash/provenance and return a typed receipt | Generating/regenerating content or accepting event/region input |
 | MCP process | Expose minimal tools and call backend with auth/idempotency | Approval, execution, Google credentials, database access |
+| Seed/preflight commands | TTY-gated controlled Calendar discovery, seed receipts, baselines, and preflight checks | HTTP/MCP access, production targets, fixture success claims |
 
 ## 5. Core flows
 

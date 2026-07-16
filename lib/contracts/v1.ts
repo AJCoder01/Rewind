@@ -6,6 +6,11 @@ const Id = z
   .min(8)
   .max(200)
   .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, "IDs must be opaque URL-safe identifiers");
+const CalendarProviderId = z
+  .string()
+  .min(1)
+  .max(512)
+  .refine((value) => value === value.trim() && !/\s/.test(value), "Provider identifiers must not contain whitespace");
 const Version = z.number().int().min(1).max(1000);
 export const Sha256DigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 export const OpaqueIdSchema = Id;
@@ -509,8 +514,8 @@ export const PreventionRuleCorePayloadSchema = PreventionRuleCoreSchema;
 
 export const CalendarSemanticBaselineSchema = z
   .object({
-    calendarId: Id,
-    providerEventId: Id,
+    calendarId: CalendarProviderId,
+    providerEventId: CalendarProviderId,
     start: ZonedDateTimeSchema,
     end: ZonedDateTimeSchema,
     durationMinutes: z.literal(30),
@@ -523,6 +528,8 @@ export const CalendarSemanticBaselineSchema = z
       .strict(),
   })
   .strict();
+
+export type CalendarSemanticBaseline = z.infer<typeof CalendarSemanticBaselineSchema>;
 
 export const ResetTargetSchema = z
   .object({

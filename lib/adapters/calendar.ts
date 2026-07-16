@@ -1,15 +1,18 @@
 import {
   CalendarCandidateQuerySchema,
   CalendarConditionalTimeUpdateSchema,
+  CalendarEventCreateSchema,
   CalendarEventReferenceSchema,
   CalendarEventSnapshotSchema,
   type CalendarCandidateQuery,
   type CalendarConditionalTimeUpdate,
+  type CalendarEventCreate,
   type CalendarEventReference,
   type CalendarEventSnapshot,
 } from "@/lib/contracts/provider-ports";
+import { sha256Digest, sha256Text } from "@/lib/domain/digest";
 
-export type CalendarOperation = "list" | "get" | "update";
+export type CalendarOperation = "list" | "get" | "create" | "update";
 export type CalendarProviderErrorKind = "unavailable" | "not_found" | "conflict";
 
 export class CalendarProviderError extends Error {
@@ -25,6 +28,7 @@ export class CalendarProviderError extends Error {
 export interface CalendarPort {
   listControlledEvents(input: CalendarCandidateQuery): Promise<readonly CalendarEventSnapshot[]>;
   getControlledEvent(input: CalendarEventReference): Promise<CalendarEventSnapshot>;
+  createControlledEvent(input: CalendarEventCreate): Promise<CalendarEventSnapshot>;
   updateStartEnd(input: CalendarConditionalTimeUpdate): Promise<CalendarEventSnapshot>;
 }
 
@@ -37,6 +41,7 @@ export type FakeCalendarOptions = Readonly<{
   events: readonly CalendarEventSnapshot[];
   failure?: FakeCalendarFailure;
   etagPrefix?: string;
+  organizerDigest?: string;
 }>;
 
 function copySnapshot(snapshot: CalendarEventSnapshot): CalendarEventSnapshot {
@@ -57,11 +62,13 @@ export class FakeCalendarPort implements CalendarPort {
   private readonly events = new Map<string, CalendarEventSnapshot>();
   private readonly failure?: FakeCalendarFailure;
   private readonly etagPrefix: string;
+  private readonly organizerDigest: string;
   private writeCount = 0;
 
   constructor(options: FakeCalendarOptions) {
     this.failure = options.failure;
     this.etagPrefix = options.etagPrefix ?? "fake-calendar-etag";
+    this.organizerDigest = options.organizerDigest ?? sha256Text("fake-calendar-organizer");
     for (const candidate of options.events) {
       const parsed = CalendarEventSnapshotSchema.parse(candidate);
       const key = eventKey(parsed.calendarId, parsed.providerEventId);
@@ -85,6 +92,33 @@ export class FakeCalendarPort implements CalendarPort {
     const event = this.events.get(eventKey(parsed.calendarId, parsed.providerEventId));
     if (!event) throw new CalendarProviderError("not_found");
     return copySnapshot(event);
+  }
+
+  async createControlledEvent(input: CalendarEventCreate): Promise<CalendarEventSnapshot> {
+    const parsed = CalendarEventCreateSchema.parse(input);
+    this.failIfConfigured("create");
+    const providerEventId = `fake-seeded-event-${parsed.region.toLowerCase()}`;
+    const key = eventKey(parsed.calendarId, providerEventId);
+    if (this.events.has(key)) throw new CalendarProviderError("conflict");
+    const snapshot = CalendarEventSnapshotSchema.parse({
+      calendarId: parsed.calendarId,
+      providerEventId,
+      title: parsed.title,
+      company: parsed.company,
+      region: parsed.region,
+      start: parsed.start,
+      end: parsed.end,
+      etag: `${this.etagPrefix}-create-${++this.writeCount}`,
+      providerUpdated: new Date(Date.UTC(2026, 0, 1, 0, 0, this.writeCount)).toISOString(),
+      organizerDigest: this.organizerDigest,
+      attendeeSetDigest: sha256Digest(parsed.attendeeEmails.map((email) => email.toLowerCase()).sort()),
+      eventType: "default",
+      recurringEventId: null,
+      ownedByConnectedAccount: true,
+      privateTags: parsed.privateTags,
+    });
+    this.events.set(key, snapshot);
+    return copySnapshot(snapshot);
   }
 
   async updateStartEnd(input: CalendarConditionalTimeUpdate): Promise<CalendarEventSnapshot> {
