@@ -68,6 +68,8 @@ S045 closes the risk-gate bookkeeping without expanding the runtime effect surfa
 
 S047 adds the `candidate-resolution.v1` service boundary. It calls the typed Calendar list operation before planning, validates exactly the two configured Acme events and their ownership/attendee/time/tag invariants, maps their regions to the closed candidate IDs, ranks the earliest event deterministically (UK must win in the controlled scenario), and records US as the visible alternative. The rule port runs on that snapshot before the planning lock port; a clarification result owns no lock. A refresh creates a higher resolution version and never edits the prior snapshot; changed provider IDs, ETags, or times raise a stale-snapshot error that callers must supersede. Tests use only `FakeCalendarPort` and `MemoryPlanningLockPort`; no live provider call or effect is part of this task.
 
+S048 adds `initial-reasoning-record.v1` and routes the candidate snapshot through `requestValidatedInitialProposal`. The model sees only closed labels/evidence and fixed action keys; deterministic code supplies the expected UK selection and the canonical parent-account brief title, while the model cannot supply provider IDs, recipients, times, ETags, or effect payloads. The persisted reasoning record binds the result to the candidate-resolution digest and retains bounded model metadata/attempts. Invalid schema, semantic, fallback, or provider output remains a typed safe failure; there is no deterministic model-success fallback.
+
 ## 3. Intended source layout
 
 ```text

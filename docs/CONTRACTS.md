@@ -206,6 +206,8 @@ The request performs controlled candidate lookup and active-rule evaluation **be
 
 `candidate-resolution.v1` is the server-owned candidate lookup boundary used before that lock claim. It contains exactly the two tagged Acme snapshots, fixed candidate IDs derived from the validated region, provider event IDs/ETags/start/end/attendee digests, deterministic ranking evidence, the UK selection, the US alternative, a provider-snapshot digest, and a resolution version. The resolver rejects duplicate/missing/wrong-date/unowned/recurring/malformed candidates and provider failures without creating a plan. A rule match returns the snapshotted choices with no lock; only a no-match result may proceed to the planning lease. Refreshes use a higher resolution/plan version and never mutate an approved snapshot; a changed provider digest is stale and must be superseded.
 
+`initial-reasoning-record.v1` records the one bounded initial model proposal against the candidate-resolution digest. Its model input contains the request, two server-written ranking evidence strings, the two fixed candidate IDs, and the three fixed initial action keys. The model may return only the one Acme-region assumption, the fixed dependency map, and a parent-account brief reference. The shared validator owns the two-attempt ceiling, rejects unknown IDs/actions, selection drift, dependency drift, and artifact leakage, and records only validated output, metadata, and attempt count. Provider event IDs, ETags, recipients, exact message content, times, and action payloads are not model-controlled fields.
+
 ```json
 {
   "worldPrId": "wpr_01...",
