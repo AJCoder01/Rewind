@@ -32,6 +32,7 @@ npm test
 npm run test:e2e
 npm run security:scan
 npm run verify:fake-production
+npm run verify:g2-closure
 npm run db:verify:ephemeral
 npm audit --audit-level=moderate
 npm run db:migrate
@@ -79,7 +80,7 @@ The S038 command is run only as `LIVE_INTEGRATION_TESTS=1 npm run prove:gmail` i
 5. A deliberate intervening Calendar edit produces `provider_conflict`, not overwrite.
 6. One human-confirmed allowlisted live Gmail message sends and returns a message receipt; replay of its application action cannot create a second dispatch.
 7. Deterministic transport fakes—not intentionally ambiguous live sends—prove Gmail's closed error matrix: only local pre-handoff failure is retryable; 4xx rejection is permanent; 408/429/5xx, transport loss, malformed 2xx, timeout, or process death after `dispatch_started_at` is uncertain and never auto-retried.
-8. A live OpenAI call using the selected model satisfies the strict smoke schemas; invalid semantic output is rejected.
+8. The explicitly selected real model runtime satisfies the strict smoke schemas; invalid semantic output is rejected and the evidence class is recorded honestly (`external_openai` or `local_model`).
 9. Seed/provider-spike commands enforce TTY confirmation, demo tags/allowlists, receipts, and CI/production refusal.
 10. A TTY-gated low-level Calendar spike proves two-event preflight, conditional restore, conflict, rolling ETags, and injected partial receipts. It exposes no reset route, archive/lock/rule/artifact cleanup, or `reset_complete` state.
 11. The authenticated connection/preflight panel reports safe configuration gaps, account-bound identity state, fixture/live-capable/blocked runtime state, database readiness, Calendar target/preflight failure or not-run state, selected model evidence, and disabled product execution/reset without calling an external provider.
@@ -187,7 +188,11 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 
 `tests/unit/connection-preflight.test.ts` covers fixture labeling, complete live-capable configuration with pending Calendar preflight, safe configuration gaps, account and approved-scope substitution, strict response parsing, dashboard authentication, and no-store output. `tests/unit/accessibility-contract.test.ts` freezes the new panel selectors. `npm run test:e2e` covers the panel's unauthenticated/authenticated route boundary alongside the existing login, non-effecting World PR, session expiry, cancellation, responsive, keyboard-focus, and reduced-motion flow. No live provider/model call or external effect is claimed for S044.
 
-### 4.10 Integration tests with deterministic adapters
+### 4.10 S045 G2 closure and G3 admission
+
+`tests/unit/g2-closure.test.ts` validates the strict `g2-closure.v1` report, binds the selected `local_ollama` runtime to `ollama`/`local_model`, checks all six fixed evidence-risk categories, rejects matched secrets without returning their values, and proves that `assertG3Admission` throws for a blocked report. `npm run verify:g2-closure` reads only the committed S032–S044 sanitized evidence manifest and returns one safe JSON report. It performs no provider, database, OAuth, Calendar, Gmail, model, or product operation. G3 may begin only when the command returns `status: passed`, `g3Admission: unlocked`, and an empty blocker list.
+
+### 4.11 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.

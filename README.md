@@ -13,7 +13,7 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Field | Value |
 |---|---|
 | Phase | G2 — OAuth, provider, and model risk retirement |
-| Implementation | G1 closed; S031–S043 complete; S044 honest connection/preflight UI is next |
+| Implementation | G1 closed; S031–S045 complete; G2 closed; S046 execution persistence is next |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-16 |
@@ -156,13 +156,16 @@ After configuring the two private database URLs described in the [S007 Supabase 
 ```text
 npm run db:migrate
 npm run db:verify
+npm run verify:g2-closure
 ```
 
 The migration command applies `0001_phase0_foundation.sql` and then `0002_oauth_transaction.sql` atomically/repeatably; each reviewed checksum and catalog must match. The database verification command performs read-only catalog/privilege checks plus constraint probes inside a transaction that always rolls back. `GET /api/health` is process liveness; `GET /api/ready` returns a sanitized `200` only when the restricted TLS runtime connection and exact foundation/OAuth schemas are ready. Google OAuth start/callback routes remain fail-closed unless configuration, transaction, signed-identity, exact-scope, and provider response checks pass.
 
+`verify:g2-closure` is the read-only G2 gate. It validates the committed redacted evidence packet, scans only those reports for secret-like material, and returns a safe `g2-closure.v1` JSON report. G3 work is admitted only when it reports `status: passed` and `g3Admission: unlocked`; a missing marker or redaction finding blocks the gate.
+
 ## First contributor actions
 
-1. Continue with S044, the honest connection/preflight UI task.
+1. Continue with S046, execution persistence, after confirming `npm run verify:g2-closure` remains green.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 

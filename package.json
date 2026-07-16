@@ -27,6 +27,7 @@
     "security:scan": "tsx scripts/security-scan.ts",
     "traceability:check": "tsx scripts/verify-traceability.ts",
     "verify:g1-interface": "tsx scripts/verify-g1-interface.ts",
+    "verify:g2-closure": "tsx scripts/verify-g2-closure.ts",
     "verify:fake-production": "tsx scripts/verify-fake-production.ts",
     "verify:openai-access": "tsx scripts/verify-openai-access.ts",
     "mcp": "tsx mcp/server.ts"

@@ -5,7 +5,7 @@
 | Status | Active canonical execution queue |
 | Execution model | One sequential task at a time |
 | Current gate | G2 — OAuth, provider, and model risk retirement |
-| Current restart point | `S044` — build the honest connection/preflight UI |
+| Current restart point | `S046` — finalize execution persistence after the G2 closure gate |
 | Last updated | 2026-07-16 |
 
 This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
@@ -96,15 +96,17 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 - [x] **S042 — Build model safety and evaluation harnesses.** Added strict cross-field validators for initial/recovery/prevention proposals, trusted explicit-target/action-ledger context, server-owned recipient expansion, bounded two-attempt validation with no fallback, adversarial fixtures/tests, and the sanitized `eval:model-safety` command. Evidence: [S042 model-safety report](../artifacts/test-runs/2026-07-16-s042-model-safety.md). No live model inference, provider mutation, or external effect was run.
 - [x] **S043 — Run the controlled provider/model spikes.** Added redacted `provider-spike.v2` and `local-model-spike.v1` reports, the TTY/live-flagged Calendar move/restore/conflict harness, strict OpenAI and loopback-only Ollama model adapters, one shared two-attempt ceiling, model-before-Calendar ordering, deterministic tests, and the [human S043 guide](S043_PROVIDER_MODEL_SPIKE_GUIDE.md). The unfunded OpenAI path failed closed and remains honestly recorded. The selected zero-spend `qwen2.5-coder:latest` Ollama path passed all three strict schema/semantic operations in one attempt each, and the human combined receipt then proved the stale Calendar conflict, controlled move/restore, and final two-event preflight. Evidence: [transport correction](../artifacts/test-runs/2026-07-16-s043-model-transport-correction.md), [rate-limit blocker](../artifacts/test-runs/2026-07-16-s043-openai-rate-limit-blocker.md), [local runtime](../artifacts/test-runs/2026-07-16-s043-local-model-runtime.md), and [combined success receipt](../artifacts/test-runs/2026-07-16-s043-provider-model-spike-success.md).
 - [x] **S044 — Build honest connection/preflight UI.** Added the authenticated, read-only `connection-preflight.v1` status boundary and dashboard panel. It reports safe configuration gaps, approved connected-identity state, fixture/live-capable/blocked runtime state, database status, Calendar target/preflight failures or not-run state, selected model evidence runtime, and explicit disabled product execution/reset. It never runs a provider/model operation or claims that the product workflow passed. Evidence: [S044 connection/preflight UI report](../artifacts/test-runs/2026-07-16-s044-connection-preflight-ui.md).
-- [ ] **S045 — Close G2.** Store redacted receipts and negative-test evidence; block G3 while any OAuth, ETag, Gmail uncertainty, strict-output, secret, or fake-in-live risk is red.
+- [x] **S045 — Close G2.** Added the strict `g2-closure.v1` report, fixed sanitized evidence manifest, secret-redaction scan, and `verify:g2-closure` gate. All six OAuth/account-binding, Calendar ETag, Gmail uncertainty, strict-model-output, secret-redaction, and fake-provider-production risks are green in the selected `local_ollama`/`local_model` evidence class; a red risk produces a blocker and keeps G3 admission blocked. Evidence: [S045 G2 closure report](../artifacts/test-runs/2026-07-16-s045-g2-closure.md).
 
 #### Gate G2 acceptance
 
-- [ ] OAuth/account binding and refresh work in the deployed environment; all substitution/replay cases fail.
-- [ ] Calendar lookup/move/restore/conflict and rolling versions are proven on controlled events.
-- [ ] Gmail success and the complete ambiguous-delivery policy are proven without unsafe live ambiguity tests.
-- [ ] Strict model schemas and deterministic semantic rejection are proven with the explicitly selected real model runtime and honestly labeled evidence class.
-- [ ] Production cannot start with fake providers.
+- [x] OAuth/account binding and refresh work in the deployed environment; all substitution/replay cases fail. Evidence: S032/S033 negative and refresh-boundary tests plus S035 connected-account/preflight proof.
+- [x] Calendar lookup/move/restore/conflict and rolling versions are proven on controlled events. Evidence: S035/S036 and the S043 human conflict/move/restore receipt.
+- [x] Gmail success and the complete ambiguous-delivery policy are proven without unsafe live ambiguity tests. Evidence: S037 deterministic uncertainty matrix and S038 one-send/replay proof.
+- [x] Strict model schemas and deterministic semantic rejection are proven with the explicitly selected real model runtime and honestly labeled evidence class. Evidence: S041/S042 and S043 `local_ollama`/`local_model` proof.
+- [x] Production cannot start with fake providers. Evidence: S043/S044 fake-production checks and the S045 executable closure gate.
+
+G3 admission is now an executable invariant: `npm run verify:g2-closure` must return a passed `g2-closure.v1` report with `g3Admission: unlocked`. Any missing evidence marker or redaction finding returns a blocker and keeps G3 closed.
 
 ### G3 — Initial World PR, approval, and execution
 
