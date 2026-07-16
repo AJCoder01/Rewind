@@ -22,7 +22,8 @@ const oauthEvidence = [
   "artifacts/test-runs/2026-07-16-s033-oauth-negative.md",
 ];
 const providerEvidence = [...oauthEvidence, "artifacts/test-runs/2026-07-16-s034-provider-ports.md"];
-const calendarSetupEvidence = [...providerEvidence, "artifacts/test-runs/2026-07-16-s035-calendar-setup.md"];
+const calendarSetupEvidence = [...providerEvidence, "artifacts/test-runs/2026-07-16-s035-calendar-setup.md", "artifacts/test-runs/2026-07-16-s035-live-closure.md"];
+const calendarPrimitiveEvidence = [...calendarSetupEvidence, "artifacts/test-runs/2026-07-16-s036-calendar-primitives.md"];
 const initialFixtures: TraceabilityFixtureId[] = ["fixture-initial.v1", "controlled-content.v1", "artifact-independence.v1"];
 const intakeCode = ["app/page.tsx", "app/api/v1/world-prs/route.ts", "lib/services/world-pr.ts", "mcp/server.ts"];
 const intakeTests = ["tests/unit/world-pr.test.ts", "tests/unit/g1-routes-auth.test.ts", "tests/unit/g1-mcp.test.ts", "scripts/test-e2e.ts"];
@@ -104,8 +105,18 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   planned("FR-10", "FR", "Immutable initial approval record", ["S046", "S051"], "Approval persistence is intentionally deferred until execution work."),
   planned("FR-11", "FR", "Approval invalidation on drift", ["S051", "S054"], "Provider/version drift checks are future provider-boundary work."),
   planned("FR-12", "FR", "Durable unique action ledger", ["S046", "S052"], "The foundation migration reserves the table; execution rows are not yet created by the service."),
-  planned("FR-13", "FR", "Calendar pre-mutation validation", ["S036", "S054"], "Calendar adapter and ETag checks are not enabled."),
-  planned("FR-14", "FR", "Conditional narrow Calendar write", ["S036", "S054"], "Calendar provider execution is not enabled."),
+  current({
+    id: "FR-13", kind: "FR", title: "Calendar pre-mutation validation", planTasks: ["S036", "S054"],
+    codePaths: ["lib/domain/calendar-demo.ts", "lib/services/calendar-primitives.ts", "lib/google/calendar.ts"],
+    testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: calendarPrimitiveEvidence,
+    status: "partial", note: "S036 verifies controlled ownership/type/recurrence/tag/attendee/time/version preconditions and records stale conflicts; product approval-bound execution remains S054 work.",
+  }),
+  current({
+    id: "FR-14", kind: "FR", title: "Conditional narrow Calendar write", planTasks: ["S036", "S054"],
+    codePaths: ["lib/google/calendar.ts", "lib/services/calendar-primitives.ts", "lib/db/demo-event-state.ts"],
+    testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: calendarPrimitiveEvidence,
+    status: "partial", note: "S036 proves start/end-only, If-Match, sendUpdates=none, verified rolling versions, restore, and conflict/uncertain outcomes with deterministic fakes; product action-ledger integration and live spike remain S043/S054 work.",
+  }),
   planned("FR-15", "FR", "Allowlisted Gmail notification", ["S037", "S055"], "Gmail provider execution is not enabled."),
   current({
     id: "FR-16", kind: "FR", title: "Independent brief provenance and exact bytes", planTasks: ["S006", "S014", "S039", "S053"],

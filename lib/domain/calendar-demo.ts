@@ -194,23 +194,13 @@ function validateSnapshotForRegion(
   } catch {
     throw new CalendarDemoValidationError("invalid_provider_snapshot");
   }
+  validateControlledCalendarEventMetadata(snapshot, parsed, region);
   const expectedTimes = expectedStartEnd(parsed.demoDate, region);
-  const expectedAttendeeDigest = sha256Digest([parsed.recipients[region][0]]);
   if (
-    snapshot.calendarId !== parsed.calendarId ||
-    snapshot.title !== titleForRegion(region) ||
-    snapshot.company !== "Acme" ||
-    snapshot.region !== region ||
     snapshot.start.instant !== expectedTimes.start ||
     snapshot.start.timeZone !== DEMO_CALENDAR_TIME_ZONE ||
     snapshot.end.instant !== expectedTimes.end ||
-    snapshot.end.timeZone !== DEMO_CALENDAR_TIME_ZONE ||
-    snapshot.organizerDigest !== sha256Text(parsed.expectedEmail) ||
-    snapshot.attendeeSetDigest !== expectedAttendeeDigest ||
-    snapshot.eventType !== "default" ||
-    snapshot.recurringEventId !== null ||
-    snapshot.ownedByConnectedAccount !== true ||
-    canonicalJson(snapshot.privateTags) !== canonicalJson({ rewind_demo: DEMO_CALENDAR_TAG, region })
+    snapshot.end.timeZone !== DEMO_CALENDAR_TIME_ZONE
   ) {
     throw new CalendarDemoValidationError("candidate_mismatch");
   }
@@ -220,6 +210,41 @@ function validateSnapshotForRegion(
     expectedEtag: snapshot.etag,
     expectedUpdatedAt: Rfc3339Schema.parse(snapshot.providerUpdated),
   };
+}
+
+/**
+ * Validate the immutable controlled-event boundary without requiring the
+ * event to still be at its seeded time. Calendar move/restore operations use
+ * this check before and after a narrow start/end patch.
+ */
+export function validateControlledCalendarEventMetadata(
+  rawSnapshot: CalendarEventSnapshot,
+  configuration: CalendarDemoConfiguration,
+  region: "UK" | "US",
+): CalendarEventSnapshot {
+  const parsed = parseConfiguration(configuration);
+  let snapshot: CalendarEventSnapshot;
+  try {
+    snapshot = CalendarEventSnapshotSchema.parse(rawSnapshot);
+  } catch {
+    throw new CalendarDemoValidationError("invalid_provider_snapshot");
+  }
+  const expectedAttendeeDigest = sha256Digest([parsed.recipients[region][0]]);
+  if (
+    snapshot.calendarId !== parsed.calendarId ||
+    snapshot.title !== titleForRegion(region) ||
+    snapshot.company !== "Acme" ||
+    snapshot.region !== region ||
+    snapshot.organizerDigest !== sha256Text(parsed.expectedEmail) ||
+    snapshot.attendeeSetDigest !== expectedAttendeeDigest ||
+    snapshot.eventType !== "default" ||
+    snapshot.recurringEventId !== null ||
+    snapshot.ownedByConnectedAccount !== true ||
+    canonicalJson(snapshot.privateTags) !== canonicalJson({ rewind_demo: DEMO_CALENDAR_TAG, region })
+  ) {
+    throw new CalendarDemoValidationError("candidate_mismatch");
+  }
+  return snapshot;
 }
 
 export function validateControlledCalendarEvent(

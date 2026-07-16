@@ -495,7 +495,20 @@ The command must discover the configured tag before any create and must refuse a
 
 `seed:demo` and `preflight:demo` are interactive admin commands only. Their private TTY prompt repeats the exact configured Calendar ID and a unique run ID, which the operator must type in full; command results print only sanitized status/counts/fingerprints. They refresh the already stored account-bound Google credential and use that explicit calendar ID. A provider error, ambiguous create result, partial state, persistence failure, or baseline/version mismatch is an honest failure and is never hidden behind fake output or retried automatically. Automated tests use `FakeCalendarPort`; no live OAuth refresh, Calendar read, Calendar write, or external effect is implied by the command contract.
 
-### 3.19 Mutation response and error matrix
+### 3.19 Calendar move/restore primitive boundary
+
+S036 extends the protected `demo_event_state.last_receipt` contract with a typed Calendar operation record. Each `move` or `restore` record contains the operation/run ID, the complete typed `before` snapshot, the exact `desired` start/end/duration/time-zone/`sendUpdates: "none"` fields, and one of these outcomes:
+
+- `started`: persisted before the conditional provider write;
+- `succeeded`: persisted with the verified `after` snapshot and a `google_calendar` receipt containing the resulting ETag;
+- `conflict`: persisted for stale local state, provider `412`, or missing target, with no automatic rebase; or
+- `uncertain`: persisted for provider unavailability or failed post-write verification, with no automatic retry.
+
+The service refetches the configured event, rechecks calendar/event identity, ownership, default type, non-recurring status, exact tag, organizer digest, attendee-set digest, time zone, and rolling ETag/`updated` version before writing. Restore is accepted only when the current event still equals the last verified move `after` state. The provider call is always an `If-Match` start/end-only update with `sendUpdates: "none"`; a successful verified response atomically replaces the rolling expected ETag/`updated` value in the state store. The immutable semantic baseline is never changed. Conflict and uncertainty are durable stopping points, not success or retry signals.
+
+Automated proof uses `FakeCalendarPort` and verifies pre-write persistence, move/restore state transitions, duration/time-zone retention, static-field preservation, stale-state refusal, provider-conflict refusal, unavailable/uncertain handling, and no-rebase behavior. Product approval/action-ledger integration remains S046/S052 work.
+
+### 3.20 Mutation response and error matrix
 
 Every success/attention response includes `requestId`; task mutations use `TaskMutationResponse` unless a richer shape is shown above. A durable attention outcome is HTTP `200` because the request was recorded and needs operator action; request/precondition conflicts use `409`; validation/clarification uses `422`; auth uses `401/403`.
 
