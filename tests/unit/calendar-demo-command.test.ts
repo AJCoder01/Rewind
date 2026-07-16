@@ -4,6 +4,7 @@ import {
   DemoCommandGuardError,
   assertTtyGatedDemoEnvironment,
   calendarDemoConfigurationFromEnvironment,
+  confirmationPhrase,
   safeDemoCommandFailureCode,
   targetFingerprint,
 } from "@/lib/services/calendar-demo-command";
@@ -60,6 +61,15 @@ describe("TTY-gated Calendar command boundary", () => {
     const fingerprint = targetFingerprint("demo-calendar-2026", "postgresql://rewind_app:private@db.example.test:5432/rewind?sslmode=require&uselibpqcompat=true");
     expect(fingerprint).toMatch(/^sha256:[a-f0-9]{16}$/);
     expect(fingerprint).not.toContain("db.example");
+  });
+
+  it("binds the private TTY confirmation to the exact Calendar target and run ID", () => {
+    expect(confirmationPhrase("seed", "seed_123", "demo-calendar-2026")).toBe(
+      "CONFIRM SEED seed_123 CALENDAR demo-calendar-2026",
+    );
+    expect(() => confirmationPhrase("preflight", "preflight_123", "calendar\nother")).toThrowError(
+      new DemoCommandGuardError("calendar_target_missing"),
+    );
   });
 
   it("maps failures to safe codes without exposing error text", () => {

@@ -53,6 +53,29 @@ describe("Google Calendar wire adapter", () => {
     const url = new URL(String(request.input));
     expect(url.searchParams.get("privateExtendedProperty")).toBe("rewind_demo=acme-renewal");
     expect(url.searchParams.get("showDeleted")).toBe("false");
+    expect(url.searchParams.get("fields")).toContain("items(");
+    expect(url.searchParams.get("fields")).toContain("nextPageToken");
+  });
+
+  it("requests an Event projection, never a collection projection, for a single event", async () => {
+    let request: { input: RequestInfo | URL; init?: RequestInit } | undefined;
+    const calendar = new GoogleCalendarPort({
+      accessToken: "access-token-value",
+      calendarId,
+      expectedEmail: "owner@example.com",
+      fetchImpl: async (input, init) => {
+        request = { input, init };
+        return response(googleEvent("UK"));
+      },
+    });
+
+    await calendar.getControlledEvent({ calendarId, providerEventId: "google-event-uk" });
+
+    expect(request?.init?.method).toBe("GET");
+    const fields = new URL(String(request?.input)).searchParams.get("fields");
+    expect(fields).toContain("id");
+    expect(fields).not.toContain("items(");
+    expect(fields).not.toContain("nextPageToken");
   });
 
   it("creates with sendUpdates=none and only controlled fields", async () => {
@@ -80,6 +103,8 @@ describe("Google Calendar wire adapter", () => {
     expect(request?.init?.method).toBe("POST");
     const url = new URL(String(request?.input));
     expect(url.searchParams.get("sendUpdates")).toBe("none");
+    expect(url.searchParams.get("fields")).not.toContain("items(");
+    expect(url.searchParams.get("fields")).not.toContain("nextPageToken");
     expect(JSON.parse(String(request?.init?.body))).toEqual({
       summary: "Acme US renewal",
       start: { dateTime: "2026-08-20T15:00:00.000Z", timeZone: "America/New_York" },
@@ -130,6 +155,8 @@ describe("Google Calendar wire adapter", () => {
     });
     expect(request?.init?.method).toBe("PATCH");
     expect(new Headers(request?.init?.headers).get("if-match")).toBe('"etag-UK"');
+    expect(new URL(String(request?.input)).searchParams.get("fields")).not.toContain("items(");
+    expect(new URL(String(request?.input)).searchParams.get("fields")).not.toContain("nextPageToken");
     expect(JSON.parse(String(request?.init?.body))).toEqual({
       start: { dateTime: "2026-08-20T19:00:00.000Z", timeZone: "America/New_York" },
       end: { dateTime: "2026-08-20T19:30:00.000Z", timeZone: "America/New_York" },

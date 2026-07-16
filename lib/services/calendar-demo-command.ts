@@ -54,8 +54,17 @@ export function targetFingerprint(calendarId: string, databaseUrl: string): stri
   return sha256Text(`calendar\0${calendarId}\0database\0${databaseUrl}`).slice(0, 23);
 }
 
-export function confirmationPhrase(operation: "seed" | "preflight", runId: string): string {
-  return `CONFIRM ${operation.toUpperCase()} ${runId}`;
+/**
+ * The interactive phrase deliberately repeats the exact configured Calendar
+ * target. A fingerprint alone cannot let an operator confirm what a command
+ * is about to read or write. This string is used only in a private TTY prompt;
+ * command results and committed evidence remain redacted.
+ */
+export function confirmationPhrase(operation: "seed" | "preflight", runId: string, calendarId: string): string {
+  if (!calendarId || calendarId.trim() !== calendarId || /[\r\n]/.test(calendarId)) {
+    throw new DemoCommandGuardError("calendar_target_missing");
+  }
+  return `CONFIRM ${operation.toUpperCase()} ${runId} CALENDAR ${calendarId}`;
 }
 
 export function safeDemoCommandFailureCode(error: unknown): string {

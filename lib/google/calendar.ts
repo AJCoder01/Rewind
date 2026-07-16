@@ -54,10 +54,26 @@ type GoogleCalendarPortOptions = Readonly<{
   fetchImpl?: typeof fetch;
 }>;
 
-const CALENDAR_FIELDS = [
-  "items(id,summary,start(dateTime,timeZone),end(dateTime,timeZone),etag,updated,organizer(email),attendees(email),eventType,recurringEventId,recurrence,extendedProperties(private))",
-  "nextPageToken",
+// `events.list` returns a collection, while `events.get`, `insert`, and
+// `patch` each return an Event resource. Keep their partial-response
+// projections distinct: collection-only `items(...)` is invalid on an Event
+// resource and Google rejects it with HTTP 400.
+const CALENDAR_EVENT_FIELDS = [
+  "id",
+  "summary",
+  "start(dateTime,timeZone)",
+  "end(dateTime,timeZone)",
+  "etag",
+  "updated",
+  "organizer(email)",
+  "attendees(email)",
+  "eventType",
+  "recurringEventId",
+  "recurrence",
+  "extendedProperties(private)",
 ].join(",");
+
+const CALENDAR_LIST_FIELDS = `items(${CALENDAR_EVENT_FIELDS}),nextPageToken`;
 
 function copyHeaders(headers: HeadersInit | undefined, accessToken: string): Headers {
   const result = new Headers(headers);
@@ -169,7 +185,7 @@ export class GoogleCalendarPort implements CalendarPort {
       url.searchParams.set("privateExtendedProperty", `rewind_demo=${parsed.tag}`);
       url.searchParams.set("showDeleted", "false");
       url.searchParams.set("maxResults", "2500");
-      url.searchParams.set("fields", CALENDAR_FIELDS);
+      url.searchParams.set("fields", CALENDAR_LIST_FIELDS);
       if (pageToken) url.searchParams.set("pageToken", pageToken);
       const body = await this.requestJson(url, { method: "GET" });
       const response = GoogleEventListSchema.safeParse(body);
@@ -187,7 +203,7 @@ export class GoogleCalendarPort implements CalendarPort {
     const parsed = CalendarEventReferenceSchema.parse(input);
     assertConfiguredCalendar(parsed.calendarId, this.calendarId);
     const url = calendarUrl(this.calendarId, parsed.providerEventId);
-    url.searchParams.set("fields", CALENDAR_FIELDS.replace(",nextPageToken", ""));
+    url.searchParams.set("fields", CALENDAR_EVENT_FIELDS);
     const body = await this.requestJson(url, { method: "GET" });
     return mapGoogleEvent(body, this.expectedEmail, this.calendarId);
   }
@@ -197,7 +213,7 @@ export class GoogleCalendarPort implements CalendarPort {
     assertConfiguredCalendar(parsed.calendarId, this.calendarId);
     const url = calendarUrl(this.calendarId);
     url.searchParams.set("sendUpdates", parsed.sendUpdates);
-    url.searchParams.set("fields", CALENDAR_FIELDS.replace(",nextPageToken", ""));
+    url.searchParams.set("fields", CALENDAR_EVENT_FIELDS);
     const body = await this.requestJson(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -217,7 +233,7 @@ export class GoogleCalendarPort implements CalendarPort {
     assertConfiguredCalendar(parsed.calendarId, this.calendarId);
     const url = calendarUrl(this.calendarId, parsed.providerEventId);
     url.searchParams.set("sendUpdates", parsed.sendUpdates);
-    url.searchParams.set("fields", CALENDAR_FIELDS.replace(",nextPageToken", ""));
+    url.searchParams.set("fields", CALENDAR_EVENT_FIELDS);
     const body = await this.requestJson(url, {
       method: "PATCH",
       headers: {

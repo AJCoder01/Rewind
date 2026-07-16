@@ -31,12 +31,13 @@ async function main(): Promise<void> {
     const databaseUrl = requireDatabaseUrl("DATABASE_URL", { DATABASE_URL: environment.DATABASE_URL });
     const runId = createOpaqueId("seed_");
     const fingerprint = targetFingerprint(configuration.calendarId, databaseUrl);
+    const confirmation = confirmationPhrase("seed", runId, configuration.calendarId);
     const readline = createInterface({ input: process.stdin, output: process.stdout });
     const answer = await readline.question(
-      `S035 will seed exactly two controlled Calendar events for target fingerprint ${fingerprint}. Type "${confirmationPhrase("seed", runId)}" to continue: `,
+      `S035 will seed exactly two controlled Calendar events in Calendar ${configuration.calendarId} (target fingerprint ${fingerprint}). Type "${confirmation}" to continue: `,
     );
     readline.close();
-    if (answer.trim() !== confirmationPhrase("seed", runId)) {
+    if (answer.trim() !== confirmation) {
       process.stdout.write('{"status":"cancelled","operation":"seed"}\n');
       return;
     }

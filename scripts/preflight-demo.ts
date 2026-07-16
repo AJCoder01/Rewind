@@ -31,12 +31,13 @@ async function main(): Promise<void> {
     const databaseUrl = requireDatabaseUrl("DATABASE_URL", { DATABASE_URL: environment.DATABASE_URL });
     const runId = createOpaqueId("preflight_");
     const fingerprint = targetFingerprint(configuration.calendarId, databaseUrl);
+    const confirmation = confirmationPhrase("preflight", runId, configuration.calendarId);
     const readline = createInterface({ input: process.stdin, output: process.stdout });
     const answer = await readline.question(
-      `S035 will read the configured Calendar and protected baseline state for target fingerprint ${fingerprint}. Type "${confirmationPhrase("preflight", runId)}" to continue: `,
+      `S035 will read Calendar ${configuration.calendarId} and protected baseline state (target fingerprint ${fingerprint}). Type "${confirmation}" to continue: `,
     );
     readline.close();
-    if (answer.trim() !== confirmationPhrase("preflight", runId)) {
+    if (answer.trim() !== confirmation) {
       process.stdout.write('{"status":"cancelled","operation":"preflight"}\n');
       return;
     }
