@@ -66,6 +66,8 @@ S044 adds the authenticated `GET /api/v1/connection/status` read model and a das
 
 S045 closes the risk-gate bookkeeping without expanding the runtime effect surface. `buildG2ClosureReport` evaluates a versioned, redacted evidence manifest for OAuth/account binding, Calendar ETag/versioning, Gmail uncertainty, strict model output, secret redaction, and fake-provider production refusal. Its report is safe to persist or print, and `assertG3Admission` is the explicit fail-closed boundary future G3 services must satisfy before work begins. The verifier does not call providers or PostgreSQL and cannot turn fixture output into live evidence; the selected model evidence remains explicitly `local_model`.
 
+S047 adds the `candidate-resolution.v1` service boundary. It calls the typed Calendar list operation before planning, validates exactly the two configured Acme events and their ownership/attendee/time/tag invariants, maps their regions to the closed candidate IDs, ranks the earliest event deterministically (UK must win in the controlled scenario), and records US as the visible alternative. The rule port runs on that snapshot before the planning lock port; a clarification result owns no lock. A refresh creates a higher resolution version and never edits the prior snapshot; changed provider IDs, ETags, or times raise a stale-snapshot error that callers must supersede. Tests use only `FakeCalendarPort` and `MemoryPlanningLockPort`; no live provider call or effect is part of this task.
+
 ## 3. Intended source layout
 
 ```text

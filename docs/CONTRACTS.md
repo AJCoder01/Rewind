@@ -204,6 +204,8 @@ Response `201` (or identical replay response `200`):
 
 The request performs controlled candidate lookup and active-rule evaluation **before** attempting the effect-bearing scenario lock. If no rule matches, it atomically acquires the lock with a planning lease, runs model-backed proposal generation/validation, and creates the immutable plan synchronously. Reads may observe `analyzing`; a successful response is reviewable.
 
+`candidate-resolution.v1` is the server-owned candidate lookup boundary used before that lock claim. It contains exactly the two tagged Acme snapshots, fixed candidate IDs derived from the validated region, provider event IDs/ETags/start/end/attendee digests, deterministic ranking evidence, the UK selection, the US alternative, a provider-snapshot digest, and a resolution version. The resolver rejects duplicate/missing/wrong-date/unowned/recurring/malformed candidates and provider failures without creating a plan. A rule match returns the snapshotted choices with no lock; only a no-match result may proceed to the planning lease. Refreshes use a higher resolution/plan version and never mutate an approved snapshot; a changed provider digest is stale and must be superseded.
+
 ```json
 {
   "worldPrId": "wpr_01...",
