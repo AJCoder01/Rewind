@@ -12,6 +12,7 @@ const clientId = "123456789-rewind.apps.googleusercontent.com";
 const now = new Date("2026-07-16T01:02:03.000Z");
 const nowSeconds = Math.floor(now.getTime() / 1000);
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const { privateKey: forgedPrivateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const exportedJwk = publicKey.export({ format: "jwk" }) as { n: string; e: string };
 const jwk: GoogleJwk = {
   kty: "RSA",
@@ -29,6 +30,7 @@ function base64UrlJson(value: unknown): string {
 function makeIdToken(
   overrides: Record<string, unknown> = {},
   headerOverrides: Record<string, unknown> = {},
+  signingKey = privateKey,
 ): string {
   const header = { alg: "RS256", kid: jwk.kid, typ: "JWT", ...headerOverrides };
   const claims = {
@@ -48,7 +50,7 @@ function makeIdToken(
   const signer = createSign("RSA-SHA256");
   signer.update(signingInput, "ascii");
   signer.end();
-  return `${signingInput}.${signer.sign(privateKey).toString("base64url")}`;
+  return `${signingInput}.${signer.sign(signingKey).toString("base64url")}`;
 }
 
 function validationOptions() {
@@ -86,7 +88,7 @@ describe("Google signed identity validation", () => {
   });
 
   it("rejects a forged signature and non-RS256 algorithm", async () => {
-    const forged = makeIdToken({ email: "rewind-demo@example.test" }).slice(0, -2) + "aa";
+    const forged = makeIdToken({}, {}, forgedPrivateKey);
     await expect(verifyGoogleIdToken(forged, validationOptions())).rejects.toBeInstanceOf(GoogleIdentityValidationError);
     await expect(
       verifyGoogleIdToken(makeIdToken({}, { alg: "HS256" }), validationOptions()),
