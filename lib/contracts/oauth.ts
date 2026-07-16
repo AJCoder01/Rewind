@@ -19,6 +19,7 @@ export const GoogleOAuthCallbackQuerySchema = z
     authuser: z.string().regex(/^\d+$/).max(8).optional(),
     hd: z.string().min(1).max(255).optional(),
     prompt: z.string().min(1).max(100).optional(),
+    iss: z.union([z.literal("https://accounts.google.com"), z.literal("accounts.google.com")]).optional(),
   })
   .strict()
   .superRefine((value, context) => {
