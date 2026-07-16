@@ -13,12 +13,12 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Field | Value |
 |---|---|
 | Phase | G2 — OAuth, provider, and model risk retirement |
-| Implementation | G1 closed; S031–S042 provider/model safety boundaries complete; S043 controlled provider/model spikes are next |
+| Implementation | G1 closed; S031–S042 complete; S043 zero-cost local model proof passed and one human combined Calendar receipt remains |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-16 |
 
-The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. S031–S035 establish OAuth identity and controlled Calendar setup; S036 adds conditional Calendar primitives; S037 adds strict Gmail templates, allowlisting, marker-before-handoff persistence, closed provider outcomes, and no-redispatch replay; S038 proves one human-confirmed live Gmail success with no-redispatch replay; S039 binds the versioned parent-account source to exact independent artifact bytes; S040 adds the strict, redacted Responses transport boundary; and S041 closes initial, recovery, and prevention-rule outputs over supplied ID/template universes. Live model effects remain gated until S043. Verified locally with Node 24: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm audit --audit-level=moderate`, `npm run security:scan`, `npm run traceability:check`, and `npm run verify:fake-production`.
+The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. S031–S039 establish the controlled Google/provider and artifact boundaries. S040–S042 close strict model transport, schemas, and semantic validation. S043 retains the optional OpenAI Responses adapter and adds an explicitly labeled, loopback-only Ollama runtime so the real model proof can run without paid API balance; `qwen2.5-coder:latest` passed all three no-effect operations. Fixture output is still forbidden from masquerading as model evidence.
 
 S019–S027 extend this slice with session expiry, CSRF/origin and resource scope checks, transactional idempotency and planning leases, rule-first clarification, thin status/cancel routes, a read-only MCP status tool, safe loading/error/empty UI states, and a tested cancel/back flow. S038’s controlled Gmail proof recorded one real sent message and a no-redispatch replay. The fixture path remains visibly non-effecting and production rejects fake-provider mode.
 
@@ -98,7 +98,7 @@ Rewind/
 │   ├── contracts/          # Zod schemas and action-template registry
 │   ├── domain/             # State machine and invariants
 │   ├── services/           # Application use cases
-│   ├── ai/                 # Versioned prompts and Responses API calls
+│   ├── ai/                 # Versioned prompts and strict model-runtime calls
 │   ├── adapters/           # Explicit Calendar, Gmail, artifact operations
 │   ├── db/                 # PostgreSQL access and migrations
 │   └── auth/               # Dashboard session and MCP authentication
@@ -140,14 +140,14 @@ Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot
 - Next.js, React, TypeScript, Tailwind CSS, and restrained Framer Motion
 - Next.js route handlers and PostgreSQL from the foundation phase
 - Zod as the shared validation layer
-- OpenAI Responses API with strict Structured Outputs and a model selected through `OPENAI_MODEL`
-- `gpt-5.6-sol` as the initial model candidate, subject to the provider/model risk-gate access and schema smoke test
+- One explicitly selected real model runtime: OpenAI Responses strict Structured Outputs, or zero-cost local Ollama native structured output
+- `qwen2.5-coder:latest` as the verified local default; local receipts are labeled `local_model`, and `:cloud` models are rejected
 - Google Calendar API with `calendar.events.owned`
 - Gmail API with `gmail.send`; no mailbox reading
 - Official TypeScript MCP SDK with one primary tool: `create_world_pr`
 - Vitest, React Testing Library where useful, and mandatory Playwright coverage of the critical flow
 
-Current OpenAI documentation lists GPT-5.6 Sol as supporting the Responses API and Structured Outputs. The model name remains configuration, not a hard-coded product invariant. See [OpenAI models](https://developers.openai.com/api/docs/models), [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), and [text generation guidance](https://developers.openai.com/api/docs/guides/text?api-mode=responses).
+The OpenAI adapter remains available when funded. The zero-spend demo uses Ollama on loopback with the same strict runtime schemas and semantic validators. See [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) and [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs).
 
 ## PostgreSQL foundation
 

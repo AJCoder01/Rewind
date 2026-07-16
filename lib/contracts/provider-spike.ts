@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { CALENDAR_DEMO_CONTRACT_VERSION } from "@/lib/contracts/calendar-demo";
 
-export const PROVIDER_SPIKE_CONTRACT_VERSION = "provider-spike.v1" as const;
+export const PROVIDER_SPIKE_CONTRACT_VERSION = "provider-spike.v2" as const;
 
 const FingerprintSchema = z.string().regex(/^sha256:[a-f0-9]{16}$/, "Fingerprints must be redacted SHA-256 prefixes");
 
@@ -26,10 +26,11 @@ const ModelOperationSummarySchema = z
   .object({
     operation: z.enum(["initial", "recovery", "prevention_rule"]),
     status: z.literal("validated"),
+    provider: z.enum(["openai", "ollama"]),
     schemaVersion: z.string().min(1).max(100),
     attempts: z.number().int().min(1).max(2),
     model: z.string().min(1).max(200),
-    responseIdFingerprint: FingerprintSchema,
+    receiptFingerprint: FingerprintSchema,
   })
   .strict();
 
@@ -45,6 +46,39 @@ const PreventionOperationSummarySchema = ModelOperationSummarySchema.extend({
   operation: z.literal("prevention_rule"),
   schemaVersion: z.literal("prevention-rule-proposal.v1"),
 });
+
+export const ProviderSpikeModelEvidenceSchema = z
+  .object({
+    runtime: z.enum(["openai_responses", "local_ollama"]),
+    evidenceClass: z.enum(["external_openai", "local_model"]),
+    operations: z.tuple([InitialOperationSummarySchema, RecoveryOperationSummarySchema, PreventionOperationSummarySchema]),
+  })
+  .strict()
+  .superRefine((model, context) => {
+    const expected = model.runtime === "openai_responses"
+      ? { evidenceClass: "external_openai", provider: "openai" }
+      : { evidenceClass: "local_model", provider: "ollama" };
+    if (model.evidenceClass !== expected.evidenceClass) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["evidenceClass"], message: "Evidence class must match model runtime" });
+    }
+    model.operations.forEach((operation, index) => {
+      if (operation.provider !== expected.provider) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["operations", index, "provider"], message: "Operation provider must match model runtime" });
+      }
+    });
+  });
+
+export const LOCAL_MODEL_SPIKE_CONTRACT_VERSION = "local-model-spike.v1" as const;
+
+export const LocalModelSpikeReportSchema = z
+  .object({
+    status: z.literal("ok"),
+    operation: z.literal("local_model_spike"),
+    contractVersion: z.literal(LOCAL_MODEL_SPIKE_CONTRACT_VERSION),
+    model: ProviderSpikeModelEvidenceSchema.refine((value) => value.runtime === "local_ollama", "Local proof requires Ollama"),
+    externalEffects: z.literal(false),
+  })
+  .strict();
 
 export const ProviderSpikeReportSchema = z
   .object({
@@ -66,11 +100,7 @@ export const ProviderSpikeReportSchema = z
           .strict(),
       })
       .strict(),
-    model: z
-      .object({
-        operations: z.tuple([InitialOperationSummarySchema, RecoveryOperationSummarySchema, PreventionOperationSummarySchema]),
-      })
-      .strict(),
+    model: ProviderSpikeModelEvidenceSchema,
     productExecution: z.literal("disabled"),
     productReset: z.literal("disabled"),
     externalEffects: z.literal("calendar_move_restore_only"),

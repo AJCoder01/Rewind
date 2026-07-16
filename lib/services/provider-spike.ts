@@ -15,6 +15,7 @@ import { EnvironmentConfigError } from "@/lib/config/environment";
 import { CalendarProviderError } from "@/lib/adapters/calendar";
 import { sha256Text } from "@/lib/domain/digest";
 import { OpenAIResponsesError } from "@/lib/ai/openai-responses";
+import { OllamaChatError, OllamaChatRequestSchema } from "@/lib/ai/ollama-chat";
 import { ModelSafetyError } from "@/lib/ai/model-safety";
 import { GoogleOAuthProviderError } from "@/lib/google/oauth";
 
@@ -27,7 +28,12 @@ export type ProviderSpikeFailureKind =
   | "credential_unavailable"
   | "calendar_configuration_invalid"
   | "calendar_unexpected_receipt"
+  | "model_runtime_invalid"
   | "model_metadata_incomplete";
+
+export type ProviderSpikeModelRuntime =
+  | Readonly<{ runtime: "openai_responses"; evidenceClass: "external_openai"; provider: "openai"; model: string }>
+  | Readonly<{ runtime: "local_ollama"; evidenceClass: "local_model"; provider: "ollama"; model: string }>;
 
 export class ProviderSpikeGuardError extends Error {
   readonly kind: ProviderSpikeGuardKind;
@@ -59,15 +65,39 @@ export function assertProviderSpikeExecutionDisabled(environment: Readonly<Recor
   }
 }
 
-export function providerSpikeTargetFingerprint(calendarId: string, databaseUrl: string): string {
-  return sha256Text(`provider-spike\0${calendarId}\0database\0${databaseUrl}`).slice(0, 23);
+export function providerSpikeModelRuntime(
+  environment: Readonly<Record<string, string | undefined>>,
+  openAiModel: string,
+): ProviderSpikeModelRuntime {
+  const runtime = environment.REWIND_S043_MODEL_RUNTIME ?? "openai_responses";
+  if (runtime === "openai_responses") {
+    if (!openAiModel) throw new ProviderSpikeFailureError("model_runtime_invalid");
+    return { runtime, evidenceClass: "external_openai", provider: "openai", model: openAiModel };
+  }
+  if (runtime !== "local_ollama") throw new ProviderSpikeFailureError("model_runtime_invalid");
+  const model = environment.REWIND_LOCAL_MODEL ?? "qwen2.5-coder:latest";
+  const parsed = OllamaChatRequestSchema.shape.model.safeParse(model);
+  if (!parsed.success) throw new ProviderSpikeFailureError("model_runtime_invalid");
+  return { runtime, evidenceClass: "local_model", provider: "ollama", model: parsed.data };
 }
 
-export function providerSpikeConfirmationPhrase(runId: string, calendarId: string): string {
-  if (!runId || !calendarId || /[\r\n]/.test(runId) || /[\r\n]/.test(calendarId)) {
+export function providerSpikeTargetFingerprint(
+  calendarId: string,
+  databaseUrl: string,
+  modelRuntime: ProviderSpikeModelRuntime,
+): string {
+  return sha256Text(`provider-spike\0${calendarId}\0database\0${databaseUrl}\0${modelRuntime.runtime}\0${modelRuntime.model}`).slice(0, 23);
+}
+
+export function providerSpikeConfirmationPhrase(
+  runId: string,
+  calendarId: string,
+  modelRuntime: ProviderSpikeModelRuntime,
+): string {
+  if (!runId || !calendarId || /[\r\n]/.test(runId) || /[\r\n]/.test(calendarId) || /[\r\n]/.test(modelRuntime.model)) {
     throw new ProviderSpikeGuardError("live_flag_required");
   }
-  return `CONFIRM PROVIDER SPIKE ${runId} CALENDAR ${calendarId}`;
+  return `CONFIRM PROVIDER SPIKE ${runId} CALENDAR ${calendarId} MODEL ${modelRuntime.runtime.toUpperCase()} ${modelRuntime.model}`;
 }
 
 export function safeProviderSpikeFailureCode(error: unknown): string {
@@ -80,6 +110,7 @@ export function safeProviderSpikeFailureCode(error: unknown): string {
   if (error instanceof CalendarProviderError) return "provider_unavailable";
   if (error instanceof GoogleOAuthProviderError) return `oauth_${error.reason}`;
   if (error instanceof OpenAIResponsesError) return `openai_${error.kind}`;
+  if (error instanceof OllamaChatError) return `ollama_${error.kind}`;
   if (error instanceof ModelSafetyError) return `model_${error.operation}_${error.kind}`;
   if (error instanceof EnvironmentConfigError) return "invalid_environment";
   return "failed_safely";

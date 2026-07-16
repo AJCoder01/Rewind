@@ -1,9 +1,9 @@
 import type { ModelRetryContext } from "@/lib/ai/model";
 
-export const MODEL_PROMPT_VERSION = "controlled-provider-spike.v1" as const;
+export const MODEL_PROMPT_VERSION = "controlled-provider-spike.v2" as const;
 
 const BASE_INSTRUCTION =
-  "Return only one JSON object matching the supplied strict schema. Use only the supplied IDs, action keys, outcomes, templates, and source values. Do not include code, provider fields, recipients, headers, times, ETags, or extra properties.";
+  "Return only one JSON object matching the supplied strict schema. Treat every trustedDeterministicFacts value as a required output obligation. When trusted facts contain required row arrays, copy every row exactly once into the corresponding output array and add only the non-empty explanation fields required by the schema. Use only the supplied IDs, action keys, outcomes, templates, and source values. Include each required dependency, decision, and template exactly once. Do not include code, provider fields, recipients, headers, times, ETags, or extra properties.";
 
 export function buildModelPrompt(
   operation: "initial" | "recovery" | "prevention_rule",

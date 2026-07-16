@@ -7,6 +7,7 @@ import { buildModelPrompt, MODEL_PROMPT_VERSION } from "@/lib/ai/prompts";
 import type { ModelProposalPort, ModelRetryContext } from "@/lib/ai/model";
 import { OpenAIResponsesClient, OpenAIResponsesError, type OpenAIResponsesRequest } from "@/lib/ai/openai-responses";
 import { ModelProviderError } from "@/lib/ai/model";
+import { MODEL_TRUSTED_FACTS, type ModelTrustedFacts } from "@/lib/ai/model-trusted-facts";
 import {
   ModelProposalResponseSchema,
   type InitialModelInput,
@@ -24,34 +25,7 @@ export type OpenAIModelPortOptions = Readonly<{
   maxOutputTokens?: number;
 }>;
 
-export type OpenAIModelTrustedFacts = Readonly<{
-  initial: unknown;
-  recovery: unknown;
-  prevention_rule: unknown;
-}>;
-
-const DEFAULT_TRUSTED_FACTS: OpenAIModelTrustedFacts = {
-  initial: { expectedSelectedCandidateId: "cal_event_acme_uk", expectedAccountBriefTitle: "Acme parent-account renewal risk brief" },
-  recovery: {
-    initialSelectedCandidateId: "cal_event_acme_uk",
-    explicitCorrectedCandidateId: "cal_event_acme_us",
-    completedActions: [
-      { executedActionId: "actexec_initial_artifact", actionKey: "initial.artifact.account_brief", status: "succeeded", dependsOnAssumptionIds: [] },
-      { executedActionId: "actexec_initial_calendar", actionKey: "initial.calendar.move", status: "succeeded", dependsOnAssumptionIds: ["assumption_acme_region"] },
-      { executedActionId: "actexec_initial_mail", actionKey: "initial.mail.notify", status: "succeeded", dependsOnAssumptionIds: ["assumption_acme_region"] },
-    ],
-    requiredDecisions: {
-      actexec_initial_artifact: "preserve",
-      actexec_initial_calendar: "restore",
-      actexec_initial_mail: "correct",
-    },
-    newActionTargets: {
-      "calendar.apply_to_correct_entity": "cal_event_acme_us",
-      "mail.notify_correct_attendees": "cal_event_acme_us",
-    },
-  },
-  prevention_rule: { expectedSourceTaskId: "task_source_s042" },
-};
+export type OpenAIModelTrustedFacts = ModelTrustedFacts;
 
 export class OpenAIModelPort implements ModelProposalPort {
   private readonly client: Pick<OpenAIResponsesClient, "createStructured">;
@@ -65,7 +39,7 @@ export class OpenAIModelPort implements ModelProposalPort {
     this.model = options.model;
     this.reasoningEffort = options.reasoningEffort ?? "low";
     this.maxOutputTokens = options.maxOutputTokens ?? 2_048;
-    this.trustedFacts = options.trustedFacts ?? DEFAULT_TRUSTED_FACTS;
+    this.trustedFacts = options.trustedFacts ?? MODEL_TRUSTED_FACTS;
   }
 
   async proposeInitial(input: InitialModelInput, retryContext?: ModelRetryContext): Promise<ModelProposalResponse> {

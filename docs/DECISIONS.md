@@ -49,6 +49,7 @@ This file records why a decision was made and which choices remain open. Accepte
 | ADR-028 | Keep Calendar setup live-only, TTY-gated, and baseline-first | Accepted |
 | ADR-029 | Isolate S043 provider/model spikes from product execution/reset | Accepted |
 | ADR-030 | Use one model retry budget and sanitized transport categories | Accepted |
+| ADR-031 | Permit an explicitly labeled local Ollama model runtime | Accepted |
 
 ## Accepted decisions
 
@@ -278,11 +279,11 @@ This file records why a decision was made and which choices remain open. Accepte
 
 ### ADR-029 — Isolate S043 provider/model spikes from product execution/reset
 
-**Decision:** S043 uses a separate TTY/live-flagged command and `provider-spike.v1` report. It calls the low-level Calendar and model ports directly under the narrow setup/live-spike exception; it does not expose or invoke product approval, execution, recovery, reset, lock, artifact, or rule paths. The controlled Calendar proof performs one deliberately stale US precondition request plus one reversible UK move/restore, while the model proof uses synthetic closed-universe fixtures.
+**Decision:** S043 uses a separate TTY/live-flagged command and versioned redacted report. `provider-spike.v2` binds either external OpenAI or local Ollama evidence explicitly. It calls the low-level Calendar and selected real model ports directly under the narrow setup/live-spike exception; it does not expose or invoke product approval, execution, recovery, reset, lock, artifact, or rule paths. The controlled Calendar proof performs one deliberately stale US precondition request plus one reversible UK move/restore, while the model proof uses synthetic closed-universe inputs.
 
 **Why:** G2 must retire OAuth, ETag, provider receipt, and strict-output risk before G3 product execution exists. Combining this risk probe with a partially implemented product saga would make live success ambiguous and could turn a spike into an unapproved external action.
 
-**Consequence:** S043 can prove real provider behavior with honest, redacted receipts while product execution and reset remain disabled. Existing S035 OAuth/lookup and S038 Gmail/replay evidence are reused, avoiding duplicate live mail.
+**Consequence:** S043 can prove real selected-model and Calendar behavior with honest, redacted runtime/evidence labels while product execution and reset remain disabled. Existing S035 OAuth/lookup and S038 Gmail/replay evidence are reused, avoiding duplicate live mail.
 
 ### ADR-030 — Use one model retry budget and sanitized transport categories
 
@@ -291,6 +292,14 @@ This file records why a decision was made and which choices remain open. Accepte
 **Why:** The first S043 live attempts collapsed every non-success into `unavailable` and combined two retry layers into as many as four HTTP requests. They also performed reversible Calendar work before discovering model failure. That obscured the external prerequisite, violated the intended attempt ceiling, and repeated avoidable live effects.
 
 **Consequence:** A future failure safely distinguishes configuration/permission, rate-limit, timeout, transient provider, refusal/truncation, and malformed-output classes. No secret or provider diagnostic body enters output, and a model failure causes zero Calendar writes.
+
+### ADR-031 — Permit an explicitly labeled local Ollama model runtime
+
+**Decision:** Rewind may select `local_ollama` explicitly for S043 and the hackathon demo when paid OpenAI API balance is unavailable. The adapter is fixed to loopback, rejects `:cloud` models, sends no credential, uses temperature zero and native JSON Schema output, then applies the complete S041 runtime schema and S042 semantic validators with the same two-attempt ceiling. `provider-spike.v2` labels the runtime, provider, and `local_model` evidence class; fixture metadata remains forbidden. OpenAI Responses remains implemented and selectable but is not required for the zero-spend demo.
+
+**Why:** The configured OpenAI project returned HTTP 429 because its API credit balance is zero and the user explicitly declined paid API usage. ChatGPT/Codex product credits do not fund Platform API calls. A real local model preserves model-generated, schema-constrained reasoning without concealing the failed external integration or inventing a mock success.
+
+**Consequence:** The demo can run without model-provider spend on hardware with Ollama and the approved local model installed. Judges and evidence can distinguish local inference from external OpenAI proof. The local runtime does not expand executable effects: deterministic ranking, recipients, templates, provider calls, approvals, and Calendar/Gmail safety remain server-owned.
 
 ## Rejected alternatives
 
@@ -326,7 +335,7 @@ Resolve these by the gate shown. Record the answer, date, and evidence here; upd
 | OPEN-007 | External/Testing OAuth audience with only the selected demo identity as test user; reauthorize within 24 hours of final recording | Complete | Resolved 2026-07-14; conservative path for the selected identity |
 | OPEN-008 | One team-controlled UK inbox and one team-controlled US inbox; literal addresses stay only in the structured deployment secret and are reconfirmed before live send | Complete | Resolved 2026-07-14; live inbox-control proof remains a G2 preflight |
 | OPEN-009 | `DEMO_DATE=2026-08-20`; UK 10:00–10:30 ET, US 11:00–11:30 ET, target 15:00–15:30 ET | Complete | Resolved 2026-07-14; fixture and runbook use the same date/baselines |
-| OPEN-010 | Verify configured OpenAI model access and strict output; choose the lowest reasoning effort that passes evaluation | G2 | Open; scheduled by `S011` and `S040`–`S045` |
+| OPEN-010 | Verify the selected real model runtime and strict output; keep provider/evidence class explicit | Complete | Resolved 2026-07-16 by ADR-031 and the zero-cost local strict-output proof; combined S043 Calendar receipt remains |
 | OPEN-011 | Freeze the exact short company-wide synthetic account-note fixture with no regional input | Complete | Resolved 2026-07-15; `controlled-content.v1`, `lib/domain/account-brief.ts`, and [S014 inventory](CONTROLLED_CONTENT_UI_INVENTORY.md) |
 | OPEN-012 | Use one canonical sequential implementation queue with no person-specific task lanes | Complete | Superseded 2026-07-14; `IMPLEMENTATION_PLAN.md` now owns `S001`–`S103` in order |
 | OPEN-013 | Sanitized Markdown in `artifacts/test-runs/`; raw logs/screenshots ignored; private provider receipts remain outside Git | Complete | Resolved 2026-07-14; tracked evidence index and `.gitignore` policy |

@@ -23,7 +23,7 @@ This file constrains every architecture, UI, and demo decision. A faster or pret
 9. Partial and uncertain outcomes remain visible. A success state requires a persisted successful outcome for every approved action.
 10. Reset never claims to delete, unsend, or restore recipient inboxes.
 11. No production customer data, public mailbox content, uncontrolled recipient, or changing third-party data enters the demo.
-12. No failed live integration is covered by a mock success state.
+12. No failed live integration is covered by a mock success state. A real local model may replace a paid model runtime only when its receipt is explicitly labeled `local_model` and never represented as OpenAI evidence.
 
 ## 2. Approval policy
 
@@ -176,7 +176,7 @@ The application does not have read/compose/modify scopes and therefore cannot po
 
 ## 8. AI safety boundary
 
-- Use the OpenAI Responses API with strict Structured Outputs and `store: false`.
+- Use one explicitly selected real model runtime: OpenAI Responses with strict Structured Outputs and `store: false`, or local-only Ollama native structured output bound to `127.0.0.1`. Local mode rejects cloud-tagged models and must be labeled `local_model`; fixture output remains forbidden for recorded reasoning.
 - Supply synthetic aliases/digests instead of raw attendee addresses and avoid unnecessary mail bodies/provider metadata in prompts.
 - Separate trusted instructions from untrusted task, correction, and provider strings.
 - Candidate titles/descriptions are data, never instructions. The controlled seeder must avoid adversarial content; evals still include prompt-injection-like fixtures.
@@ -184,10 +184,10 @@ The application does not have read/compose/modify scopes and therefore cannot po
 - Deterministic code checks the provider-grounded initial rank, complete dependency graph, artifact source/output independence, every recovery decision, typed rule bounds, and all exact effects.
 - A refusal, truncation, absent parsed output, schema error, unknown ID, or semantic incompatibility is a failed planning attempt.
 - Retry once with structured validation errors; after that, fail visibly and execute nothing.
-- Record model, prompt version, schema version, reasoning configuration, and response ID where available.
+- Record provider/runtime, evidence class, model, prompt version, schema version, reasoning configuration, and a response/receipt fingerprint where available.
 - Never store chain-of-thought or request it in product logs.
 
-`store: false` avoids optional Responses application-state storage, but it does not promise zero provider retention; default API abuse-monitoring logs may be retained under OpenAI's current data controls. Use synthetic demo data and review [OpenAI API data controls](https://platform.openai.com/docs/models/default-usage-policies-by-endpoint).
+`store: false` avoids optional Responses application-state storage, but it does not promise zero provider retention; default API abuse-monitoring logs may be retained under OpenAI's current data controls. Local Ollama mode sends the synthetic prompt only to the fixed loopback endpoint and must not select `:cloud` models. In either mode, use synthetic demo data. Review [OpenAI API data controls](https://platform.openai.com/docs/models/default-usage-policies-by-endpoint) and [Ollama structured outputs](https://docs.ollama.com/capabilities/structured-outputs).
 
 ## 9. Data inventory and minimization
 

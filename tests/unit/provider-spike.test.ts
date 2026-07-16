@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import { FakeCalendarPort } from "@/lib/adapters/calendar";
 import { sha256Text } from "@/lib/domain/digest";
 import { MemoryDemoEventStateStore } from "@/lib/db/demo-event-state";
-import { ProviderSpikeReportSchema } from "@/lib/contracts/provider-spike";
+import { LocalModelSpikeReportSchema, ProviderSpikeReportSchema } from "@/lib/contracts/provider-spike";
 import { seedControlledCalendar } from "@/lib/services/calendar-demo";
 import {
   assertProviderSpikeExecutionDisabled,
   ProviderSpikeGuardError,
   ProviderSpikeFailureError,
   providerSpikeConfirmationPhrase,
+  providerSpikeModelRuntime,
   runControlledCalendarProviderSpike,
   runControlledProviderModelSpikePhases,
   safeProviderSpikeFailureCode,
@@ -68,16 +69,36 @@ describe("controlled provider spike boundary", () => {
   });
 
   it("keeps the exact target only in the private confirmation phrase", () => {
-    expect(providerSpikeConfirmationPhrase("run-spike-001", "calendar-123")).toBe(
-      "CONFIRM PROVIDER SPIKE run-spike-001 CALENDAR calendar-123",
+    const runtime = providerSpikeModelRuntime({ REWIND_S043_MODEL_RUNTIME: "local_ollama", REWIND_LOCAL_MODEL: "gemma3:4b" }, "unused");
+    expect(providerSpikeConfirmationPhrase("run-spike-001", "calendar-123", runtime)).toBe(
+      "CONFIRM PROVIDER SPIKE run-spike-001 CALENDAR calendar-123 MODEL LOCAL_OLLAMA gemma3:4b",
     );
+  });
+
+  it("selects only explicit loopback Ollama or configured OpenAI model runtimes", () => {
+    expect(providerSpikeModelRuntime({}, "gpt-test")).toEqual({
+      runtime: "openai_responses",
+      evidenceClass: "external_openai",
+      provider: "openai",
+      model: "gpt-test",
+    });
+    expect(providerSpikeModelRuntime({ REWIND_S043_MODEL_RUNTIME: "local_ollama" }, "unused")).toEqual({
+      runtime: "local_ollama",
+      evidenceClass: "local_model",
+      provider: "ollama",
+      model: "qwen2.5-coder:latest",
+    });
+    expect(() => providerSpikeModelRuntime({ REWIND_S043_MODEL_RUNTIME: "local_ollama", REWIND_LOCAL_MODEL: "remote:cloud" }, "unused")).toThrowError(
+      ProviderSpikeFailureError,
+    );
+    expect(() => providerSpikeModelRuntime({ REWIND_S043_MODEL_RUNTIME: "unknown" }, "unused")).toThrowError(ProviderSpikeFailureError);
   });
 
   it("accepts only the redacted report shape and fixed operation schema versions", () => {
     const report = {
       status: "ok",
       operation: "provider_model_spikes",
-      contractVersion: "provider-spike.v1",
+      contractVersion: "provider-spike.v2",
       calendar: {
         preflightBefore: { status: "ok", contractVersion: "calendar-demo.v1", candidateCount: 2, baselineCount: 2, expectedVersionCount: 2 },
         staleConflict: { status: "conflict", reason: "provider_conflict" },
@@ -87,10 +108,12 @@ describe("controlled provider spike boundary", () => {
         partialReceiptStatuses: { uk: ["succeeded", "succeeded"], us: ["conflict"] },
       },
       model: {
+        runtime: "local_ollama",
+        evidenceClass: "local_model",
         operations: [
-          { operation: "initial", status: "validated", schemaVersion: "initial-reasoning.v1", attempts: 1, model: "test-model", responseIdFingerprint: "sha256:0000000000000000" },
-          { operation: "recovery", status: "validated", schemaVersion: "recovery-proposal.v1", attempts: 1, model: "test-model", responseIdFingerprint: "sha256:1111111111111111" },
-          { operation: "prevention_rule", status: "validated", schemaVersion: "prevention-rule-proposal.v1", attempts: 1, model: "test-model", responseIdFingerprint: "sha256:2222222222222222" },
+          { operation: "initial", status: "validated", provider: "ollama", schemaVersion: "initial-reasoning.v1", attempts: 1, model: "test-model", receiptFingerprint: "sha256:0000000000000000" },
+          { operation: "recovery", status: "validated", provider: "ollama", schemaVersion: "recovery-proposal.v1", attempts: 1, model: "test-model", receiptFingerprint: "sha256:1111111111111111" },
+          { operation: "prevention_rule", status: "validated", provider: "ollama", schemaVersion: "prevention-rule-proposal.v1", attempts: 1, model: "test-model", receiptFingerprint: "sha256:2222222222222222" },
         ],
       },
       productExecution: "disabled",
@@ -98,7 +121,23 @@ describe("controlled provider spike boundary", () => {
       externalEffects: "calendar_move_restore_only",
     } as const;
     expect(ProviderSpikeReportSchema.parse(report)).toEqual(report);
+    expect(LocalModelSpikeReportSchema.safeParse({
+      status: "ok",
+      operation: "local_model_spike",
+      contractVersion: "local-model-spike.v1",
+      model: report.model,
+      externalEffects: false,
+    }).success).toBe(true);
+    expect(ProviderSpikeReportSchema.safeParse({
+      ...report,
+      model: {
+        runtime: "openai_responses",
+        evidenceClass: "external_openai",
+        operations: report.model.operations.map((operation) => ({ ...operation, provider: "openai" })),
+      },
+    }).success).toBe(true);
     expect(ProviderSpikeReportSchema.safeParse({ ...report, model: { operations: report.model.operations.map((item, index) => index === 0 ? { ...item, schemaVersion: "recovery-proposal.v1" } : item) } }).success).toBe(false);
+    expect(ProviderSpikeReportSchema.safeParse({ ...report, model: { ...report.model, evidenceClass: "external_openai" } }).success).toBe(false);
     expect(ProviderSpikeReportSchema.safeParse({ ...report, rawProviderResponse: "forbidden" }).success).toBe(false);
   });
 

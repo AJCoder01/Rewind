@@ -18,7 +18,7 @@ describe("OpenAI model proposal adapter", () => {
           metadata: {
             provider: "openai",
             model: "test-model",
-            promptVersion: "controlled-provider-spike.v1",
+            promptVersion: "controlled-provider-spike.v2",
             schemaVersion: "initial-reasoning.v1",
             reasoningEffort: "low",
             responseId: "resp_test_123",
@@ -38,7 +38,7 @@ describe("OpenAI model proposal adapter", () => {
       expect.objectContaining({ role: "user" }),
     ]));
     expect(request?.jsonSchema).toMatchObject({ type: "object", additionalProperties: false });
-    expect(request?.promptVersion).toBe("controlled-provider-spike.v1");
+    expect(request?.promptVersion).toBe("controlled-provider-spike.v2");
     expect(attemptOptions).toEqual({ maxAttempts: 1 });
     expect(JSON.stringify(request)).not.toContain("owner@example.com");
   });

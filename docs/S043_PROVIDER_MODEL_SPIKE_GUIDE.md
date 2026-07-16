@@ -5,22 +5,31 @@ This is the human-only checkpoint for S043. It runs the low-level Calendar provi
 ## Before running
 
 - Use the `codex/s043-provider-model-spikes` branch in the Rewind workspace.
-- Keep the private `.env.local` unchanged. It must already contain the connected, expected Google identity, explicit demo Calendar ID, PostgreSQL runtime URL, recipient allowlist, and configured OpenAI project key/model.
+- Keep the private `.env.local` credentials unchanged. It must already contain the connected, expected Google identity, explicit demo Calendar ID, PostgreSQL runtime URL, and recipient allowlist. The existing OpenAI fields remain part of the application contract but are not called in explicit local mode.
+- Install and start Ollama locally. `qwen2.5-coder:latest` is the verified default local model. Confirm it appears in `ollama list`; do not select any model ending in `:cloud`.
 - Run `npm run db:verify` first. Do not paste its connection details or any environment values into chat.
 - Confirm the two S035 controlled events are already seeded and the S035 preflight is recorded. Do not run `seed:demo` again.
 - Do not enable `REWIND_PRODUCT_EXECUTION_ENABLED` or `REWIND_PRODUCT_RESET_ENABLED`. Do not run `reset:demo` or any product execution action during this checkpoint.
 
-No new credentials, OAuth consent, Google Cloud console change, OpenAI project change, database migration, or deployment is required. The existing private OAuth credential is refreshed by the command; its access token is never printed or persisted.
+No new credential, OAuth consent, Google Cloud/OpenAI console change, database migration, deployment, or paid API balance is required. Local model prompts stay on `127.0.0.1`; the existing private Google OAuth credential is refreshed only after the local model phase succeeds.
+
+First run the no-effect local proof:
+
+```text
+npm run prove:model-local
+```
+
+It must return `status: ok`, `operation: local_model_spike`, `runtime: local_ollama`, `evidenceClass: local_model`, and `externalEffects: false`. This is real local inference, not fixture output and not OpenAI evidence.
 
 ## Run the Calendar and model spike
 
 In a normal interactive terminal at the repository root, run:
 
 ```text
-LIVE_INTEGRATION_TESTS=1 npm run prove:provider-spikes
+REWIND_S043_MODEL_RUNTIME=local_ollama LIVE_INTEGRATION_TESTS=1 npm run prove:provider-spikes
 ```
 
-The private prompt repeats the exact configured Calendar ID and a target fingerprint. Type the full confirmation phrase only after checking that the Calendar target is the intended controlled account. Any other input cancels before OAuth refresh, database state changes, provider calls, or model calls.
+The private prompt repeats the exact configured Calendar ID, selected local runtime/model, and a target fingerprint. Type the full confirmation phrase only after checking both the Calendar target and `MODEL LOCAL_OLLAMA qwen2.5-coder:latest`. Any other input cancels before OAuth refresh, database state changes, Calendar calls, or model calls.
 
 The command then:
 
@@ -29,11 +38,11 @@ The command then:
 3. Sends one deliberately stale `If-Match` Calendar patch for the US candidate; Google must return a provider conflict and the event must remain unchanged.
 4. Moves the UK candidate by one hour with `sendUpdates=none`, verifies the after-state, and restores the recorded move exactly once.
 
-The Calendar move and restore are the only external effects in this command. The stale US request is intended to produce no Calendar mutation. Model calls have no external effect and use `store: false`.
+The Calendar move and restore are the only external effects in this command. The stale US request is intended to produce no Calendar mutation. Local model calls have no external or paid-provider effect and use the fixed loopback Ollama endpoint. OpenAI mode remains available only when selected by omitting the local runtime flag; it is not used for the zero-spend path.
 
 Do not rerun the command after a timeout or uncertain provider result. Stop and report the sanitized failure code; a Calendar `uncertain` outcome requires review before any further action. Known safe diagnostic codes include `credential_unavailable`, `oauth_*`, `provider_unavailable`, `preflight_failed`, and `model_<operation>_<kind>`. Model kinds distinguish `invalid_request`, `unauthorized`, `forbidden`, `not_found`, `rate_limited`, `timeout`, `unavailable`, `refusal`, `truncated`, and `invalid_output`; they never contain provider text. Deterministic request/auth/permission/model-lookup failures are not retried. A model failure occurs before any Calendar mutation.
 
-For `model_*_rate_limited`, stop rather than repeatedly rerunning the combined spike. A project/organization owner must privately check the OpenAI Platform Billing and Limits pages: HTTP 429 can mean either request pacing or exhausted credits/monthly spend, and Rewind intentionally does not read the provider error body to distinguish them. After the external limit is available, run this command only once and return its final sanitized JSON.
+For `model_*_rate_limited` in OpenAI mode, stop rather than repeatedly rerunning the combined spike. The zero-spend resolution is to use the explicit local command above, not to label OpenAI as successful.
 
 ## Gmail evidence
 
@@ -47,7 +56,7 @@ Paste only the final JSON line from `prove:provider-spikes`, for example:
 {
   "status": "ok",
   "operation": "provider_model_spikes",
-  "contractVersion": "provider-spike.v1",
+  "contractVersion": "provider-spike.v2",
   "calendar": {
     "preflightBefore": {"status": "ok", "candidateCount": 2, "baselineCount": 2, "expectedVersionCount": 2},
     "staleConflict": {"status": "conflict", "reason": "provider_conflict"},
@@ -56,10 +65,10 @@ Paste only the final JSON line from `prove:provider-spikes`, for example:
     "preflightAfter": {"status": "ok", "candidateCount": 2, "baselineCount": 2, "expectedVersionCount": 2},
     "partialReceiptStatuses": {"uk": ["succeeded", "succeeded"], "us": ["conflict"]}
   },
-  "model": {"operations": [
-    {"operation": "initial", "status": "validated", "schemaVersion": "initial-reasoning.v1", "attempts": 1, "model": "<configured-model>", "responseIdFingerprint": "sha256:..."},
-    {"operation": "recovery", "status": "validated", "schemaVersion": "recovery-proposal.v1", "attempts": 1, "model": "<configured-model>", "responseIdFingerprint": "sha256:..."},
-    {"operation": "prevention_rule", "status": "validated", "schemaVersion": "prevention-rule-proposal.v1", "attempts": 1, "model": "<configured-model>", "responseIdFingerprint": "sha256:..."}
+  "model": {"runtime": "local_ollama", "evidenceClass": "local_model", "operations": [
+    {"operation": "initial", "status": "validated", "provider": "ollama", "schemaVersion": "initial-reasoning.v1", "attempts": 1, "model": "qwen2.5-coder:latest", "receiptFingerprint": "sha256:..."},
+    {"operation": "recovery", "status": "validated", "provider": "ollama", "schemaVersion": "recovery-proposal.v1", "attempts": 1, "model": "qwen2.5-coder:latest", "receiptFingerprint": "sha256:..."},
+    {"operation": "prevention_rule", "status": "validated", "provider": "ollama", "schemaVersion": "prevention-rule-proposal.v1", "attempts": 1, "model": "qwen2.5-coder:latest", "receiptFingerprint": "sha256:..."}
   ]},
   "productExecution": "disabled",
   "productReset": "disabled",

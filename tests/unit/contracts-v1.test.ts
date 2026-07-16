@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CreateWorldPrRequestSchema, CreateWorldPrResponseSchema, InitialPlanPayloadSchema, WorldPrViewSchema } from "@/lib/contracts/v1";
+import { CreateWorldPrRequestSchema, CreateWorldPrResponseSchema, InitialPlanPayloadSchema, ModelMetadataSchema, WorldPrViewSchema } from "@/lib/contracts/v1";
 import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import { buildFixtureWorldPr, buildFixtureWorldPrRecord } from "@/lib/domain/fixture-world-pr";
 
@@ -95,5 +95,20 @@ describe("contracts.v1", () => {
       responseId: "fixture-response",
       source: "fixture",
     });
+  });
+
+  it("accepts real local-model metadata but forbids fixture or fallback source labels", () => {
+    const metadata = {
+      provider: "ollama",
+      model: "qwen2.5-coder:latest",
+      promptVersion: "controlled-provider-spike.v2",
+      schemaVersion: "initial-reasoning.v1",
+      reasoningEffort: "none",
+      responseId: "ollama-safe-receipt",
+      source: "model",
+    } as const;
+    expect(ModelMetadataSchema.parse(metadata)).toEqual(metadata);
+    expect(ModelMetadataSchema.safeParse({ ...metadata, source: "fixture" }).success).toBe(false);
+    expect(ModelMetadataSchema.safeParse({ ...metadata, source: "fallback" }).success).toBe(false);
   });
 });
