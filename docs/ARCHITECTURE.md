@@ -70,6 +70,8 @@ S047 adds the `candidate-resolution.v1` service boundary. It calls the typed Cal
 
 S048 adds `initial-reasoning-record.v1` and routes the candidate snapshot through `requestValidatedInitialProposal`. The model sees only closed labels/evidence and fixed action keys; deterministic code supplies the expected UK selection and the canonical parent-account brief title, while the model cannot supply provider IDs, recipients, times, ETags, or effect payloads. The persisted reasoning record binds the result to the candidate-resolution digest and retains bounded model metadata/attempts. Invalid schema, semantic, fallback, or provider output remains a typed safe failure; there is no deterministic model-success fallback.
 
+S049 adds the deterministic initial-plan expander. It verifies request/resolution/reasoning identity, generates the exact account-brief bytes and provenance, maps the validated selected snapshot to Calendar preconditions, converts the fixed 15:00 ET target without relying on model output, resolves the UK recipient only from the server allowlist, validates the registered mail template, and builds the immutable artifact → Calendar → Gmail tuple. The full payload is parsed through `VerifiedInitialPlanPayloadSchema` after canonical SHA-256 hashing, and the read-model plan pointer uses the same digest. Tests mutate recipient, target, dependency, order, time, and hash inputs without invoking an external provider.
+
 ## 3. Intended source layout
 
 ```text

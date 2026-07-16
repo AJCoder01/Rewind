@@ -310,7 +310,17 @@ export const InitialPlanPayloadSchema = InitialPlanPayloadCoreSchema.extend({
 })
   .strict()
   .superRefine((value, context) => {
-    const [artifact, calendar] = value.actions;
+    const [artifact, calendar, mail] = value.actions;
+    const actionKeys = value.actions.map((action) => action.actionKey);
+    if (JSON.stringify(actionKeys) !== JSON.stringify(value.executionOrder)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["executionOrder"], message: "Initial action order must match the immutable execution order" });
+    }
+    if (mail.requiresSucceededActionKey !== calendar.actionKey) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["actions", 2, "requiresSucceededActionKey"], message: "Initial mail must depend on the Calendar action" });
+    }
+    if (artifact.externalEffect !== false || calendar.externalEffect !== true || mail.externalEffect !== true) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["actions"], message: "Initial external-effect labels must match the fixed action types" });
+    }
     const candidateIds = new Set(value.candidateSet.map((candidate) => candidate.candidateId));
     const candidateRegions = new Set(value.candidateSet.map((candidate) => candidate.region));
     const selected = value.candidateSet.find((candidate) => candidate.candidateId === value.selectedCandidateId);

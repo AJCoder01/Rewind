@@ -208,6 +208,8 @@ The request performs controlled candidate lookup and active-rule evaluation **be
 
 `initial-reasoning-record.v1` records the one bounded initial model proposal against the candidate-resolution digest. Its model input contains the request, two server-written ranking evidence strings, the two fixed candidate IDs, and the three fixed initial action keys. The model may return only the one Acme-region assumption, the fixed dependency map, and a parent-account brief reference. The shared validator owns the two-attempt ceiling, rejects unknown IDs/actions, selection drift, dependency drift, and artifact leakage, and records only validated output, metadata, and attempt count. Provider event IDs, ETags, recipients, exact message content, times, and action payloads are not model-controlled fields.
 
+`initial-plan-expansion.v1` is deterministic and server-owned. It binds the reasoning record to the candidate-resolution digest, generates the canonical parent-account brief during planning, expands only the selected UK event and configured UK allowlist recipient, converts the fixed 15:00 America/New_York target with DST-safe conversion, validates the registered Gmail template/body hash, and emits the fixed artifact → Calendar → Gmail action tuple. `InitialPlanPayloadSchema` rejects action-order/effect-label drift; `VerifiedInitialPlanPayloadSchema` rejects full-payload, artifact-byte, or mail-body hash drift. The resulting digest covers every field that approval will later name.
+
 ```json
 {
   "worldPrId": "wpr_01...",
