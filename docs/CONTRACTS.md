@@ -516,6 +516,12 @@ The service refetches the configured event, rechecks calendar/event identity, ow
 
 Automated proof uses `FakeCalendarPort` and verifies pre-write persistence, move/restore state transitions, duration/time-zone retention, static-field preservation, stale-state refusal, provider-conflict refusal, unavailable/uncertain handling, and no-rebase behavior. Product approval/action-ledger integration remains S046/S052 work.
 
+### 3.21 Controlled provider/model spike report
+
+`provider-spike.v2` is an admin-only, redacted report contract for S043. The report records two exact Calendar preflight counts before and after the spike, one deliberate stale-provider conflict, one verified move, one verified restore, and the per-candidate partial receipt statuses. Its model evidence names `openai_responses | local_ollama`, binds that runtime to `external_openai | local_model`, and requires every operation provider to match. It records only validated operation names, schema versions, bounded attempt counts, model names, and SHA-256 receipt fingerprints; it never stores prompts, outputs, raw provider responses, credentials, Calendar IDs, recipients, event IDs, message IDs, or ETags. `local-model-spike.v1` reuses the same model evidence object for the no-effect `prove:model-local` command and requires `local_ollama`, `local_model`, and `externalEffects: false`.
+
+`prove:provider-spikes` requires the same non-production PostgreSQL/TTY/live-flag guard as the setup commands and rejects explicit product execution/reset enablement. `REWIND_S043_MODEL_RUNTIME=local_ollama` explicitly selects the fixed-loopback, cloud-model-rejecting local path; omission preserves `openai_responses`. The confirmation phrase and target fingerprint bind the selected runtime and model. All three non-effecting model calls and validators complete before the Calendar phase can begin. The stale wrapper changes only the `If-Match` value sent for the deliberate conflict request; no retry or rebase is allowed. The command performs one reversible UK move and one restore, then requires the final two-event preflight to pass. S035's OAuth/lookup evidence and S038's allowlisted Gmail/replay evidence remain separate human checkpoints.
+
 ### 3.21 Mutation response and error matrix
 
 Every success/attention response includes `requestId`; task mutations use `TaskMutationResponse` unless a richer shape is shown above. A durable attention outcome is HTTP `200` because the request was recorded and needs operator action; request/precondition conflicts use `409`; validation/clarification uses `422`; auth uses `401/403`.
@@ -1122,9 +1128,9 @@ The client sends `store: false` and `text.format: { type: "json_schema", strict:
 
 ### S041 model-only output schemas
 
-`createInitialReasoningSchemaContract`, `createRecoveryProposalSchemaContract`, and `createPreventionRuleProposalSchemaContract` each return a strict runtime Zod schema and the corresponding strict JSON Schema for the Responses request. Dynamic candidate, executed-action, and source-task IDs are enums populated only from the validated operation input. Action keys, recovery outcomes, new-action templates, assumption IDs, rule type, and rule action are closed literals. These proposal schemas contain no provider event/calendar IDs, recipients, mail bodies, headers, times, ETags, or raw provider arguments.
+`createInitialReasoningSchemaContract`, `createRecoveryProposalSchemaContract`, and `createPreventionRuleProposalSchemaContract` each return a strict runtime Zod schema and the corresponding strict JSON Schema for the selected real model transport. Dynamic candidate, executed-action, and source-task IDs are enums populated only from the validated operation input. Action keys, recovery outcomes, new-action templates, assumption IDs, rule type, and rule action are closed literals. These proposal schemas contain no provider event/calendar IDs, recipients, mail bodies, headers, times, ETags, or raw provider arguments.
 
-S042 adds the semantic validator immediately after these schemas. It requires deterministic initial selection/dependencies and independent brief content; a recovery proposal must name an explicit trusted corrected candidate, cover every supplied succeeded action exactly once, map Calendar/mail/artifact dependencies to `restore`/`correct`/`preserve`, and contain each fixed new-action template exactly once for the corrected candidate; the typed rule proposal must remain bound to its source task. Recovery recipient expansion accepts only server-supplied exact allowlist values. The optional model-port retry context contains only the second-attempt marker, a safe failure kind, and machine-readable issue codes/paths. `requestValidatedInitialProposal`, `requestValidatedRecoveryProposal`, and `requestValidatedPreventionRuleProposal` retry at most once with that context, reject `fallback` metadata, and return a safe typed failure after the second schema/semantic/provider failure. They never generate a deterministic success result. The S042 harness uses synthetic inputs only; the full 25-paraphrase recovery evaluation remains S070/S091.
+S042 adds the semantic validator immediately after these schemas. It requires deterministic initial selection/dependencies and independent brief content; a recovery proposal must name an explicit trusted corrected candidate, cover every supplied succeeded action exactly once, map Calendar/mail/artifact dependencies to `restore`/`correct`/`preserve`, and contain each fixed new-action template exactly once for the corrected candidate; the typed rule proposal must remain bound to its source task. Recovery recipient expansion accepts only server-supplied exact allowlist values. The optional model-port retry context contains only the second-attempt marker, a safe failure kind, and machine-readable issue codes/paths. `requestValidatedInitialProposal`, `requestValidatedRecoveryProposal`, and `requestValidatedPreventionRuleProposal` own the complete maximum of two provider calls: schema/semantic/refusal/truncation/invalid-output/transient failures may receive one safe retry, while invalid request, unauthorized, forbidden, not-found, and fallback failures stop after the first call. Safe transport kinds never include provider body text. They never generate a deterministic success result. The S042 harness uses synthetic inputs only; the full 25-paraphrase recovery evaluation remains S070/S091.
 
 ```typescript
 interface ModelMetadata {
@@ -1146,9 +1152,19 @@ interface FixtureModelMetadata {
   responseId?: string;
   source: "fixture";
 }
+
+interface OllamaModelMetadata {
+  provider: "ollama";
+  model: string;
+  promptVersion: string;
+  schemaVersion: string;
+  reasoningEffort: "none";
+  responseId?: string;
+  source: "model";
+}
 ```
 
-`OPENAI_MODEL` supplies the model. The provider/model risk phase initially tests `gpt-5.6-sol` if the project can access it and strict-schema evaluation passes. Store the actual returned model metadata. `FixtureModelMetadata` is permitted for the explicitly labeled deterministic test/development slice and for the deployed G1 non-effecting PostgreSQL contract proof. In the deployed proof it is a contract-fixture marker only: no model/provider call occurs, the UI must state that no live-provider evidence is claimed, and the metadata cannot authorize or support an external effect. It remains forbidden for deployed effect-bearing/live mode. A fallback source must be visibly logged and is forbidden during the recorded demo unless explicitly disclosed.
+`OPENAI_MODEL` supplies the optional OpenAI model. Explicit local S043 mode uses `REWIND_LOCAL_MODEL`, defaulting to `qwen2.5-coder:latest`, through the fixed loopback Ollama endpoint. Store the actual returned model metadata and label local evidence `local_model`; it is a real local inference, not external OpenAI evidence. `FixtureModelMetadata` remains limited to deterministic tests and the visibly non-effecting deployed G1 contract proof. It cannot authorize or support an external effect. A fallback source remains forbidden during the recorded demo.
 
 ## 13. Plan hashing and idempotency
 

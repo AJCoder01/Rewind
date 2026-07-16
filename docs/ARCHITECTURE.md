@@ -32,7 +32,7 @@ flowchart LR
     API --> Service["Application services"]
     Service --> Domain["State machine and validators"]
     Service --> DB[("PostgreSQL")]
-    Service --> AI["OpenAI Responses API"]
+    Service --> AI["Selected strict model runtime<br/>OpenAI or local Ollama"]
     Service --> Cal["Google Calendar adapter"]
     Service --> Mail["Gmail send adapter"]
     Service --> Artifact["Approved artifact store"]
@@ -54,11 +54,13 @@ S038 adds a TTY-only low-level proof command, not a product execution route. It 
 
 S039 adds the scenario-specific account-brief boundary. `generateAccountBriefForPlanning` accepts only the versioned `acme_parent_account_notes` source during the planning phase, derives the fixed brief bytes, and binds the source version/digest, content digest, excluded dimensions, and validator version. The service rejects source drift and region/event/attendee/meeting-time leakage before any provider call. `persistApprovedAccountBrief` validates the immutable approved bytes and delegates them to the artifact port without regenerating content; the existing artifact adapter remains a persistence boundary only.
 
-S040 adds `OpenAIResponsesClient`, a server-only raw Responses API boundary. It sends the configured model, `store: false`, and strict `text.format` JSON Schema requests, parses only the response ID/model/usage and structured output, maps refusal/truncation/malformed/provider failures to redacted typed errors, and performs at most one retry with a safe validation instruction. It never logs or returns the API key, raw prompt, refusal text, or raw provider response; S041 supplies operation-specific model schemas and S042 supplies complete semantic validation.
+S040 adds `OpenAIResponsesClient`, a server-only raw Responses API boundary. It sends the configured model, `store: false`, and strict `text.format` JSON Schema requests, parses only the response ID/model/usage and structured output, and maps refusal, truncation, malformed output, timeout, invalid request, auth/permission, missing-model, rate-limit, and provider failures to redacted typed errors without reading or logging provider error bodies. Its standalone default permits one retry for retryable failures, while callers may reduce that budget. It never logs or returns the API key, raw prompt, refusal text, or raw provider response; S041 supplies operation-specific model schemas and S042 supplies complete semantic validation.
 
 S041 adds three model-only schema factories over the exact supplied universe for each operation. Initial reasoning is limited to known candidate IDs, fixed assumption/dependency IDs, and the controlled account-brief source. Recovery is limited to known candidate and succeeded-action IDs, `restore | correct | preserve`, and the two registered apply templates. Prevention output can only propose the one fixed Acme ambiguity rule. Every runtime object and emitted JSON Schema rejects additional properties, while provider IDs, recipients, message bodies, headers, times, ETags, and provider calls remain deterministic server-owned fields. Complete cross-field semantic validation and adversarial evaluation remain S042 work.
 
-S042 adds the deterministic model-safety boundary after schema parsing. Initial proposals must match the provider-ranked candidate and exact dependency map; recovery proposals require an explicit trusted corrected candidate, all and only succeeded initial actions, compatible `restore`/`correct`/`preserve` outcomes, and both fixed new-action templates; prevention proposals remain bound to the completed source task. Account-brief output is checked for scenario-dimension leakage, and recovery recipients are expanded only from the server-owned team allowlist. The validation runner makes at most two model-port attempts, rejects fallback metadata, records only redacted typed failures, and has no deterministic success fallback. The `eval:model-safety` harness is synthetic and non-effecting; the complete 25-paraphrase recovery gate remains a later task.
+S042 adds the deterministic model-safety boundary after schema parsing. Initial proposals must match the provider-ranked candidate and exact dependency map; recovery proposals require an explicit trusted corrected candidate, all and only succeeded initial actions, compatible `restore`/`correct`/`preserve` outcomes, and both fixed new-action templates; prevention proposals remain bound to the completed source task. Account-brief output is checked for scenario-dimension leakage, and recovery recipients are expanded only from the server-owned team allowlist. The validation runner owns the complete two-attempt model budget: each real model adapter performs one transport call per outer attempt, deterministic invalid-request/auth/permission/not-found/fallback failures stop after one call, and only retryable transport/output/schema/semantic failures receive the second attempt. It records only redacted typed failures and has no deterministic success fallback. The `eval:model-safety` harness is synthetic and non-effecting; the complete 25-paraphrase recovery gate remains a later task.
+
+S043 adds `OpenAIModelPort`, `OllamaModelPort`, and the versioned synthetic spike prompt. OpenAI mode uses `store: false` and a 90-second call timeout. Explicit `local_ollama` mode uses only `http://127.0.0.1:11434/api/chat`, rejects cloud model tags, fixes temperature to zero, and submits a structural JSON Schema projection compatible with Ollama's grammar; the complete schema and S042 semantic validators still run after generation. Shared trusted deterministic facts remain separate from every model response and no model field can create a provider call. The non-effecting model phase runs before any Calendar mutation. `prove:model-local` records a no-effect `local-model-spike.v1` receipt, while the human combined command records `provider-spike.v2` with `external_openai` or `local_model` evidence explicitly. `runControlledCalendarProviderSpike` then preflights both events, sends one stale `If-Match` request that must conflict, moves/restores one event with `sendUpdates=none`, and requires a final two-event preflight. Neither command has an HTTP/MCP entry point or invokes product execution/reset.
 
 ## 3. Intended source layout
 
@@ -80,7 +82,7 @@ lib/
     calendar-demo.ts
   services/        # create, approve, execute, recover, rule, reset use cases
     calendar-demo.ts
-  ai/              # Prompt/schema versions and Responses API client
+  ai/              # Prompt/schema versions and strict model clients
     model.ts        # Explicit initial/recovery/rule model port and fake
   adapters/
     calendar.ts
@@ -129,7 +131,7 @@ sequenceDiagram
     participant App as "Rewind service"
     participant DB as "PostgreSQL"
     participant Cal as "Calendar"
-    participant AI as "Responses API"
+    participant AI as "Selected model runtime"
     participant Mail as "Gmail"
 
     User->>Entry: Submit request
@@ -168,7 +170,7 @@ sequenceDiagram
     actor User
     participant App as "Rewind service"
     participant DB as "PostgreSQL"
-    participant AI as "Responses API"
+    participant AI as "Selected model runtime"
     participant Cal as "Calendar"
     participant Mail as "Gmail"
 
@@ -417,11 +419,11 @@ The post-recovery **Try guardrail** UI submits to normal `POST /world-prs`. Cand
 - approval/digest, allowlist, ETag, idempotency, action leasing, execution, verification, and reset;
 - schema and semantic validation.
 
-Use the OpenAI Responses API with strict Structured Outputs. Treat refusal, truncation, missing parsed output, or schema mismatch as a planning failure. Retry once with validation errors. A deterministic scenario fallback may exist behind a disabled development flag for fault testing, but must not run during the recorded demo or appear as model reasoning.
+Use the explicitly selected real model runtime with schema-constrained output. OpenAI mode uses Responses strict Structured Outputs. Zero-cost local mode uses loopback-only Ollama structured output and is always labeled `local_model`; cloud-tagged Ollama models are forbidden. Treat refusal, truncation, missing parsed output, schema mismatch, or semantic mismatch as a planning failure. Retry once with validation errors. A deterministic fixture fallback may exist behind a disabled development flag for fault testing, but must not run during the recorded demo or appear as model reasoning.
 
-This preserves the brief's four meaningful reasoning tasks—assumption extraction, dependency mapping, recovery classification, and typed rule generalization—inside closed, validated universes. GPT proposes what the relationships mean; deterministic code controls every provider effect.
+This preserves the brief's four meaningful reasoning tasks—assumption extraction, dependency mapping, recovery classification, and typed rule generalization—inside closed, validated universes. The selected real model proposes what the relationships mean; deterministic code controls every provider effect.
 
-Current OpenAI guidance recommends Responses for text-generation applications and Structured Outputs over JSON mode; GPT-5.6 Sol currently lists both Responses and Structured Outputs support: [Responses guidance](https://developers.openai.com/api/docs/guides/text?api-mode=responses), [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), and [GPT-5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol).
+Current OpenAI guidance recommends Responses for OpenAI text-generation applications and Structured Outputs over JSON mode; GPT-5.6 Sol lists both capabilities. Ollama documents native local JSON Schema output separately. References: [Responses guidance](https://developers.openai.com/api/docs/guides/text?api-mode=responses), [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [GPT-5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol), and [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs).
 
 ## 10. Idempotency, serialization, and resume
 

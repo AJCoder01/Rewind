@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const MAX_INPUT_LENGTH = 50_000;
+export const OPENAI_RESPONSES_DEFAULT_TIMEOUT_MS = 90_000;
 
 const OpenAIInputMessageSchema = z
   .object({
@@ -67,7 +68,17 @@ export type OpenAIResponsesResult = Readonly<{
   metadata: OpenAIResponsesMetadata;
 }>;
 
-export type OpenAIResponsesFailureKind = "unavailable" | "refusal" | "truncated" | "invalid_output";
+export type OpenAIResponsesFailureKind =
+  | "invalid_request"
+  | "unauthorized"
+  | "forbidden"
+  | "not_found"
+  | "rate_limited"
+  | "timeout"
+  | "unavailable"
+  | "refusal"
+  | "truncated"
+  | "invalid_output";
 
 export class OpenAIResponsesError extends Error {
   readonly kind: OpenAIResponsesFailureKind;
@@ -89,6 +100,22 @@ export type OpenAIResponsesClientOptions = Readonly<{
   endpoint?: string;
   timeoutMs?: number;
 }>;
+
+export type OpenAIResponsesAttemptOptions = Readonly<{ maxAttempts?: 1 | 2 }>;
+
+function failureForHttpStatus(status: number): OpenAIResponsesFailureKind {
+  if (status === 400 || status === 422) return "invalid_request";
+  if (status === 401) return "unauthorized";
+  if (status === 403) return "forbidden";
+  if (status === 404) return "not_found";
+  if (status === 408) return "timeout";
+  if (status === 429) return "rate_limited";
+  return "unavailable";
+}
+
+function retryableFailure(kind: OpenAIResponsesFailureKind): boolean {
+  return !["invalid_request", "unauthorized", "forbidden", "not_found"].includes(kind);
+}
 
 function safeRetryInput(input: OpenAIResponsesRequest["input"], failure: OpenAIResponsesFailureKind): OpenAIResponsesRequest["input"] {
   const retryMessage = `The previous structured-output attempt failed validation (${failure}). Return only an object matching the supplied schema; do not add properties or explanatory text.`;
@@ -136,31 +163,42 @@ export class OpenAIResponsesClient {
     this.apiKey = options.apiKey;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.endpoint = options.endpoint ?? OPENAI_RESPONSES_URL;
-    this.timeoutMs = options.timeoutMs ?? 30_000;
+    this.timeoutMs = options.timeoutMs ?? OPENAI_RESPONSES_DEFAULT_TIMEOUT_MS;
+    if (!Number.isInteger(this.timeoutMs) || this.timeoutMs < 10 || this.timeoutMs > 300_000) {
+      throw new Error("OpenAI Responses timeout configuration is invalid.");
+    }
   }
 
-  async createStructured(request: OpenAIResponsesRequest): Promise<OpenAIResponsesResult> {
+  async createStructured(
+    request: OpenAIResponsesRequest,
+    attemptOptions: OpenAIResponsesAttemptOptions = {},
+  ): Promise<OpenAIResponsesResult> {
     const parsedRequest = OpenAIResponsesRequestSchema.parse(request);
+    const maxAttempts = attemptOptions.maxAttempts ?? 2;
     let input = parsedRequest.input;
     let lastFailure: OpenAIResponsesError | undefined;
 
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         const response = await this.send(parsedRequest, input);
         return this.parseResponse(response, parsedRequest, attempt);
       } catch (error) {
         const failure = error instanceof OpenAIResponsesError ? new OpenAIResponsesError(error.kind, attempt, error) : new OpenAIResponsesError("unavailable", attempt, error);
         lastFailure = failure;
-        if (attempt === 2) throw failure;
+        if (attempt === maxAttempts || !retryableFailure(failure.kind)) throw failure;
         input = safeRetryInput(input, failure.kind);
       }
     }
-    throw lastFailure ?? new OpenAIResponsesError("unavailable", 2);
+    throw lastFailure ?? new OpenAIResponsesError("unavailable", maxAttempts);
   }
 
   private async send(request: z.output<typeof OpenAIResponsesRequestSchema>, input: OpenAIResponsesRequest["input"]): Promise<unknown> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.timeoutMs);
     try {
       const response = await this.fetchImpl(this.endpoint, {
         method: "POST",
@@ -175,10 +213,11 @@ export class OpenAIResponsesClient {
         }),
         signal: controller.signal,
       });
-      if (!response.ok) throw new OpenAIResponsesError("unavailable", 1);
+      if (!response.ok) throw new OpenAIResponsesError(failureForHttpStatus(response.status), 1);
       return await response.json();
     } catch (error) {
       if (error instanceof OpenAIResponsesError) throw error;
+      if (timedOut) throw new OpenAIResponsesError("timeout", 1, error);
       throw new OpenAIResponsesError("unavailable", 1, error);
     } finally {
       clearTimeout(timer);

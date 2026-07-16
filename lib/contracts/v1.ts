@@ -261,6 +261,17 @@ export const ModelMetadataSchema = z.discriminatedUnion("provider", [
     .strict(),
   z
     .object({
+      provider: z.literal("ollama"),
+      model: z.string().min(1).max(200),
+      promptVersion: z.string().min(1).max(100),
+      schemaVersion: z.string().min(1).max(100),
+      reasoningEffort: z.literal("none"),
+      responseId: z.string().min(1).max(200).optional(),
+      source: z.literal("model"),
+    })
+    .strict(),
+  z
+    .object({
       provider: z.literal("fixture"),
       model: z.string().min(1).max(200),
       promptVersion: z.string().min(1).max(100),

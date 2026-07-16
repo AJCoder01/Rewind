@@ -5,7 +5,7 @@
 | Status | Active canonical execution queue |
 | Execution model | One sequential task at a time |
 | Current gate | G2 — OAuth, provider, and model risk retirement |
-| Current restart point | `S043` — run the controlled provider/model spikes |
+| Current restart point | `S044` — build the honest connection/preflight UI |
 | Last updated | 2026-07-16 |
 
 This is the single implementation plan for Rewind. It owns task order and phase gates. It does not divide work by person. Product behavior remains canonical in `PRD.md`, non-negotiable safety rules in `SAFETY.md`, runtime design in `ARCHITECTURE.md`, boundary shapes in `CONTRACTS.md`, and verification details in `TEST_PLAN.md`.
@@ -94,7 +94,7 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 - [x] **S040 — Implement the OpenAI Responses client.** Added the server-only Responses boundary with configured-model requests, `store: false`, strict Structured Outputs, refusal/truncation/malformed/provider handling, response metadata capture, one bounded retry, redacted errors, and deterministic HTTP tests. Evidence: [S040 OpenAI Responses report](../artifacts/test-runs/2026-07-16-s040-openai-responses.md). No live model call was run; S043 owns the provider spike.
 - [x] **S041 — Define versioned model-only schemas.** Added strict runtime and Responses JSON Schemas for `initial-reasoning.v1`, `recovery-proposal.v1`, and `prevention-rule-proposal.v1`; each closes dynamic IDs/templates over its validated supplied universe and excludes executable provider fields. Evidence: [S041 model-schema report](../artifacts/test-runs/2026-07-16-s041-model-schemas.md). No model inference, provider mutation, or external effect was run.
 - [x] **S042 — Build model safety and evaluation harnesses.** Added strict cross-field validators for initial/recovery/prevention proposals, trusted explicit-target/action-ledger context, server-owned recipient expansion, bounded two-attempt validation with no fallback, adversarial fixtures/tests, and the sanitized `eval:model-safety` command. Evidence: [S042 model-safety report](../artifacts/test-runs/2026-07-16-s042-model-safety.md). No live model inference, provider mutation, or external effect was run.
-- [ ] **S043 — Run the controlled provider/model spikes.** Prove live OAuth refresh, exact Calendar lookup, conditional move/restore/conflict, low-level two-event preflight/partial receipts, one allowlisted Gmail success, and live strict model output; keep product reset and product execution disabled.
+- [x] **S043 — Run the controlled provider/model spikes.** Added redacted `provider-spike.v2` and `local-model-spike.v1` reports, the TTY/live-flagged Calendar move/restore/conflict harness, strict OpenAI and loopback-only Ollama model adapters, one shared two-attempt ceiling, model-before-Calendar ordering, deterministic tests, and the [human S043 guide](S043_PROVIDER_MODEL_SPIKE_GUIDE.md). The unfunded OpenAI path failed closed and remains honestly recorded. The selected zero-spend `qwen2.5-coder:latest` Ollama path passed all three strict schema/semantic operations in one attempt each, and the human combined receipt then proved the stale Calendar conflict, controlled move/restore, and final two-event preflight. Evidence: [transport correction](../artifacts/test-runs/2026-07-16-s043-model-transport-correction.md), [rate-limit blocker](../artifacts/test-runs/2026-07-16-s043-openai-rate-limit-blocker.md), [local runtime](../artifacts/test-runs/2026-07-16-s043-local-model-runtime.md), and [combined success receipt](../artifacts/test-runs/2026-07-16-s043-provider-model-spike-success.md).
 - [ ] **S044 — Build honest connection/preflight UI.** Show connected identity, configuration gaps, preflight failures, and fake/live state without implying that the product workflow has passed.
 - [ ] **S045 — Close G2.** Store redacted receipts and negative-test evidence; block G3 while any OAuth, ETag, Gmail uncertainty, strict-output, secret, or fake-in-live risk is red.
 
@@ -103,7 +103,7 @@ This is the single implementation plan for Rewind. It owns task order and phase 
 - [ ] OAuth/account binding and refresh work in the deployed environment; all substitution/replay cases fail.
 - [ ] Calendar lookup/move/restore/conflict and rolling versions are proven on controlled events.
 - [ ] Gmail success and the complete ambiguous-delivery policy are proven without unsafe live ambiguity tests.
-- [ ] Strict model schemas and deterministic semantic rejection are proven live.
+- [ ] Strict model schemas and deterministic semantic rejection are proven with the explicitly selected real model runtime and honestly labeled evidence class.
 - [ ] Production cannot start with fake providers.
 
 ### G3 — Initial World PR, approval, and execution
