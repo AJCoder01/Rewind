@@ -198,6 +198,7 @@ const AccountBriefActionSchema = z
         provenance: z
           .object({
             sourceId: z.literal("acme_parent_account_notes"),
+            sourceVersion: z.literal("controlled-content.v1"),
             sourceDigest: Sha256DigestSchema,
             excludedDimensions: z
               .tuple([

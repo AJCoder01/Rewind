@@ -152,6 +152,7 @@ export const AccountBriefArtifactInputSchema = z
     provenance: z
       .object({
         sourceId: z.literal("acme_parent_account_notes"),
+        sourceVersion: z.literal("controlled-content.v1"),
         sourceDigest: Sha256DigestSchema,
         excludedDimensions: z
           .tuple([z.literal("calendar_event"), z.literal("region"), z.literal("attendees"), z.literal("meeting_time")])

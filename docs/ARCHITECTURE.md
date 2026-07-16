@@ -52,6 +52,8 @@ S037 adds the Gmail delivery boundary without enabling a product approval/execut
 
 S038 adds a TTY-only low-level proof command, not a product execution route. It requires `LIVE_INTEGRATION_TESTS=1`, non-production PostgreSQL mode, non-CI execution, the connected configured Google identity, and literal confirmation of the exact allowlisted UK recipient plus unique run ID. The command creates one fixed proof task/plan/action ledger identity under the live-spike admin exception, refreshes the token before claiming dispatch, sends once through `GmailDeliveryService`, immediately replays the same action, and requires one persisted attempt with the same sent receipt. A completed proof can only return `already_complete`; uncertain/permanent/in-progress state cannot resend. Output contains only run/status/counts and recipient/message fingerprints.
 
+S039 adds the scenario-specific account-brief boundary. `generateAccountBriefForPlanning` accepts only the versioned `acme_parent_account_notes` source during the planning phase, derives the fixed brief bytes, and binds the source version/digest, content digest, excluded dimensions, and validator version. The service rejects source drift and region/event/attendee/meeting-time leakage before any provider call. `persistApprovedAccountBrief` validates the immutable approved bytes and delegates them to the artifact port without regenerating content; the existing artifact adapter remains a persistence boundary only.
+
 ## 3. Intended source layout
 
 ```text

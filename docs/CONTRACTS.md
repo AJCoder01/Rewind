@@ -887,6 +887,7 @@ interface RedactedActionError {
 
 interface ArtifactProvenance {
   sourceId: "acme_parent_account_notes";
+  sourceVersion: "controlled-content.v1";
   sourceDigest: string;
   excludedDimensions: ["calendar_event", "region", "attendees", "meeting_time"];
   validatorVersion: string;

@@ -8,13 +8,13 @@ This inventory freezes the synthetic content and the non-effecting review surfac
 
 | Item | Canonical value | Version/proof |
 |---|---|---|
-| Parent-account source ID | `acme_parent_account_notes` | `controlled-content.v1` |
+| Parent-account source ID/version | `acme_parent_account_notes` / `controlled-content.v1` | Versioned planning source |
 | Independence validator | `artifact-independence.v1` | `lib/domain/account-brief.ts` |
 | Brief title | `Acme parent-account renewal risk brief` | `ACCOUNT_BRIEF_TITLE` |
 | Demo date/time zone | `2026-08-20`, `America/New_York` | Fixed scenario boundary |
 | Candidate labels | `Acme UK renewal`, `Acme US renewal` | Fixture candidate universe |
 
-The source fixture is exactly:
+The versioned source fixture is exactly:
 
 ```text
 Acme parent-account notes
