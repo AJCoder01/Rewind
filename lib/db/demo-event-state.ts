@@ -3,7 +3,9 @@ import {
   DemoEventStateSchema,
   DemoSeedAuditMetadataSchema,
   type DemoEventState,
+  type DemoEventStateReceipt,
   type DemoSeedAuditMetadata,
+  ControlledCalendarCandidateIdSchema,
 } from "@/lib/contracts/calendar-demo";
 
 export type DemoSeedAuditInput = Readonly<{
@@ -13,10 +15,18 @@ export type DemoSeedAuditInput = Readonly<{
   failureKind?: "provider" | "validation" | "persistence";
 }>;
 
+export type CalendarOperationStateInput = Readonly<{
+  candidateId: DemoEventState["candidateId"];
+  receipt: DemoEventStateReceipt;
+  expectedEtag?: string;
+  expectedUpdatedAt?: string;
+}>;
+
 export interface DemoEventStateStore {
   readAll(): Promise<readonly DemoEventState[]>;
   recordSeedAudit(input: DemoSeedAuditInput): Promise<void>;
   saveSeededState(state: DemoEventState): Promise<void>;
+  recordCalendarOperation(input: CalendarOperationStateInput): Promise<void>;
 }
 
 function copyState(state: DemoEventState): DemoEventState {
@@ -27,6 +37,7 @@ function copyState(state: DemoEventState): DemoEventState {
 export class MemoryDemoEventStateStore implements DemoEventStateStore {
   private readonly states = new Map<string, DemoEventState>();
   private readonly audits: DemoSeedAuditMetadata[] = [];
+  private readonly operationReceipts: DemoEventStateReceipt[] = [];
 
   async readAll(): Promise<readonly DemoEventState[]> {
     return Array.from(this.states.values()).sort((left, right) => left.candidateId.localeCompare(right.candidateId)).map(copyState);
@@ -43,8 +54,29 @@ export class MemoryDemoEventStateStore implements DemoEventStateStore {
     this.states.set(parsed.candidateId, copyState(parsed));
   }
 
+  async recordCalendarOperation(input: CalendarOperationStateInput): Promise<void> {
+    const candidateId = ControlledCalendarCandidateIdSchema.parse(input.candidateId);
+    const receipt = DemoEventStateSchema.shape.lastReceipt.parse(input.receipt);
+    const current = this.states.get(candidateId);
+    if (!current) throw new Error("Demo event baseline does not exist.");
+    this.operationReceipts.push(receipt);
+    this.states.set(
+      candidateId,
+      copyState({
+        ...current,
+        expectedEtag: input.expectedEtag ?? current.expectedEtag,
+        expectedUpdatedAt: input.expectedUpdatedAt ?? current.expectedUpdatedAt,
+        lastReceipt: receipt,
+      }),
+    );
+  }
+
   getAuditsForTest(): readonly DemoSeedAuditMetadata[] {
     return this.audits.map((audit) => ({ ...audit }));
+  }
+
+  getCalendarOperationReceiptsForTest(): readonly DemoEventStateReceipt[] {
+    return this.operationReceipts.map((receipt) => DemoEventStateSchema.shape.lastReceipt.parse(JSON.parse(JSON.stringify(receipt)) as unknown));
   }
 }
 
@@ -104,5 +136,20 @@ export class PostgresDemoEventStateStore implements DemoEventStateStore {
       ],
     );
     if (result.rowCount !== 1) throw new Error("Demo event baseline is immutable and already exists.");
+  }
+
+  async recordCalendarOperation(input: CalendarOperationStateInput): Promise<void> {
+    const candidateId = ControlledCalendarCandidateIdSchema.parse(input.candidateId);
+    const receipt = DemoEventStateSchema.shape.lastReceipt.parse(input.receipt);
+    const result = await this.pool.query(
+      `UPDATE demo_event_state
+          SET expected_etag = COALESCE($2, expected_etag),
+              expected_updated_at = COALESCE($3, expected_updated_at),
+              last_receipt = $4::jsonb,
+              updated_at = now()
+        WHERE candidate_id = $1`,
+      [candidateId, input.expectedEtag ?? null, input.expectedUpdatedAt ?? null, JSON.stringify(receipt)],
+    );
+    if (result.rowCount !== 1) throw new Error("Demo event baseline does not exist.");
   }
 }
