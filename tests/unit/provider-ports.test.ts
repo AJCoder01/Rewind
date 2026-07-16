@@ -13,7 +13,7 @@ import {
 } from "@/lib/domain/account-brief";
 import { sha256Text } from "@/lib/domain/digest";
 import { PROVIDER_PORTS_CONTRACT_VERSION } from "@/lib/contracts/provider-ports";
-import type { AccountBriefArtifactInput, CalendarEventSnapshot, RecoveryModelInput } from "@/lib/contracts/provider-ports";
+import type { AccountBriefArtifactInput, CalendarEventSnapshot, InitialModelInput, RecoveryModelInput } from "@/lib/contracts/provider-ports";
 
 const calendarId = "fake-demo-calendar";
 const calendarEvents: readonly CalendarEventSnapshot[] = [
@@ -78,15 +78,22 @@ const artifact = {
 const initialInput = {
   request: "Synthetic Acme request",
   candidateEvidence: ["Synthetic candidate evidence one", "Synthetic candidate evidence two"],
-  allowedCandidateIds: ["fixture-event-uk", "fixture-event-us"],
-  allowedActionKeys: ["initial.calendar.move", "initial.mail.notify"],
-};
+  allowedCandidateIds: ["cal_event_acme_uk", "cal_event_acme_us"],
+  allowedActionKeys: ["initial.artifact.account_brief", "initial.calendar.move", "initial.mail.notify"],
+} satisfies InitialModelInput;
 
 const recoveryInput = {
   lateContext: "Synthetic corrected context",
-  completedActionIds: ["fixture-action-uk"],
-  allowedOutcomes: ["restore", "correct", "preserve", "apply"],
-  allowedActionKeys: ["recovery.calendar.restore_uk", "recovery.mail.correct_uk"],
+  allowedCandidateIds: ["cal_event_acme_uk", "cal_event_acme_us"],
+  completedActionIds: ["fixture-action-artifact", "fixture-action-calendar", "fixture-action-mail"],
+  allowedOutcomes: ["restore", "correct", "preserve"],
+  allowedNewActionTemplates: ["calendar.apply_to_correct_entity", "mail.notify_correct_attendees"],
+  allowedActionKeys: [
+    "recovery.calendar.restore_uk",
+    "recovery.calendar.move_us",
+    "recovery.mail.correct_uk",
+    "recovery.mail.notify_us",
+  ],
 } satisfies RecoveryModelInput;
 
 const preventionRuleInput = {

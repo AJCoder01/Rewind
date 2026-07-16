@@ -13,12 +13,12 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 | Field | Value |
 |---|---|
 | Phase | G2 — OAuth, provider, and model risk retirement |
-| Implementation | G1 closed; S031–S040 provider safety boundaries complete; S041 model-only schemas are next |
+| Implementation | G1 closed; S031–S041 provider/model safety boundaries complete; S042 safety/evaluation harnesses are next |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
 | Last updated | 2026-07-16 |
 
-The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. S031–S035 establish OAuth identity and controlled Calendar setup; S036 adds conditional Calendar primitives; S037 adds strict Gmail templates, allowlisting, marker-before-handoff persistence, closed provider outcomes, and no-redispatch replay; S038 proves one human-confirmed live Gmail success with no-redispatch replay; S039 binds the versioned parent-account source to exact independent artifact bytes; and S040 adds the strict, redacted Responses transport boundary. Live model effects remain gated until S043. Verified locally with Node 24: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm audit --audit-level=moderate`, `npm run security:scan`, `npm run traceability:check`, and `npm run verify:fake-production`.
+The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. S031–S035 establish OAuth identity and controlled Calendar setup; S036 adds conditional Calendar primitives; S037 adds strict Gmail templates, allowlisting, marker-before-handoff persistence, closed provider outcomes, and no-redispatch replay; S038 proves one human-confirmed live Gmail success with no-redispatch replay; S039 binds the versioned parent-account source to exact independent artifact bytes; S040 adds the strict, redacted Responses transport boundary; and S041 closes initial, recovery, and prevention-rule outputs over supplied ID/template universes. Live model effects remain gated until S043. Verified locally with Node 24: `npm run build`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm audit --audit-level=moderate`, `npm run security:scan`, `npm run traceability:check`, and `npm run verify:fake-production`.
 
 S019–S027 extend this slice with session expiry, CSRF/origin and resource scope checks, transactional idempotency and planning leases, rule-first clarification, thin status/cancel routes, a read-only MCP status tool, safe loading/error/empty UI states, and a tested cancel/back flow. S038’s controlled Gmail proof recorded one real sent message and a no-redispatch replay. The fixture path remains visibly non-effecting and production rejects fake-provider mode.
 
@@ -162,7 +162,7 @@ The migration command applies `0001_phase0_foundation.sql` and then `0002_oauth_
 
 ## First contributor actions
 
-1. Continue with S041, the versioned model-only schemas task.
+1. Continue with S042, the model safety and evaluation harness task.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 

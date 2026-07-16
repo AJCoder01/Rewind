@@ -25,7 +25,11 @@ const providerEvidence = [...oauthEvidence, "artifacts/test-runs/2026-07-16-s034
 const calendarSetupEvidence = [...providerEvidence, "artifacts/test-runs/2026-07-16-s035-calendar-setup.md", "artifacts/test-runs/2026-07-16-s035-live-closure.md"];
 const calendarPrimitiveEvidence = [...calendarSetupEvidence, "artifacts/test-runs/2026-07-16-s036-calendar-primitives.md"];
 const artifactEvidence = [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s038-gmail-live-proof.md", "artifacts/test-runs/2026-07-16-s039-artifact-boundary.md"];
-const modelEvidence = [...artifactEvidence, "artifacts/test-runs/2026-07-16-s040-openai-responses.md"];
+const modelEvidence = [
+  ...artifactEvidence,
+  "artifacts/test-runs/2026-07-16-s040-openai-responses.md",
+  "artifacts/test-runs/2026-07-16-s041-model-schemas.md",
+];
 const initialFixtures: TraceabilityFixtureId[] = ["fixture-initial.v1", "controlled-content.v1", "artifact-independence.v1"];
 const intakeCode = ["app/page.tsx", "app/api/v1/world-prs/route.ts", "lib/services/world-pr.ts", "mcp/server.ts"];
 const intakeTests = ["tests/unit/world-pr.test.ts", "tests/unit/g1-routes-auth.test.ts", "tests/unit/g1-mcp.test.ts", "scripts/test-e2e.ts"];
@@ -136,14 +140,24 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   planned("FR-18", "FR", "Safe retry and resume", ["S021", "S052", "S057"], "Resume semantics require the action ledger and provider adapters."),
   planned("FR-19", "FR", "Late context only after completed execution", ["S060"], "Initial execution and late-context intake are not implemented."),
   planned("FR-20", "FR", "Explicit corrected target and provider grounding", ["S060", "S061"], "Recovery planning is not implemented."),
-  planned("FR-21", "FR", "Strict recovery proposal universe", ["S062", "S063"], "Recovery model schemas are future work."),
+  current({
+    id: "FR-21", kind: "FR", title: "Strict recovery proposal universe", planTasks: ["S041", "S062", "S063"],
+    codePaths: ["lib/contracts/provider-ports.ts", "lib/ai/model-schemas.ts"], testPaths: ["tests/unit/model-schemas.test.ts", "tests/unit/provider-ports.test.ts"],
+    fixtureIds: ["traceability.v1"], evidencePaths: modelEvidence, status: "partial",
+    note: "S041 closes recovery output over supplied candidate, succeeded-action, outcome, and registered-template universes and excludes executable provider fields; complete semantic validation and product recovery planning remain S042/S062–S063.",
+  }),
   planned("FR-22", "FR", "Complete recovery decision validation", ["S063"], "Recovery semantic validation is future work."),
   planned("FR-23", "FR", "Fixed Causal Revert visualization", ["S065"], "The current UI has no recovery graph."),
   planned("FR-24", "FR", "Recovery cancel/revise", ["S065", "S072"], "Recovery mutation routes are future work."),
   planned("FR-25", "FR", "Recovery approval digest binding", ["S064", "S066"], "Recovery approval is future work."),
   planned("FR-26", "FR", "Recovery preflight and fixed order", ["S067", "S068"], "Recovery provider execution is future work."),
   planned("FR-27", "FR", "Honest recovery attention states", ["S069", "S072"], "Recovery attention handling is future work."),
-  planned("FR-28", "FR", "Typed prevention-rule proposal", ["S075"], "Prevention rules are future work."),
+  current({
+    id: "FR-28", kind: "FR", title: "Typed prevention-rule proposal", planTasks: ["S041", "S075"],
+    codePaths: ["lib/ai/model-schemas.ts", "lib/contracts/v1.ts"], testPaths: ["tests/unit/model-schemas.test.ts", "tests/unit/g1-contracts.test.ts"],
+    fixtureIds: ["traceability.v1"], evidencePaths: modelEvidence, status: "partial",
+    note: "S041 permits only the fixed Acme ambiguity proposal and keeps rule identity/status/digest deterministic; generation, persistence, and separate activation remain S075–S076.",
+  }),
   planned("FR-29", "FR", "Separate rule activation", ["S076"], "Rule activation is future work."),
   current({
     id: "FR-30", kind: "FR", title: "Clarification-only guardrail proof", planTasks: ["S021", "S023", "S077", "S079"],
@@ -183,8 +197,8 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   }),
   current({
     id: "SAFE-08", kind: "SAFE", title: "Closed strict model/action boundary", planTasks: ["S004", "S006", "S034", "S040", "S041"],
-    codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/domain/fixture-world-pr.ts", "lib/ai/model.ts", "lib/ai/openai-responses.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/openai-responses.test.ts"], fixtureIds: initialFixtures, evidencePaths: modelEvidence, status: "partial",
-    note: "Strict fixture lifecycle, plan/action, prevention-rule, reset-plan, provider-port, and S040 Structured Outputs request contracts reject unknown/unsafe fields; raw model output remains untrusted and operation-specific schemas/semantic validators remain S041 work.",
+    codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/domain/fixture-world-pr.ts", "lib/ai/model.ts", "lib/ai/openai-responses.ts", "lib/ai/model-schemas.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/model-schemas.test.ts"], fixtureIds: initialFixtures, evidencePaths: modelEvidence, status: "partial",
+    note: "Strict lifecycle/plan/provider contracts, the S040 Responses transport, and S041 model-only schemas reject unknown fields and close every supplied ID/outcome/template universe; complete cross-field semantic validation remains S042 work.",
   }),
   current({
     id: "SAFE-09", kind: "SAFE", title: "Server-only private environment boundary", planTasks: ["S003", "S012", "S013", "S031", "S032", "S033"],
@@ -205,9 +219,9 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   }),
   planned("NFR-03", "NFR", "Stale Calendar changes never overwrite", ["S036", "S054", "S067"], "Provider stale-state proof is future work."),
   current({
-    id: "NFR-04", kind: "NFR", title: "Unknown inputs never reach adapters", planTasks: ["S004", "S006", "S023", "S034", "S035", "S037", "S039", "S040", "S042"],
-    codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/calendar-demo.ts", "lib/services/world-pr.ts", "lib/services/calendar-demo.ts", "lib/services/gmail-delivery.ts", "lib/services/account-brief.ts", "lib/ai/openai-responses.ts", "lib/db/memory-store.ts", "lib/db/demo-event-state.ts", "lib/db/gmail-dispatch.ts", "lib/adapters/calendar.ts", "lib/google/calendar.ts", "lib/adapters/gmail.ts", "lib/google/gmail.ts", "lib/adapters/artifact.ts", "lib/ai/model.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/calendar-demo.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/account-brief.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/g1-memory-store.test.ts"], fixtureIds: initialFixtures, evidencePaths: modelEvidence, status: "partial",
-    note: "Closed fixture, Calendar, Gmail, S039 artifact, and S040 Responses request contracts reject unknown or semantically unsafe inputs before adapter behavior; complete live-service semantic validation remains planned.",
+    id: "NFR-04", kind: "NFR", title: "Unknown inputs never reach adapters", planTasks: ["S004", "S006", "S023", "S034", "S035", "S037", "S039", "S040", "S041", "S042"],
+    codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/calendar-demo.ts", "lib/services/world-pr.ts", "lib/services/calendar-demo.ts", "lib/services/gmail-delivery.ts", "lib/services/account-brief.ts", "lib/ai/openai-responses.ts", "lib/ai/model-schemas.ts", "lib/db/memory-store.ts", "lib/db/demo-event-state.ts", "lib/db/gmail-dispatch.ts", "lib/adapters/calendar.ts", "lib/google/calendar.ts", "lib/adapters/gmail.ts", "lib/google/gmail.ts", "lib/adapters/artifact.ts", "lib/ai/model.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/calendar-demo.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/account-brief.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/model-schemas.test.ts", "tests/unit/g1-memory-store.test.ts"], fixtureIds: initialFixtures, evidencePaths: modelEvidence, status: "partial",
+    note: "Closed fixture, Calendar, Gmail, artifact, Responses, and S041 proposal contracts reject unknown IDs/templates/fields before adapter behavior; complete cross-field and live-service semantic validation remains planned.",
   }),
   planned("NFR-05", "NFR", "Recovery paraphrase and negative safety gates", ["S070", "S071", "S091"], "Recovery evaluation fixtures are future work."),
   current({
@@ -227,9 +241,9 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   }),
   planned("NFR-09", "NFR", "Reset returns baselines and retains mail", ["S080", "S082", "S085", "S093"], "Reset is future work."),
   current({
-    id: "NFR-10", kind: "NFR", title: "No secret or production-data leakage", planTasks: ["S003", "S012", "S013", "S032", "S033", "S034", "S035", "S037", "S039", "S040", "S089"],
-    codePaths: ["lib/config/environment.ts", "lib/auth/session.ts", "lib/api/errors.ts", "lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/calendar-demo.ts", "lib/google/oidc.ts", "lib/google/credentials.ts", "lib/google/calendar.ts", "lib/google/gmail.ts", "lib/adapters/gmail.ts", "lib/adapters/artifact.ts", "lib/ai/model.ts", "lib/ai/openai-responses.ts", "lib/services/gmail-delivery.ts", "lib/services/account-brief.ts", "lib/services/calendar-demo-command.ts", "scripts/seed-demo.ts", "scripts/preflight-demo.ts", "scripts/security-scan.ts", "docs/CONTROLLED_CONTENT_UI_INVENTORY.md"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/google-identity.test.ts", "tests/unit/oauth-routes.test.ts", "tests/unit/oauth-transaction.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/account-brief.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/calendar-demo.test.ts", "tests/unit/calendar-demo-command.test.ts", "tests/unit/security-scan.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/g1-mcp.test.ts"], fixtureIds: ["controlled-content.v1", "traceability.v1"], evidencePaths: [...modelEvidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
-    note: "Tracked secret scanning, synthetic-content rules, S039 independent-artifact leakage rejection, S040 server-only API-key/header/redacted-error handling, redacted command/status projections, server-only configuration, no-mailbox identity validation, encrypted secret handling, explicit Calendar target/TTY guards, Gmail body/recipient/provider-body redaction, and deterministic fakes are covered; complete application log/client leakage checks remain planned.",
+    id: "NFR-10", kind: "NFR", title: "No secret or production-data leakage", planTasks: ["S003", "S012", "S013", "S032", "S033", "S034", "S035", "S037", "S039", "S040", "S041", "S089"],
+    codePaths: ["lib/config/environment.ts", "lib/auth/session.ts", "lib/api/errors.ts", "lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/calendar-demo.ts", "lib/google/oidc.ts", "lib/google/credentials.ts", "lib/google/calendar.ts", "lib/google/gmail.ts", "lib/adapters/gmail.ts", "lib/adapters/artifact.ts", "lib/ai/model.ts", "lib/ai/openai-responses.ts", "lib/ai/model-schemas.ts", "lib/services/gmail-delivery.ts", "lib/services/account-brief.ts", "lib/services/calendar-demo-command.ts", "scripts/seed-demo.ts", "scripts/preflight-demo.ts", "scripts/security-scan.ts", "docs/CONTROLLED_CONTENT_UI_INVENTORY.md"], testPaths: ["tests/unit/environment-config.test.ts", "tests/unit/google-identity.test.ts", "tests/unit/oauth-routes.test.ts", "tests/unit/oauth-transaction.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/account-brief.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/model-schemas.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/calendar-demo.test.ts", "tests/unit/calendar-demo-command.test.ts", "tests/unit/security-scan.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/g1-mcp.test.ts"], fixtureIds: ["controlled-content.v1", "traceability.v1"], evidencePaths: [...modelEvidence, "artifacts/test-runs/2026-07-15-s013-ci-security.md"], status: "partial",
+    note: "Tracked secret scanning, synthetic-content rules, S039 independent-artifact leakage rejection, S040 server-only API-key/header/redacted-error handling, S041 exclusion of executable provider and recipient/message fields, redacted command/status projections, server-only configuration, no-mailbox identity validation, encrypted secret handling, explicit Calendar target/TTY guards, Gmail redaction, and deterministic fakes are covered; complete application log/client leakage checks remain planned.",
   }),
 ] as const;
 

@@ -169,28 +169,80 @@ export const ArtifactReceiptSchema = z
 
 export const ModelOperationSchema = z.enum(["initial", "recovery", "prevention_rule"]);
 
+export const INITIAL_MODEL_ACTION_KEYS = [
+  "initial.artifact.account_brief",
+  "initial.calendar.move",
+  "initial.mail.notify",
+] as const;
+export const RECOVERY_MODEL_ACTION_KEYS = [
+  "recovery.calendar.restore_uk",
+  "recovery.calendar.move_us",
+  "recovery.mail.correct_uk",
+  "recovery.mail.notify_us",
+] as const;
+export const RECOVERY_MODEL_OUTCOMES = ["restore", "correct", "preserve"] as const;
+export const RECOVERY_MODEL_NEW_ACTION_TEMPLATES = [
+  "calendar.apply_to_correct_entity",
+  "mail.notify_correct_attendees",
+] as const;
+
+function rejectDuplicateValues(values: readonly string[], context: z.RefinementCtx) {
+  if (new Set(values).size !== values.length) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Closed model universes must contain unique values" });
+  }
+}
+
+const TwoCandidateIdsSchema = z
+  .array(ProviderIdentifierSchema)
+  .length(2)
+  .superRefine(rejectDuplicateValues);
+
+const CompletedActionIdsSchema = z
+  .array(ProviderIdentifierSchema)
+  .min(1)
+  .max(8)
+  .superRefine(rejectDuplicateValues);
+
 export const InitialModelInputSchema = z
   .object({
     request: z.string().min(1).max(2000),
     candidateEvidence: z.array(z.string().min(1).max(500)).length(2),
-    allowedCandidateIds: z.array(ProviderIdentifierSchema).length(2),
-    allowedActionKeys: z.array(z.string().min(1).max(200)).min(1).max(8),
+    allowedCandidateIds: TwoCandidateIdsSchema,
+    allowedActionKeys: z.tuple([
+      z.literal(INITIAL_MODEL_ACTION_KEYS[0]),
+      z.literal(INITIAL_MODEL_ACTION_KEYS[1]),
+      z.literal(INITIAL_MODEL_ACTION_KEYS[2]),
+    ]),
   })
   .strict();
 
 export const RecoveryModelInputSchema = z
   .object({
     lateContext: z.string().min(1).max(5000),
-    completedActionIds: z.array(ProviderIdentifierSchema).min(1).max(8),
-    allowedOutcomes: z.array(z.enum(["restore", "correct", "preserve", "apply"])).min(1).max(4),
-    allowedActionKeys: z.array(z.string().min(1).max(200)).min(1).max(8),
+    allowedCandidateIds: TwoCandidateIdsSchema,
+    completedActionIds: CompletedActionIdsSchema,
+    allowedOutcomes: z.tuple([
+      z.literal(RECOVERY_MODEL_OUTCOMES[0]),
+      z.literal(RECOVERY_MODEL_OUTCOMES[1]),
+      z.literal(RECOVERY_MODEL_OUTCOMES[2]),
+    ]),
+    allowedNewActionTemplates: z.tuple([
+      z.literal(RECOVERY_MODEL_NEW_ACTION_TEMPLATES[0]),
+      z.literal(RECOVERY_MODEL_NEW_ACTION_TEMPLATES[1]),
+    ]),
+    allowedActionKeys: z.tuple([
+      z.literal(RECOVERY_MODEL_ACTION_KEYS[0]),
+      z.literal(RECOVERY_MODEL_ACTION_KEYS[1]),
+      z.literal(RECOVERY_MODEL_ACTION_KEYS[2]),
+      z.literal(RECOVERY_MODEL_ACTION_KEYS[3]),
+    ]),
   })
   .strict();
 
 export const PreventionRuleModelInputSchema = z
   .object({
     sourceTaskId: ProviderIdentifierSchema,
-    candidateIds: z.array(ProviderIdentifierSchema).length(2),
+    candidateIds: TwoCandidateIdsSchema,
     ruleType: z.literal("calendar_company_region_ambiguity"),
     allowedAction: z.literal("ask_for_confirmation"),
   })
