@@ -51,6 +51,7 @@ The harness covers valid initial/recovery/prevention output, malformed output, u
 - `npm run verify:fake-production`: passed — production fixture selection rejected.
 - `npm audit --audit-level=moderate`: passed — 0 vulnerabilities.
 - `git diff --check`: passed.
+- Hosted GitHub Actions `Rewind CI` run `#81` for commit `af5ffef`: passed, including locked install, lint, typecheck, unit/contract tests, production build, dependency audit, secret scan, fake-production guard, ephemeral migration replay, and browser smoke.
 
 ## Requirement links and remaining risk
 
