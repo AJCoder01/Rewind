@@ -129,6 +129,34 @@ interface TaskMutationResponse {
 
 Readiness failure returns the canonical error envelope with HTTP `503`, `code: "provider_unavailable"`, `retryable: true`, and the generic message `Rewind is not ready.` Neither endpoint exposes connection strings, roles, provider diagnostics, SQL, or stack traces. Both endpoints set `Cache-Control: no-store`.
 
+`GET /api/v1/connection/status` is an authenticated dashboard-only, read-only projection of connection prerequisites. It accepts neither MCP bearer authentication nor a browser mutation. It may inspect validated private configuration, restricted database readiness, and the stored OAuth credential metadata; it never refreshes a token, calls Calendar/Gmail/model providers, changes state, or runs the human-gated Calendar preflight. The exact response is the strict `connection-preflight.v1` contract in `lib/contracts/connection-preflight.ts`:
+
+```json
+{
+  "contractVersion": "connection-preflight.v1",
+  "overall": "attention | blocked",
+  "runtime": {
+    "mode": "fixture | live_capable | blocked",
+    "modelRuntime": "openai_responses | local_ollama | not_configured",
+    "productExecution": "disabled",
+    "productReset": "disabled"
+  },
+  "configuration": { "status": "complete | incomplete", "issues": [{ "field": "...", "code": "..." }] },
+  "identity": { "status": "connected | not_connected | mismatch | unavailable", "email": "..." },
+  "database": { "status": "fixture | ready | not_ready | unavailable", "schemaVersion": "..." },
+  "calendar": { "status": "configured | not_configured | unavailable" },
+  "demoDate": { "status": "configured | not_configured" },
+  "preflight": {
+    "status": "blocked | not_run",
+    "checks": [{ "id": "configuration | database | google_identity | calendar", "status": "passed | failed | not_run", "detail": "..." }]
+  },
+  "workflow": { "status": "disabled", "message": "..." },
+  "requestId": "req_..."
+}
+```
+
+Configuration issues contain only safe field names and validation codes. A connected email is returned only when the stored Google subject and normalized email match the configured account; mismatches never return the stored email. Fixture mode, pending preflight, and disabled execution/reset are always visible and cannot be represented as a passed product workflow. Unauthorized requests return the standard `401` error envelope; unexpected status failures return a sanitized `503` and `Cache-Control: no-store`.
+
 ### 3.2 Create World PR
 
 `POST /api/v1/world-prs`

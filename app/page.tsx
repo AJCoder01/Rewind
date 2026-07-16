@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ApiErrorResponseSchema, CreateWorldPrResponseSchema } from "@/lib/contracts/v1";
 import { SUPPORTED_SCENARIO_REQUEST } from "@/lib/domain/scenario";
 import { newIdempotencyKey, readCsrfToken } from "@/lib/client/request";
+import { ConnectionPreflightPanel } from "@/app/components/connection-preflight-panel";
 
 export default function HomePage() {
   const router = useRouter();
@@ -79,6 +80,7 @@ export default function HomePage() {
           <h1 id="page-title">Make the reasoning behind an action visible.</h1>
           <p className="lede">Rewind records the assumption behind an approved task, then helps a human review the smallest valid repair when later context changes its meaning.</p>
         </section>
+        <ConnectionPreflightPanel />
         <section className="composer-section" aria-labelledby="composer-title">
           <div className="section-heading">
             <div>

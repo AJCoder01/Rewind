@@ -1,6 +1,6 @@
 # Controlled content and UI inventory
 
-Status: frozen for S014 and validated for S017, version `controlled-content.v1`, 2026-07-15.
+Status: frozen for S014, validated for S017, and extended with the S044 connection/preflight surface, version `controlled-content.v1`, 2026-07-16.
 
 This inventory freezes the synthetic content and the non-effecting review surface. It does not enable Calendar, Gmail, OpenAI, approval, recovery, rule, or reset behavior.
 
@@ -49,12 +49,14 @@ The source and output contain no region, event, attendee, or meeting-time facts.
 | Safe errors | Explain that no external action was attempted when the request cannot be safely recorded or loaded |
 | Session expiry | Explain that the review session expired and offer “Sign in” |
 | Status | Every status has text; color and decorative dots are supplementary only |
+| Connection/preflight | “What is actually connected?”, safe configuration field/code gaps, connected identity only after exact account binding, fixture/live-capable/blocked runtime, and explicit “Product execution is disabled” copy. Calendar preflight is “Blocked” or “Not run”; the dashboard never claims a passed product workflow. |
 
 ## Current screen/state inventory
 
 | Screen/state | Route/file | Required semantic structure | External effects |
 |---|---|---|---|
 | Composer | `/`, `app/page.tsx` | `main`, one `h1`, labelled request field, one primary submit, fixture status row | None |
+| Connection/preflight panel | `/`, `app/components/connection-preflight-panel.tsx`, `GET /api/v1/connection/status` | authenticated read-only status panel with runtime boundary, identity, configuration gaps, four labelled checks, and disabled workflow notice | None; no token refresh or provider/model call |
 | Login | `/login`, `app/login/page.tsx` | `main`, one `h1`, labelled passcode field, one submit, alert on failure | None |
 | Loading review | `/pr/:worldPrId`, `app/pr/[worldPrId]/page.tsx` | `main`, polite live loading message | None |
 | Expired/failed review | `/pr/:worldPrId` | alert message and sign-in link when appropriate | None |
@@ -71,6 +73,7 @@ The current slice keeps route handlers thin and renders the small screen directl
 | Surface | Selector |
 |---|---|
 | Composer screen/request/submit/status | `composer-screen`, `composer-request`, `create-world-pr`, `fixture-status` |
+| Connection/preflight panel/status/checks | `connection-preflight`, `connection-summary`, `preflight-summary`, `configuration-gaps` |
 | Login screen/input/submit | `login-screen`, `dashboard-passcode`, `login-submit` |
 | Review screen/assumption/actions/timeline/fixture notice | `review-screen`, `assumption-panel`, `planned-actions`, `review-timeline`, `fixture-mode-notice` |
 

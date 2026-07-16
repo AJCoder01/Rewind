@@ -82,6 +82,7 @@ The S038 command is run only as `LIVE_INTEGRATION_TESTS=1 npm run prove:gmail` i
 8. A live OpenAI call using the selected model satisfies the strict smoke schemas; invalid semantic output is rejected.
 9. Seed/provider-spike commands enforce TTY confirmation, demo tags/allowlists, receipts, and CI/production refusal.
 10. A TTY-gated low-level Calendar spike proves two-event preflight, conditional restore, conflict, rolling ETags, and injected partial receipts. It exposes no reset route, archive/lock/rule/artifact cleanup, or `reset_complete` state.
+11. The authenticated connection/preflight panel reports safe configuration gaps, account-bound identity state, fixture/live-capable/blocked runtime state, database readiness, Calendar target/preflight failure or not-run state, selected model evidence, and disabled product execution/reset without calling an external provider.
 
 OAuth, conditional Calendar restore, Gmail replay prevention, and strict model output are release-blocking risks. Feature integration stops while any G2 item is red.
 
@@ -182,7 +183,11 @@ S039 covers versioned source binding, exact source/content hashes, independent-a
 
 The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-spike.v1` receipt must label local evidence and `externalEffects: false`. The human combined checkpoint is `REWIND_S043_MODEL_RUNTIME=local_ollama LIVE_INTEGRATION_TESTS=1 npm run prove:provider-spikes` in a TTY. It first validates all three real local model outputs with S042. Only then may Calendar perform one controlled UK move/restore; the deliberate US stale patch must not mutate the event. Existing S035 OAuth/lookup and S038 Gmail evidence are linked rather than duplicated. Product execution/reset remain disabled.
 
-### 4.7 Integration tests with deterministic adapters
+### 4.9 S044 connection and preflight UI
+
+`tests/unit/connection-preflight.test.ts` covers fixture labeling, complete live-capable configuration with pending Calendar preflight, safe configuration gaps, account and approved-scope substitution, strict response parsing, dashboard authentication, and no-store output. `tests/unit/accessibility-contract.test.ts` freezes the new panel selectors. `npm run test:e2e` covers the panel's unauthenticated/authenticated route boundary alongside the existing login, non-effecting World PR, session expiry, cancellation, responsive, keyboard-focus, and reduced-motion flow. No live provider/model call or external effect is claimed for S044.
+
+### 4.10 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.
