@@ -204,7 +204,11 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 
 `tests/unit/initial-artifact-execution.test.ts` covers exact planned-byte handoff, durable before-state ordering, typed receipt/after-state persistence, succeeded replay without a second write, retryable artifact unavailability, permanent validation rejection, receipt-hash mismatch conflict, before-state persistence failure with zero artifact calls, and task-scoped immutable PostgreSQL artifact replay. No live database/provider or external effect is claimed.
 
-### 4.14 Integration tests with deterministic adapters
+### 4.14 S054 exact approved Calendar execution
+
+`tests/unit/initial-calendar-execution.test.ts` covers exact plan/approval binding, artifact dependency ordering, complete before-state persistence before the provider call, start/end-only conditional input with `sendUpdates: "none"`, new-ETag verification, succeeded replay without a second update, stale ETag, allowlist drift, pre-write unavailability/retry, ambiguous update conflict, before-state persistence failure, and post-write verification failure. The tests use deterministic candidate resolution/plan expansion and `FakeCalendarPort`; no live database/provider or external effect is claimed.
+
+### 4.15 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.
@@ -213,7 +217,7 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 - Recovery preflight before first side effect and fixed execution order.
 - Resume skips succeeded actions and blocks conflict/uncertain actions.
 - Model client: success, refusal, truncation, invalid JSON/schema, semantic error, one retry, final failure.
-- Calendar adapter: move, verify, restore, ETag mismatch, attendee drift, wrong calendar/type.
+- Calendar adapter: move, verify, restore, ETag mismatch, attendee drift, wrong calendar/type, and approved action-ledger execution.
 - Gmail adapter: success, local pre-handoff failure, explicit 4xx rejection, every post-handoff uncertainty class, allowlist failure.
 - Reset: approved digest, two-event preflight, success, zero-write conflict, second-write race/partial result, rolling ETags, in-progress rejection, archive/rule/artifact/lock semantics.
 

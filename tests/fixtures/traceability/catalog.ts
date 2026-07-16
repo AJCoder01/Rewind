@@ -24,7 +24,8 @@ const oauthEvidence = [
 const providerEvidence = [...oauthEvidence, "artifacts/test-runs/2026-07-16-s034-provider-ports.md"];
 const calendarSetupEvidence = [...providerEvidence, "artifacts/test-runs/2026-07-16-s035-calendar-setup.md", "artifacts/test-runs/2026-07-16-s035-live-closure.md"];
 const calendarPrimitiveEvidence = [...calendarSetupEvidence, "artifacts/test-runs/2026-07-16-s036-calendar-primitives.md"];
-const artifactEvidence = [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s038-gmail-live-proof.md", "artifacts/test-runs/2026-07-16-s039-artifact-boundary.md"];
+const calendarExecutionEvidence = [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s054-calendar-execution.md"];
+const artifactEvidence = [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s038-gmail-live-proof.md", "artifacts/test-runs/2026-07-16-s039-artifact-boundary.md", "artifacts/test-runs/2026-07-16-s053-artifact-execution.md"];
 const modelEvidence = [
   ...artifactEvidence,
   "artifacts/test-runs/2026-07-16-s040-openai-responses.md",
@@ -115,19 +116,28 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     note: "Preview and clarification cancellation release only the owned fixture lock and return to the composer; approval/execution cancellation remains future work.",
   }),
   planned("FR-10", "FR", "Immutable initial approval record", ["S046", "S051"], "Approval persistence is intentionally deferred until execution work."),
-  planned("FR-11", "FR", "Approval invalidation on drift", ["S051", "S054"], "Provider/version drift checks are future provider-boundary work."),
-  planned("FR-12", "FR", "Durable unique action ledger", ["S046", "S052"], "The foundation migration reserves the table; execution rows are not yet created by the service."),
+  current({
+    id: "FR-11", kind: "FR", title: "Approval invalidation on drift", planTasks: ["S051", "S054"],
+    codePaths: ["lib/services/initial-execution.ts", "lib/services/initial-calendar-execution.ts", "lib/contracts/initial-calendar-execution.ts"],
+    testPaths: ["tests/unit/initial-execution.test.ts", "tests/unit/initial-calendar-execution.test.ts"], fixtureIds: ["initial-plan.v1"], evidencePaths: calendarExecutionEvidence,
+    status: "partial", note: "The approved Calendar action fails closed on ETag, target, ownership/type/recurrence/tag, organizer, attendee/allowlist, or time drift; Gmail and full workflow invalidation remain S055/S057.",
+  }),
+  current({
+    id: "FR-12", kind: "FR", title: "Durable unique action ledger", planTasks: ["S046", "S052"],
+    codePaths: ["lib/db/execution-store.ts", "lib/services/initial-execution.ts"], testPaths: ["tests/unit/execution-persistence.test.ts", "tests/unit/initial-execution.test.ts"], fixtureIds: ["initial-plan.v1"], evidencePaths: calendarExecutionEvidence,
+    status: "partial", note: "The memory/PostgreSQL ledgers persist immutable plans, approvals, unique action rows, leases, before/after state, typed receipts, and terminal outcomes; full workflow/UI verification remains S055–S057.",
+  }),
   current({
     id: "FR-13", kind: "FR", title: "Calendar pre-mutation validation", planTasks: ["S036", "S054"],
-    codePaths: ["lib/domain/calendar-demo.ts", "lib/services/calendar-primitives.ts", "lib/google/calendar.ts"],
-    testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: calendarPrimitiveEvidence,
-    status: "partial", note: "S036 verifies controlled ownership/type/recurrence/tag/attendee/time/version preconditions and records stale conflicts; product approval-bound execution remains S054 work.",
+    codePaths: ["lib/domain/calendar-demo.ts", "lib/services/calendar-primitives.ts", "lib/services/initial-calendar-execution.ts", "lib/contracts/initial-calendar-execution.ts", "lib/google/calendar.ts"],
+    testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/initial-calendar-execution.test.ts"], fixtureIds: ["traceability.v1", "initial-plan.v1"], evidencePaths: calendarExecutionEvidence,
+    status: "partial", note: "S036 verifies the primitive boundary and S054 rechecks the approved target/version, controlled ownership/type/recurrence/tag, organizer/attendee allowlist, and exact plan times before the action-ledger write; live product proof remains S058.",
   }),
   current({
     id: "FR-14", kind: "FR", title: "Conditional narrow Calendar write", planTasks: ["S036", "S054"],
-    codePaths: ["lib/google/calendar.ts", "lib/services/calendar-primitives.ts", "lib/db/demo-event-state.ts"],
-    testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: calendarPrimitiveEvidence,
-    status: "partial", note: "S036 proves start/end-only, If-Match, sendUpdates=none, verified rolling versions, restore, and conflict/uncertain outcomes with deterministic fakes; product action-ledger integration and live spike remain S043/S054 work.",
+    codePaths: ["lib/google/calendar.ts", "lib/services/calendar-primitives.ts", "lib/services/initial-calendar-execution.ts", "lib/contracts/initial-calendar-execution.ts", "lib/db/demo-event-state.ts"],
+    testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/initial-calendar-execution.test.ts"], fixtureIds: ["traceability.v1", "initial-plan.v1"], evidencePaths: calendarExecutionEvidence,
+    status: "partial", note: "S036 proves start/end-only, If-Match, sendUpdates=none, verified rolling versions, restore, and conflict/uncertain outcomes; S054 adds approved action-ledger ordering, before/after snapshots, new-ETag verification, and replay safety with deterministic fakes.",
   }),
   current({
     id: "FR-15", kind: "FR", title: "Allowlisted Gmail notification", planTasks: ["S037", "S038", "S055"],
@@ -197,7 +207,11 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     fixtureIds: ["traceability.v1"], evidencePaths: calendarSetupEvidence, status: "partial",
     note: "S032 verifies the signed configured Google subject/email and exact identity scope boundary, S034 freezes typed Calendar/Gmail boundaries, and S035 adds explicit calendar targeting, exact-two ownership/type/tag validation, and deterministic setup failure outcomes; live ownership/seed proof and recipient allowlist enforcement remain S035/S037 provider-gate work.",
   }),
-  planned("SAFE-06", "SAFE", "Calendar ETag conflict protection", ["S036", "S054", "S067"], "Calendar conditional execution is future work."),
+  current({
+    id: "SAFE-06", kind: "SAFE", title: "Calendar ETag conflict protection", planTasks: ["S036", "S054", "S067"],
+    codePaths: ["lib/adapters/calendar.ts", "lib/google/calendar.ts", "lib/services/calendar-primitives.ts", "lib/services/initial-calendar-execution.ts"], testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/initial-calendar-execution.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: calendarExecutionEvidence,
+    status: "partial", note: "S036 and S054 fail closed on stale ETags and never rebase; recovery ETag protection remains S067.",
+  }),
   current({
     id: "SAFE-07", kind: "SAFE", title: "Ambiguous Gmail delivery is not retried", planTasks: ["S034", "S037", "S055", "S069"],
     codePaths: ["lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/gmail-live-proof.ts", "lib/google/gmail.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts", "scripts/prove-gmail.ts"],
@@ -227,7 +241,11 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     codePaths: ["lib/db/store.ts", "lib/db/memory-store.ts", "lib/db/postgres-store.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts"], testPaths: ["tests/unit/world-pr.test.ts", "tests/unit/g1-memory-store.test.ts", "tests/unit/postgres-store.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/gmail-live-proof.test.ts", "tests/unit/gmail-live-proof-store.test.ts"], fixtureIds: ["fixture-initial.v1", "traceability.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md"], status: "partial",
     note: "Create replay and the S037 Gmail terminal/retryable/uncertain replay rules are covered without a second send; complete Calendar/artifact/action-ledger replay remains S052.",
   }),
-  planned("NFR-03", "NFR", "Stale Calendar changes never overwrite", ["S036", "S054", "S067"], "Provider stale-state proof is future work."),
+  current({
+    id: "NFR-03", kind: "NFR", title: "Stale Calendar changes never overwrite", planTasks: ["S036", "S054", "S067"],
+    codePaths: ["lib/services/calendar-primitives.ts", "lib/services/initial-calendar-execution.ts", "lib/adapters/calendar.ts", "lib/google/calendar.ts"], testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/initial-calendar-execution.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: calendarExecutionEvidence,
+    status: "partial", note: "S036 and S054 prove stale preflight/conditional-write refusal with zero approved action writes; recovery remains S067.",
+  }),
   current({
     id: "NFR-04", kind: "NFR", title: "Unknown inputs never reach adapters", planTasks: ["S004", "S006", "S023", "S034", "S035", "S037", "S039", "S040", "S041", "S042", "S043"],
     codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/contracts/provider-spike.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/calendar-demo.ts", "lib/services/world-pr.ts", "lib/services/calendar-demo.ts", "lib/services/gmail-delivery.ts", "lib/services/account-brief.ts", "lib/services/provider-spike.ts", "lib/ai/openai-responses.ts", "lib/ai/openai-model.ts", "lib/ai/ollama-chat.ts", "lib/ai/ollama-model.ts", "lib/ai/model-schemas.ts", "lib/ai/model-safety.ts", "lib/db/memory-store.ts", "lib/db/demo-event-state.ts", "lib/db/gmail-dispatch.ts", "lib/adapters/calendar.ts", "lib/google/calendar.ts", "lib/adapters/gmail.ts", "lib/google/gmail.ts", "lib/adapters/artifact.ts", "lib/ai/model.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/calendar-demo.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/account-brief.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/openai-model.test.ts", "tests/unit/ollama-chat.test.ts", "tests/unit/ollama-model.test.ts", "tests/unit/model-schemas.test.ts", "tests/unit/model-safety.test.ts", "tests/unit/provider-spike.test.ts", "tests/unit/g1-memory-store.test.ts"], fixtureIds: [...initialFixtures, "model-safety.v1"], evidencePaths: modelEvidence, status: "partial",
