@@ -149,8 +149,14 @@ describe("Google OAuth transaction boundary", () => {
 
   it("accepts only the exact approved scope set", () => {
     expect(parseGrantedGoogleScopes(GOOGLE_OAUTH_SCOPES.join(" "))).toEqual([...GOOGLE_OAUTH_SCOPES]);
+    expect(
+      parseGrantedGoogleScopes(
+        `${GOOGLE_OAUTH_SCOPES.join(" ")} https://www.googleapis.com/auth/userinfo.email`,
+      ),
+    ).toEqual([...GOOGLE_OAUTH_SCOPES]);
     expect(() => parseGrantedGoogleScopes("openid email")).toThrow();
     expect(() => parseGrantedGoogleScopes(`${GOOGLE_OAUTH_SCOPES.join(" ")} https://www.googleapis.com/auth/drive`)).toThrow();
+    expect(() => parseGrantedGoogleScopes(`${GOOGLE_OAUTH_SCOPES.join(" ")} https://www.googleapis.com/auth/userinfo.profile`)).toThrow();
   });
 
   it("refreshes an account-bound credential and encrypts a rotated refresh token", async () => {

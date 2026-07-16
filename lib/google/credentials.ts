@@ -23,15 +23,19 @@ export type ValidatedGoogleIdentity = z.infer<typeof ValidatedGoogleIdentitySche
 
 export type GoogleOAuthScope = (typeof GOOGLE_OAUTH_SCOPES)[number];
 
+const GOOGLE_SCOPE_ALIASES: Readonly<Record<string, GoogleOAuthScope>> = {
+  "https://www.googleapis.com/auth/userinfo.email": "email",
+};
+
 /** The authorization grant must contain exactly the four approved scopes. */
 export function parseGrantedGoogleScopes(scope: string | undefined): readonly GoogleOAuthScope[] {
   if (!scope || scope.trim() !== scope) throw new Error("Google OAuth scopes were not returned safely.");
   const values = scope.split(/\s+/);
+  const canonicalValues = values.map((value) => GOOGLE_SCOPE_ALIASES[value] ?? value);
   if (
-    values.length !== GOOGLE_OAUTH_SCOPES.length ||
-    new Set(values).size !== values.length ||
-    values.some((value) => !GOOGLE_OAUTH_SCOPES.includes(value as GoogleOAuthScope)) ||
-    GOOGLE_OAUTH_SCOPES.some((value) => !values.includes(value))
+    canonicalValues.some((value) => !GOOGLE_OAUTH_SCOPES.includes(value as GoogleOAuthScope)) ||
+    new Set(canonicalValues).size !== GOOGLE_OAUTH_SCOPES.length ||
+    GOOGLE_OAUTH_SCOPES.some((value) => !canonicalValues.includes(value))
   ) {
     throw new Error("Google OAuth scopes were outside the approved set.");
   }

@@ -9,14 +9,16 @@
 
 ## Issue
 
-The deployed callback returned the sanitized `invalid_request` / incomplete-callback response after Google consent. The callback schema was strict but allowed only the core `state`, `code`, and provider-error fields. Google's authorization-code response may also include bounded metadata such as `scope`, numeric `authuser`, hosted-domain `hd`, and `prompt`.
+The deployed callback returned the sanitized `invalid_request` / incomplete-callback response after Google consent. The callback schema was strict but allowed only the core `state`, `code`, and provider-error fields. Google's authorization-code response may also include bounded metadata such as `iss`, `scope`, numeric `authuser`, hosted-domain `hd`, and `prompt`. Google may also return the redundant `userinfo.email` spelling alongside the OIDC `email` scope.
 
 ## Correction
 
 - Accept Google's documented callback metadata with bounded schemas.
+- Validate a returned callback `iss` only against Google's two accepted issuer spellings.
+- Canonicalize only Google's redundant `userinfo.email` scope to the approved `email` identity scope.
 - Keep the metadata informational only; authorization remains bound to the stored state, session, redirect, client, PKCE verifier, and validated signed ID token.
 - Keep unknown callback fields rejected.
-- Keep exact approved scopes enforced from the token response before credential persistence.
+- Keep exact approved capabilities enforced from the token response before credential persistence; unrelated scopes remain rejected.
 - Add a regression proving the documented metadata path connects with deterministic provider fakes and an unknown field remains rejected.
 
 ## Verification

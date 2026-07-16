@@ -100,7 +100,7 @@ function stubGoogleTokenExchange(idToken: string, calls: string[]): void {
           expires_in: 3600,
           refresh_token: "fake-refresh-token",
           id_token: idToken,
-          scope: GOOGLE_OAUTH_SCOPES.join(" "),
+          scope: `${GOOGLE_OAUTH_SCOPES.join(" ")} https://www.googleapis.com/auth/userinfo.email`,
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
@@ -187,7 +187,7 @@ describe("Google OAuth routes", () => {
     const location = new URL(started.headers.get("location")!);
     stubGoogleTokenExchange(makeIdToken(location.searchParams.get("nonce")!, overrides), []);
 
-    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code&scope=${encodeURIComponent(GOOGLE_OAUTH_SCOPES.join(" "))}&authuser=0&hd=example.test&prompt=consent`;
+    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code&scope=${encodeURIComponent(GOOGLE_OAUTH_SCOPES.join(" "))}&authuser=0&hd=example.test&prompt=consent&iss=https%3A%2F%2Faccounts.google.com`;
     const response = await callbackGoogleOAuth(request(callbackPath, session));
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ error: { code: "forbidden", retryable: false } });
@@ -251,7 +251,7 @@ describe("Google OAuth routes", () => {
     const calls: string[] = [];
     stubGoogleTokenExchange(makeIdToken(location.searchParams.get("nonce")!), calls);
 
-    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code&scope=${encodeURIComponent(GOOGLE_OAUTH_SCOPES.join(" "))}&authuser=0&hd=example.test&prompt=consent`;
+    const callbackPath = `/api/v1/oauth/google/callback?state=${encodeURIComponent(location.searchParams.get("state")!)}&code=fake-code&scope=${encodeURIComponent(GOOGLE_OAUTH_SCOPES.join(" "))}&authuser=0&hd=example.test&prompt=consent&iss=https%3A%2F%2Faccounts.google.com`;
     const response = await callbackGoogleOAuth(request(callbackPath, session));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ status: "connected", provider: "google" });
