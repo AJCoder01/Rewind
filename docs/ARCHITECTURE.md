@@ -78,6 +78,8 @@ S051 adds the `initial-approval.v1` mutation boundary. The dashboard-only approv
 
 S052 connects approval to the durable action ledger without opening an effect path. `initial-execution.v1` materializes the fixed artifact → Calendar → Gmail tuple as three immutable planned rows with stable operation keys before any provider call. The claim coordinator rechecks approval and digest, enforces the fixed dependency order, distinguishes active leases from succeeded replay, permits only explicit retryable failures, marks expired Gmail work uncertain, and stops expired Calendar work for provider reconciliation. Provider invocation and before/after receipt persistence remain the S053–S055 service boundaries.
 
+S053 adds the scenario-specific initial artifact executor. It revalidates the immutable approved payload, claims the artifact row, persists a redacted source/content-hash before-state before calling the artifact port, passes the exact planned bytes without regeneration, verifies the returned content hash, and persists the typed artifact receipt/after-state. Known store unavailability is explicitly retryable; validation rejection is permanent; ambiguous or mismatched receipts stop as conflicts. `PostgresArtifactPort` uses a stable task-scoped artifact ID and never overwrites different content or provenance, while deterministic tests use `FakeArtifactPort`.
+
 ## 3. Intended source layout
 
 ```text

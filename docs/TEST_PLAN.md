@@ -200,7 +200,11 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 
 `tests/unit/initial-execution.test.ts` covers idempotent preparation of exactly three rows, fixed action order, stable row identity, active lease/busy behavior, succeeded skip, retryable-only claims, dependency blocking, expired Gmail uncertainty, expired Calendar reconciliation stops, terminal conflict blocking, and approval/digest authorization. Existing execution-persistence tests retain the lower-level duplicate-claim and lease contract. No provider or external effect is claimed.
 
-### 4.13 Integration tests with deterministic adapters
+### 4.13 S053 exact approved artifact execution
+
+`tests/unit/initial-artifact-execution.test.ts` covers exact planned-byte handoff, durable before-state ordering, typed receipt/after-state persistence, succeeded replay without a second write, retryable artifact unavailability, permanent validation rejection, receipt-hash mismatch conflict, before-state persistence failure with zero artifact calls, and task-scoped immutable PostgreSQL artifact replay. No live database/provider or external effect is claimed.
+
+### 4.14 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.
