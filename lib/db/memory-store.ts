@@ -135,6 +135,21 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
     return structuredClone(record.planPayload);
   }
 
+  async persistInitialPlanVersion(worldPrId: string, payload: NonNullable<CreateWorldPrStoreResult["planPayload"]>, view: WorldPrView): Promise<void> {
+    if (payload.taskId !== worldPrId || view.worldPrId !== worldPrId || !view.activePlan || view.activePlan.pointer.planId !== payload.planId) {
+      throw new StoreError("internal_error", "The refreshed plan does not belong to the World PR.");
+    }
+    WorldPrViewSchema.parse(view);
+    if (!this.byWorldPrId.has(worldPrId)) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+    const existing = this.byPlanId.get(payload.planId);
+    if (existing) {
+      if (JSON.stringify(existing.planPayload) !== JSON.stringify(payload)) throw new StoreError("internal_error", "An immutable plan version changed during refresh.");
+    } else {
+      this.byPlanId.set(payload.planId, { worldPrId, planPayload: structuredClone(payload) });
+    }
+    this.byWorldPrId.set(worldPrId, structuredClone(view));
+  }
+
   async updateView(worldPrId: string, view: WorldPrView): Promise<void> {
     if (view.worldPrId !== worldPrId) throw new StoreError("internal_error", "The durable World PR view identifier changed.");
     WorldPrViewSchema.parse(view);

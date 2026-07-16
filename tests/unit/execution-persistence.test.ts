@@ -65,7 +65,7 @@ describe("execution persistence contract", () => {
     const plan = executionPlan();
     await expect(store.createPlan(plan)).resolves.toEqual(plan);
     await expect(store.createPlan(plan)).resolves.toEqual(plan);
-    await expect(store.createPlan({ ...plan, digest: `sha256:${"f".repeat(64)}` })).rejects.toMatchObject({ code: "plan_immutable_conflict" });
+    await expect(store.createPlan({ ...plan, digest: `sha256:${"f".repeat(64)}` })).rejects.toThrow("Execution plan digest must match the immutable payload");
     const approval = ApprovalRecordSchema.parse({
       approvalId: createOpaqueId("approval_"),
       planId: plan.planId,

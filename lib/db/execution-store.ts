@@ -290,6 +290,7 @@ type PlanRow = QueryResultRow & {
 type ApprovalRow = QueryResultRow & {
   id: string;
   plan_id: string;
+  plan_version?: number;
   plan_digest: string;
   actor_id: string;
   approved_at: Date | string;
@@ -337,7 +338,7 @@ function rowToApproval(row: ApprovalRow): ApprovalRecord {
   return ApprovalRecordSchema.parse({
     approvalId: row.id,
     planId: row.plan_id,
-    planVersion: 1,
+    planVersion: Number(row.plan_version ?? 1),
     planDigest: row.plan_digest,
     actorId: row.actor_id,
     approvedAt: iso(row.approved_at),
@@ -419,18 +420,29 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const plan = await client.query<{ version: number; digest: string }>("SELECT version, digest FROM plans WHERE id = $1 FOR SHARE", [approval.planId]);
+      const plan = await client.query<{ version: number; digest: string; task_id: string; status: string }>(
+        `SELECT plans.version, plans.digest, plans.task_id, tasks.status
+           FROM plans JOIN tasks ON tasks.id = plans.task_id
+          WHERE plans.id = $1
+          FOR UPDATE OF plans, tasks`,
+        [approval.planId],
+      );
       if (plan.rowCount !== 1) throw new ExecutionPersistenceError("plan_not_found", "The approved plan does not exist.");
       if (plan.rows[0].version !== approval.planVersion || plan.rows[0].digest !== approval.planDigest) {
         throw new ExecutionPersistenceError("approval_conflict", "Approval does not match the immutable plan version and digest.");
       }
+      if (plan.rows[0].status !== "preview_ready") {
+        throw new ExecutionPersistenceError("approval_conflict", "The World PR is no longer an unapproved preview.");
+      }
       const existing = await client.query<ApprovalRow>(
-        `SELECT id, plan_id, plan_digest, actor_id, approved_at FROM approvals WHERE plan_id = $1 FOR UPDATE`,
+        `SELECT approvals.id, approvals.plan_id, plans.version AS plan_version, approvals.plan_digest, approvals.actor_id, approvals.approved_at
+           FROM approvals JOIN plans ON plans.id = approvals.plan_id
+          WHERE approvals.plan_id = $1 FOR UPDATE`,
         [approval.planId],
       );
       if (existing.rowCount === 1) {
-        const stored = rowToApproval({ ...existing.rows[0], planVersion: approval.planVersion } as ApprovalRow & { planVersion?: number });
-        const comparable = { ...stored, planVersion: approval.planVersion };
+        const stored = rowToApproval(existing.rows[0]);
+        const comparable = stored;
         if (JSON.stringify(comparable) !== JSON.stringify(approval)) throw new ExecutionPersistenceError("approval_conflict", "This plan already has a different immutable approval.");
         await client.query("COMMIT");
         return { approval, replay: true };

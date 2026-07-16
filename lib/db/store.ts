@@ -74,6 +74,7 @@ export interface WorldPrStore {
   createInitial(input: CreateWorldPrStoreInput): Promise<CreateWorldPrStoreResult>;
   get(worldPrId: string, actorId?: string): Promise<WorldPrView | null>;
   getInitialPlanPayload(worldPrId: string, planId: string): Promise<InitialPlanPayload | null>;
+  persistInitialPlanVersion(worldPrId: string, payload: InitialPlanPayload, view: WorldPrView): Promise<void>;
   updateView(worldPrId: string, view: WorldPrView): Promise<void>;
   cancel(input: CancelWorldPrStoreInput): Promise<CancelWorldPrStoreResult>;
 }

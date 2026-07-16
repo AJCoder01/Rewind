@@ -192,7 +192,11 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 
 `tests/unit/g2-closure.test.ts` validates the strict `g2-closure.v1` report, binds the selected `local_ollama` runtime to `ollama`/`local_model`, checks all six fixed evidence-risk categories, rejects matched secrets without returning their values, and proves that `assertG3Admission` throws for a blocked report. `npm run verify:g2-closure` reads only the committed S032–S044 sanitized evidence manifest and returns one safe JSON report. It performs no provider, database, OAuth, Calendar, Gmail, model, or product operation. G3 may begin only when the command returns `status: passed`, `g3Admission: unlocked`, and an empty blocker list.
 
-### 4.11 Integration tests with deterministic adapters
+### 4.11 S051 initial approval/cancel/replan
+
+`tests/unit/initial-approval.test.ts` covers exact actor/time/version/digest approval persistence, no action rows before execution, duplicate approval replay, stale pointer rejection, different-actor and MCP refusal, approved-plan cancellation lock preservation, immutable unapproved preview supersession, replacement digest/tamper rejection, and the dashboard-only route boundary. `tests/unit/execution-persistence.test.ts` additionally proves that the execution-plan schema rejects a payload/digest mismatch. All S051 tests use the deterministic memory fixture and ledger; no provider, database, model, or external effect is claimed.
+
+### 4.12 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.

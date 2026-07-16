@@ -9,6 +9,8 @@ import {
   type WorldPrView,
 } from "@/lib/contracts/v1";
 import { getWorldPrStore } from "@/lib/db";
+import { getExecutionPersistenceStore } from "@/lib/db";
+import { ExecutionPersistenceError } from "@/lib/db/execution-store";
 import {
   cancelBodyHash,
   FakeProviderConfigurationError,
@@ -29,6 +31,20 @@ export type ServiceErrorCode =
   | "scenario_busy"
   | "task_not_found"
   | "invalid_task_state"
+  | "plan_not_found"
+  | "plan_digest_mismatch"
+  | "plan_stale"
+  | "approval_required"
+  | "candidate_set_invalid"
+  | "model_output_invalid"
+  | "unknown_entity"
+  | "unknown_action"
+  | "unknown_template"
+  | "recipient_not_allowed"
+  | "provider_conflict"
+  | "delivery_uncertain"
+  | "action_not_retryable"
+  | "reset_conflict"
   | "provider_unavailable"
   | "internal_error";
 
@@ -111,6 +127,12 @@ export async function cancelWorldPr(input: CancelWorldPrInput): Promise<{ respon
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
   const requestId = input.requestId ?? createOpaqueId("req_");
   try {
+    const current = await getWorldPrStore().get(id.data, input.actorId);
+    if (!current) throw new ServiceError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+    if (current.activePlan?.pointer.kind === "initial") {
+      const approval = await getExecutionPersistenceStore().getApproval(current.activePlan.pointer.planId);
+      if (approval) throw new ServiceError("invalid_task_state", "An approved plan cannot be cancelled before its durable execution state is resolved.");
+    }
     const result: CancelWorldPrStoreResult = await getWorldPrStore().cancel({
       actorId: input.actorId,
       endpoint: `POST /api/v1/world-prs/${id.data}/cancel`,
@@ -158,6 +180,19 @@ function toServiceError(error: unknown): ServiceError {
   }
   if (error instanceof StorageNotConfiguredError || error instanceof FakeProviderConfigurationError) {
     return new ServiceError("provider_unavailable", "The configured storage or provider boundary is unavailable; no external action was attempted.", { cause: error });
+  }
+  if (error instanceof ExecutionPersistenceError) {
+    const messages: Record<ExecutionPersistenceError["code"], string> = {
+      plan_immutable_conflict: "The immutable plan already contains different content.",
+      plan_not_found: "The requested immutable plan does not exist.",
+      approval_conflict: "This immutable plan already has a different approval.",
+      action_immutable_conflict: "The immutable plan already has different durable action state.",
+      action_not_found: "The immutable plan has missing durable action state.",
+      action_not_claimable: "The immutable plan is not in a safe state for this operation.",
+      lease_reconciliation_required: "The immutable plan requires durable provider reconciliation before it can change.",
+      persistence_failure: "The request could not be recorded safely; no external action was attempted.",
+    };
+    return new ServiceError(error.code === "plan_not_found" ? "plan_not_found" : "provider_unavailable", messages[error.code], { cause: error });
   }
   return new ServiceError("internal_error", "The request could not be recorded safely; no external action was attempted.", { cause: error });
 }

@@ -28,7 +28,17 @@ export const ExecutionPlanCoreSchema = z
   })
   .strict();
 
-export const ExecutionPlanSchema = ExecutionPlanCoreSchema.extend({ digest: Sha256DigestSchema }).strict();
+export const ExecutionPlanSchema = ExecutionPlanCoreSchema.extend({ digest: Sha256DigestSchema })
+  .strict()
+  .superRefine((value, context) => {
+    if (computePlanPayloadDigest(value.payload) !== value.digest) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["digest"], message: "Execution plan digest must match the immutable payload" });
+    }
+    const payloadDigest = value.payload.digest;
+    if (typeof payloadDigest === "string" && payloadDigest !== value.digest) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["payload", "digest"], message: "Embedded payload digest must match the execution plan digest" });
+    }
+  });
 
 export const ApprovalRecordSchema = z
   .object({

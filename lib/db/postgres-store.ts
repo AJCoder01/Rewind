@@ -163,6 +163,51 @@ export class PostgresWorldPrStore implements WorldPrStore {
     return VerifiedInitialPlanPayloadSchema.parse(result.rows[0].payload);
   }
 
+  async persistInitialPlanVersion(worldPrId: string, payload: InitialPlanPayload, view: WorldPrView): Promise<void> {
+    const parsedPayload = VerifiedInitialPlanPayloadSchema.parse(payload);
+    const parsedView = WorldPrViewSchema.parse(view);
+    if (parsedPayload.taskId !== worldPrId || parsedView.worldPrId !== worldPrId || !parsedView.activePlan || !isInitialPlanView(parsedView.activePlan) || parsedView.activePlan.pointer.planId !== parsedPayload.planId) {
+      throw new StoreError("internal_error", "The refreshed plan does not belong to the World PR.");
+    }
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const current = await client.query<{ read_model: unknown }>("SELECT read_model FROM tasks WHERE id = $1 FOR UPDATE", [worldPrId]);
+      if (!current.rowCount) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+      const existingPlan = await client.query<{ payload: unknown }>("SELECT payload FROM plans WHERE id = $1 AND task_id = $2 AND kind = 'initial'", [parsedPayload.planId, worldPrId]);
+      if (existingPlan.rowCount === 1) {
+        if (canonicalJson(VerifiedInitialPlanPayloadSchema.parse(existingPlan.rows[0].payload)) !== canonicalJson(parsedPayload)) {
+          throw new StoreError("internal_error", "An immutable plan version changed during refresh.");
+        }
+      } else {
+        await client.query(
+          `INSERT INTO plans
+            (id, task_id, kind, version, schema_version, prompt_version, model, payload, digest, created_at)
+           VALUES ($1, $2, 'initial', $3, 'initial-plan.v1', $4, $5, $6::jsonb, $7, now())`,
+          [parsedPayload.planId, worldPrId, parsedPayload.version, parsedPayload.modelMetadata.promptVersion, parsedPayload.modelMetadata.model, JSON.stringify(parsedPayload), parsedPayload.digest],
+        );
+      }
+      await client.query(
+        `UPDATE tasks
+            SET status = $2,
+                run_id = $3,
+                planning_lease_until = now() + interval '10 minutes',
+                attention_reason = NULL,
+                read_model = $4::jsonb,
+                updated_at = now()
+          WHERE id = $1`,
+        [worldPrId, parsedView.status, parsedView.runId ?? null, JSON.stringify(parsedView)],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      if (error instanceof StoreError) throw error;
+      throw new StoreError("internal_error", "The refreshed plan could not be persisted safely.", { cause: error });
+    } finally {
+      client.release();
+    }
+  }
+
   async updateView(worldPrId: string, view: WorldPrView): Promise<void> {
     const parsed = WorldPrViewSchema.parse(view);
     const result = await this.pool.query(
@@ -200,6 +245,16 @@ export class PostgresWorldPrStore implements WorldPrStore {
       const taskResult = await client.query<{ read_model: unknown }>("SELECT read_model FROM tasks WHERE id = $1 FOR UPDATE", [input.worldPrId]);
       if (!taskResult.rowCount) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
       const current = WorldPrViewSchema.parse(taskResult.rows[0].read_model);
+      const approvedPlan = await client.query(
+        `SELECT 1
+           FROM approvals
+           JOIN plans ON plans.id = approvals.plan_id
+          WHERE plans.task_id = $1
+            AND plans.kind = 'initial'
+          LIMIT 1`,
+        [input.worldPrId],
+      );
+      if (approvedPlan.rowCount) throw new StoreError("invalid_task_state", "This World PR has an approved plan and cannot be cancelled before durable execution is resolved.");
       if (current.status !== "preview_ready" && current.status !== "clarification_required") {
         throw new StoreError("invalid_task_state", "This World PR cannot be cancelled from its current state.");
       }

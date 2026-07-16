@@ -329,26 +329,33 @@ Request:
 ```json
 {
   "planId": "plan_01...",
+  "planVersion": 1,
   "planDigest": "sha256:..."
 }
 ```
 
-The approval request runs the short, persisted saga synchronously. It does not return `202` and continue work in an unobserved background task. While the request is active, reads may show `executing`.
+The approval mutation is dashboard-only and runs its durable approval write synchronously. MCP may create and read safe status, but may never approve or replan. At the S051 boundary this endpoint records the exact actor/time/plan-version/digest and returns the still-reviewable `preview_ready` state; it creates no action rows and calls no provider. S052–S055 extend this same approved-plan boundary with durable action preparation and execution. It does not return `202` and continue an unobserved background task.
 
-Success `200` after all approved initial actions succeed:
+Success `200` at S051:
 
 ```json
 {
   "worldPrId": "wpr_01...",
-  "status": "completed",
-  "planId": "plan_01...",
+  "status": "preview_ready",
+  "activePlan": { "planId": "plan_01...", "kind": "initial", "version": 1, "digest": "sha256:..." },
   "requestId": "req_01..."
 }
 ```
 
-The handler transaction verifies session, CSRF, task state, current plan ID/digest, provider preview version, and absence of an existing different approval. It stores approval and claims/creates action ledger rows before dispatch. A partial/conflict/uncertain outcome returns the durable `attention_required` read model rather than a success claim; the action ledger remains resumable where safe.
+The handler verifies session, CSRF, task state, the exact current plan ID/version/digest, and absence of an existing different approval. An identical approval replays without a second approval or timeline entry; another actor or any changed pointer/content fails closed. The approved plan cannot be cancelled or replanned, and the scenario lock is not released. Provider/recipient/template/version drift is rejected by the later execution preflight before any action row dispatch.
 
 If provider state differs before any action row starts, return `409 plan_stale`, mark the plan superseded, execute nothing, and direct the user to section 3.11.1. Never mutate an approved plan in place.
+
+### 3.5.1 Supersede an unapproved initial preview
+
+`POST /api/v1/world-prs/:worldPrId/plans/initial/refresh`
+
+The request body is the same strict `{ planId, planVersion, planDigest }` pointer. It is dashboard-only, requires `Idempotency-Key`, and is allowed only for the current `preview_ready` plan before approval or durable action state. The S051 fixture-safe boundary persists a server-owned successor with a new plan ID, version, digest, and pointer while retaining the old payload unchanged; a later provider-backed implementation must supply a freshly resolved successor before claiming provider drift is repaired. The HTTP caller cannot supply provider IDs, recipients, content, dependencies, or action payloads. A stale pointer, approved plan, or existing action row returns `409` and no plan is mutated.
 
 ### 3.6 Resume known-safe work
 
@@ -440,7 +447,7 @@ Resolution first tries to acquire the effect-bearing scenario lock. If another r
 
 `POST /api/v1/world-prs/:worldPrId/plans/initial/refresh`
 
-Allowed only when no initial action has started. It refetches candidates/provider versions, reruns initial planning and artifact validation, stores `version + 1`, marks the old plan superseded, and returns `preview_ready` with a new `PlanPointer`. Any old approval is invalid. If an action row/approval has begun execution, return `409 invalid_task_state`.
+Allowed only when no initial action has started. S051 establishes the authenticated, fixture-safe supersession boundary and rejects caller-supplied replacement effects; the provider-backed path must refetch candidates/provider versions, rerun initial planning and artifact validation, store `version + 1`, mark the old plan superseded, and return `preview_ready` with a new `PlanPointer`. Any old approval is invalid. If an action row/approval has begun execution, return `409 invalid_task_state`.
 
 #### 3.11.2 Refresh recovery preview
 
