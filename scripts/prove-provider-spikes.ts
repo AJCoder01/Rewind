@@ -29,6 +29,7 @@ import {
   providerSpikeTargetFingerprint,
   runControlledCalendarProviderSpike,
   ProviderSpikeFailureError,
+  runControlledProviderModelSpikePhases,
   safeProviderSpikeFailureCode,
 } from "@/lib/services/provider-spike";
 import { assertTtyGatedDemoEnvironment, calendarDemoConfigurationFromEnvironment } from "@/lib/services/calendar-demo-command";
@@ -71,63 +72,58 @@ async function main(): Promise<void> {
       return;
     }
 
-    pool = new Pool({ connectionString: databaseUrl, max: 1 });
-    const oauthStore = new PostgresOAuthStore(pool);
-    const credential = await oauthStore.getCredential();
-    if (
-      !credential ||
-      credential.googleSub !== environment.REWIND_GOOGLE_EXPECTED_SUB ||
-      credential.email !== environment.REWIND_GOOGLE_EXPECTED_EMAIL
-    ) {
-      throw new ProviderSpikeFailureError("credential_unavailable");
-    }
-    const accessToken = await refreshGoogleAccessToken(
-      { clientId: environment.GOOGLE_CLIENT_ID, clientSecret: environment.GOOGLE_CLIENT_SECRET },
-      credential,
-      environment.REWIND_TOKEN_ENCRYPTION_KEY,
-      oauthStore,
-    );
-    const calendar = new GoogleCalendarPort({
-      accessToken: accessToken.accessToken,
-      calendarId: configuration.calendarId,
-      expectedEmail: configuration.expectedEmail,
+    const spike = await runControlledProviderModelSpikePhases({
+      runModel: async () => {
+        const model = new OpenAIModelPort({
+          client: new OpenAIResponsesClient({ apiKey: environment.OPENAI_API_KEY }),
+          model: environment.OPENAI_MODEL,
+        });
+        const initial = modelSummary(await requestValidatedInitialProposal(model, MODEL_SAFETY_INITIAL_INPUT, MODEL_SAFETY_INITIAL_CONTEXT));
+        const recoveryResult = await requestValidatedRecoveryProposal(model, MODEL_SAFETY_RECOVERY_INPUT, MODEL_SAFETY_RECOVERY_CONTEXT);
+        const recovery = {
+          operation: "recovery" as const,
+          ...modelSummary(recoveryResult),
+        };
+        const preventionResult = await requestValidatedPreventionRuleProposal(model, MODEL_SAFETY_PREVENTION_INPUT, MODEL_SAFETY_PREVENTION_CONTEXT);
+        const prevention = {
+          operation: "prevention_rule" as const,
+          ...modelSummary(preventionResult),
+        };
+        return { operations: [{ operation: "initial" as const, ...initial }, recovery, prevention] };
+      },
+      runCalendar: async () => {
+        pool = new Pool({ connectionString: databaseUrl, max: 1 });
+        const oauthStore = new PostgresOAuthStore(pool);
+        const credential = await oauthStore.getCredential();
+        if (
+          !credential ||
+          credential.googleSub !== environment.REWIND_GOOGLE_EXPECTED_SUB ||
+          credential.email !== environment.REWIND_GOOGLE_EXPECTED_EMAIL
+        ) {
+          throw new ProviderSpikeFailureError("credential_unavailable");
+        }
+        const accessToken = await refreshGoogleAccessToken(
+          { clientId: environment.GOOGLE_CLIENT_ID, clientSecret: environment.GOOGLE_CLIENT_SECRET },
+          credential,
+          environment.REWIND_TOKEN_ENCRYPTION_KEY,
+          oauthStore,
+        );
+        const calendar = new GoogleCalendarPort({
+          accessToken: accessToken.accessToken,
+          calendarId: configuration.calendarId,
+          expectedEmail: configuration.expectedEmail,
+        });
+        const state = new PostgresDemoEventStateStore(pool);
+        return runControlledCalendarProviderSpike({ calendar, state, configuration, runId });
+      },
     });
-    const state = new PostgresDemoEventStateStore(pool);
-    const calendarResult = await runControlledCalendarProviderSpike({
-      calendar,
-      state,
-      configuration,
-      runId,
-    });
-
-    const model = new OpenAIModelPort({
-      client: new OpenAIResponsesClient({ apiKey: environment.OPENAI_API_KEY }),
-      model: environment.OPENAI_MODEL,
-    });
-    const initial = modelSummary(await requestValidatedInitialProposal(model, MODEL_SAFETY_INITIAL_INPUT, MODEL_SAFETY_INITIAL_CONTEXT));
-    const recoveryResult = await requestValidatedRecoveryProposal(model, MODEL_SAFETY_RECOVERY_INPUT, MODEL_SAFETY_RECOVERY_CONTEXT);
-    const recovery = {
-      operation: "recovery" as const,
-      ...modelSummary(recoveryResult),
-    };
-    const preventionResult = await requestValidatedPreventionRuleProposal(model, MODEL_SAFETY_PREVENTION_INPUT, MODEL_SAFETY_PREVENTION_CONTEXT);
-    const prevention = {
-      operation: "prevention_rule" as const,
-      ...modelSummary(preventionResult),
-    };
 
     const report = ProviderSpikeReportSchema.parse({
       status: "ok",
       operation: "provider_model_spikes",
       contractVersion: PROVIDER_SPIKE_CONTRACT_VERSION,
-      calendar: calendarResult,
-      model: {
-        operations: [
-          { operation: "initial", ...initial },
-          recovery,
-          prevention,
-        ],
-      },
+      calendar: spike.calendar,
+      model: spike.model,
       productExecution: "disabled",
       productReset: "disabled",
       externalEffects: "calendar_move_restore_only",

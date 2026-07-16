@@ -13,7 +13,17 @@ import {
   type RecoveryModelInput,
 } from "@/lib/contracts/provider-ports";
 
-export type ModelProviderFailureKind = "unavailable" | "refusal" | "truncated" | "invalid_output";
+export type ModelProviderFailureKind =
+  | "invalid_request"
+  | "unauthorized"
+  | "forbidden"
+  | "not_found"
+  | "rate_limited"
+  | "timeout"
+  | "unavailable"
+  | "refusal"
+  | "truncated"
+  | "invalid_output";
 
 export type ModelRetryContext = Readonly<{
   attempt: 2;

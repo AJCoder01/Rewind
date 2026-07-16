@@ -86,6 +86,20 @@ export function safeProviderSpikeFailureCode(error: unknown): string {
 }
 
 /**
+ * Execute the non-effecting model proof before any Calendar mutation. This
+ * prevents model configuration/provider failures from causing repeated live
+ * Calendar move/restore cycles during the human spike.
+ */
+export async function runControlledProviderModelSpikePhases<TModel, TCalendar>(input: Readonly<{
+  runModel: () => Promise<TModel>;
+  runCalendar: () => Promise<TCalendar>;
+}>): Promise<Readonly<{ model: TModel; calendar: TCalendar }>> {
+  const model = await input.runModel();
+  const calendar = await input.runCalendar();
+  return { model, calendar };
+}
+
+/**
  * Provider-spike-only Calendar wrapper. It forces one stale If-Match request
  * to the real adapter, which must return a 412 without changing the event.
  * It is not used by product routes and never retries the request.

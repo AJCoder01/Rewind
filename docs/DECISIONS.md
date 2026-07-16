@@ -48,6 +48,7 @@ This file records why a decision was made and which choices remain open. Accepte
 | ADR-027 | Freeze explicit provider ports and deterministic fakes | Accepted |
 | ADR-028 | Keep Calendar setup live-only, TTY-gated, and baseline-first | Accepted |
 | ADR-029 | Isolate S043 provider/model spikes from product execution/reset | Accepted |
+| ADR-030 | Use one model retry budget and sanitized transport categories | Accepted |
 
 ## Accepted decisions
 
@@ -282,6 +283,14 @@ This file records why a decision was made and which choices remain open. Accepte
 **Why:** G2 must retire OAuth, ETag, provider receipt, and strict-output risk before G3 product execution exists. Combining this risk probe with a partially implemented product saga would make live success ambiguous and could turn a spike into an unapproved external action.
 
 **Consequence:** S043 can prove real provider behavior with honest, redacted receipts while product execution and reset remain disabled. Existing S035 OAuth/lookup and S038 Gmail/replay evidence are reused, avoiding duplicate live mail.
+
+### ADR-030 — Use one model retry budget and sanitized transport categories
+
+**Decision:** The semantic validation runner owns the complete maximum of two model provider calls. `OpenAIModelPort` invokes the raw Responses client with one attempt per outer call. Deterministic invalid-request, authentication, permission, missing-model, and fallback failures stop immediately; retryable transport/output/schema/semantic failures may receive one second attempt. The raw boundary classifies HTTP status and local timeout without parsing or exposing provider error bodies. The S043 model phase completes before any Calendar write.
+
+**Why:** The first S043 live attempts collapsed every non-success into `unavailable` and combined two retry layers into as many as four HTTP requests. They also performed reversible Calendar work before discovering model failure. That obscured the external prerequisite, violated the intended attempt ceiling, and repeated avoidable live effects.
+
+**Consequence:** A future failure safely distinguishes configuration/permission, rate-limit, timeout, transient provider, refusal/truncation, and malformed-output classes. No secret or provider diagnostic body enters output, and a model failure causes zero Calendar writes.
 
 ## Rejected alternatives
 

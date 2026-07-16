@@ -123,6 +123,72 @@ describe("S040 OpenAI Responses client", () => {
     await expect(client.createStructured(request)).rejects.not.toThrow(apiKey);
   });
 
+  it.each([
+    [400, "invalid_request"],
+    [401, "unauthorized"],
+    [403, "forbidden"],
+    [404, "not_found"],
+    [422, "invalid_request"],
+  ] as const)("classifies HTTP %i without retrying or exposing the response", async (status, kind) => {
+    let callCount = 0;
+    const client = new OpenAIResponsesClient({
+      apiKey,
+      fetchImpl: async () => {
+        callCount += 1;
+        return jsonResponse({ error: { message: `private ${apiKey}` } }, status);
+      },
+    });
+
+    await expect(client.createStructured(request)).rejects.toMatchObject({ kind, attempts: 1 });
+    expect(callCount).toBe(1);
+    await expect(client.createStructured(request)).rejects.not.toThrow(apiKey);
+  });
+
+  it.each([
+    [408, "timeout"],
+    [409, "unavailable"],
+    [429, "rate_limited"],
+  ] as const)("classifies retryable HTTP %i and stops at the shared attempt ceiling", async (status, kind) => {
+    let callCount = 0;
+    const client = new OpenAIResponsesClient({
+      apiKey,
+      fetchImpl: async () => {
+        callCount += 1;
+        return jsonResponse({ error: { message: "private transient detail" } }, status);
+      },
+    });
+
+    await expect(client.createStructured(request)).rejects.toMatchObject({ kind, attempts: 2 });
+    expect(callCount).toBe(2);
+  });
+
+  it("classifies rate limits and honors a caller-owned one-attempt budget", async () => {
+    let callCount = 0;
+    const client = new OpenAIResponsesClient({
+      apiKey,
+      fetchImpl: async () => {
+        callCount += 1;
+        return jsonResponse({ error: { message: "private rate-limit detail" } }, 429);
+      },
+    });
+
+    await expect(client.createStructured(request, { maxAttempts: 1 })).rejects.toMatchObject({ kind: "rate_limited", attempts: 1 });
+    expect(callCount).toBe(1);
+  });
+
+  it("distinguishes a local timeout from provider unavailability", async () => {
+    const client = new OpenAIResponsesClient({
+      apiKey,
+      timeoutMs: 10,
+      fetchImpl: async (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+        }),
+    });
+
+    await expect(client.createStructured(request, { maxAttempts: 1 })).rejects.toMatchObject({ kind: "timeout", attempts: 1 });
+  });
+
   it("rejects non-strict schemas before making a provider request", async () => {
     let called = false;
     const client = new OpenAIResponsesClient({

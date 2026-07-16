@@ -106,7 +106,9 @@ export class OpenAIModelPort implements ModelProposalPort {
     };
     let result: Awaited<ReturnType<OpenAIResponsesClient["createStructured"]>>;
     try {
-      result = await this.client.createStructured(request);
+      // The outer S042 validator owns the one allowed retry so the complete
+      // model path can never amplify two logical attempts into four HTTP calls.
+      result = await this.client.createStructured(request, { maxAttempts: 1 });
     } catch (error) {
       if (error instanceof OpenAIResponsesError) throw new ModelProviderError(error.kind);
       throw error;

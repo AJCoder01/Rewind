@@ -51,6 +51,12 @@ export type ModelSafetyFailureKind =
   | "schema_invalid"
   | "semantic_invalid"
   | "fallback_forbidden"
+  | "invalid_request"
+  | "unauthorized"
+  | "forbidden"
+  | "not_found"
+  | "rate_limited"
+  | "timeout"
   | "unavailable"
   | "refusal"
   | "truncated"
@@ -378,6 +384,10 @@ function safeFailure(operation: ModelOperation, error: unknown, attempts: number
   return new ModelSafetyError(operation, "invalid_output", attempts);
 }
 
+function retryableFailure(kind: ModelSafetyFailureKind): boolean {
+  return !["fallback_forbidden", "invalid_request", "unauthorized", "forbidden", "not_found"].includes(kind);
+}
+
 async function runValidatedProposal<T>(
   operation: ModelOperation,
   invoke: (retryContext?: ModelRetryContext) => Promise<ModelProposalResponse>,
@@ -393,6 +403,7 @@ async function runValidatedProposal<T>(
       return { proposal, metadata: response.metadata, attempts: attempt };
     } catch (error) {
       lastFailure = safeFailure(operation, error, attempt);
+      if (!retryableFailure(lastFailure.kind)) throw lastFailure;
       if (attempt < MODEL_VALIDATION_MAX_ATTEMPTS) {
         retryContext = {
           attempt: 2,

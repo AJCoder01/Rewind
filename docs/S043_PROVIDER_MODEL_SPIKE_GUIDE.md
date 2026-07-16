@@ -24,14 +24,14 @@ The private prompt repeats the exact configured Calendar ID and a target fingerp
 
 The command then:
 
-1. Reads and validates exactly two tagged, owned, timed, non-recurring events and two persisted rolling versions.
-2. Sends one deliberately stale `If-Match` Calendar patch for the US candidate; Google must return a provider conflict and the event must remain unchanged.
-3. Moves the UK candidate by one hour with `sendUpdates=none`, verifies the after-state, and restores the recorded move exactly once.
-4. Runs initial, recovery, and prevention-rule strict Structured Outputs using synthetic fixture data only, then passes each result through the S042 semantic validator.
+1. Runs initial, recovery, and prevention-rule strict Structured Outputs using synthetic fixture data only, then passes each result through the S042 semantic validator.
+2. Only after all three model proofs pass, reads and validates exactly two tagged, owned, timed, non-recurring events and two persisted rolling versions.
+3. Sends one deliberately stale `If-Match` Calendar patch for the US candidate; Google must return a provider conflict and the event must remain unchanged.
+4. Moves the UK candidate by one hour with `sendUpdates=none`, verifies the after-state, and restores the recorded move exactly once.
 
 The Calendar move and restore are the only external effects in this command. The stale US request is intended to produce no Calendar mutation. Model calls have no external effect and use `store: false`.
 
-Do not rerun the command after a timeout or uncertain provider result. Stop and report the sanitized failure code; a Calendar `uncertain` outcome requires review before any further action. Known safe diagnostic codes include `credential_unavailable`, `oauth_*`, `provider_unavailable`, `preflight_failed`, `openai_*`, and `model_*`; they never contain provider text. Do not retry until the code has been reviewed.
+Do not rerun the command after a timeout or uncertain provider result. Stop and report the sanitized failure code; a Calendar `uncertain` outcome requires review before any further action. Known safe diagnostic codes include `credential_unavailable`, `oauth_*`, `provider_unavailable`, `preflight_failed`, and `model_<operation>_<kind>`. Model kinds distinguish `invalid_request`, `unauthorized`, `forbidden`, `not_found`, `rate_limited`, `timeout`, `unavailable`, `refusal`, `truncated`, and `invalid_output`; they never contain provider text. Deterministic request/auth/permission/model-lookup failures are not retried. A model failure occurs before any Calendar mutation.
 
 ## Gmail evidence
 

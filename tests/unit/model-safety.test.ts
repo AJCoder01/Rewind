@@ -273,9 +273,21 @@ describe("S042 model retry and fallback safety", () => {
     );
     await expect(
       requestValidatedPreventionRuleProposal(model, MODEL_SAFETY_PREVENTION_INPUT, MODEL_SAFETY_PREVENTION_CONTEXT),
-    ).rejects.toMatchObject({ kind: "fallback_forbidden", attempts: 2 });
-    expect(model.calls).toEqual(["prevention_rule", "prevention_rule"]);
+    ).rejects.toMatchObject({ kind: "fallback_forbidden", attempts: 1 });
+    expect(model.calls).toEqual(["prevention_rule"]);
   });
+
+  it.each(["invalid_request", "unauthorized", "forbidden", "not_found"] as const)(
+    "does not retry deterministic %s provider failures",
+    async (kind) => {
+      const model = new FakeModelPort({ outputs: {}, failures: [{ operation: "initial", kind }] });
+      await expect(requestValidatedInitialProposal(model, MODEL_SAFETY_INITIAL_INPUT, MODEL_SAFETY_INITIAL_CONTEXT)).rejects.toMatchObject({
+        kind,
+        attempts: 1,
+      });
+      expect(model.getCalls()).toEqual(["initial"]);
+    },
+  );
 
   it("does not expose model output or provider failure text in safe errors", () => {
     const error = new ModelSafetyError("recovery", "semantic_invalid", 2, [{ code: "explicit_target_required", path: "correctedAssumption" }]);

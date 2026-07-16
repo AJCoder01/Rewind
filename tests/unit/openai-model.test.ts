@@ -3,14 +3,16 @@ import { OpenAIModelPort } from "@/lib/ai/openai-model";
 import { requestValidatedInitialProposal } from "@/lib/ai/model-safety";
 import { OpenAIResponsesError } from "@/lib/ai/openai-responses";
 import { MODEL_SAFETY_INITIAL_CONTEXT, MODEL_SAFETY_INITIAL_INPUT, MODEL_SAFETY_INITIAL_PROPOSAL } from "@/tests/fixtures/model-safety";
-import type { OpenAIResponsesRequest, OpenAIResponsesResult } from "@/lib/ai/openai-responses";
+import type { OpenAIResponsesAttemptOptions, OpenAIResponsesRequest, OpenAIResponsesResult } from "@/lib/ai/openai-responses";
 
 describe("OpenAI model proposal adapter", () => {
   it("binds a strict schema request to the versioned prompt and emits model metadata", async () => {
     let request: OpenAIResponsesRequest | undefined;
+    let attemptOptions: OpenAIResponsesAttemptOptions | undefined;
     const client = {
-      createStructured: async (input: OpenAIResponsesRequest): Promise<OpenAIResponsesResult> => {
+      createStructured: async (input: OpenAIResponsesRequest, options?: OpenAIResponsesAttemptOptions): Promise<OpenAIResponsesResult> => {
         request = input;
+        attemptOptions = options;
         return {
           parsed: MODEL_SAFETY_INITIAL_PROPOSAL,
           metadata: {
@@ -37,13 +39,17 @@ describe("OpenAI model proposal adapter", () => {
     ]));
     expect(request?.jsonSchema).toMatchObject({ type: "object", additionalProperties: false });
     expect(request?.promptVersion).toBe("controlled-provider-spike.v1");
+    expect(attemptOptions).toEqual({ maxAttempts: 1 });
     expect(JSON.stringify(request)).not.toContain("owner@example.com");
   });
 
   it("preserves safe Responses failure kinds through the model port", async () => {
+    let calls = 0;
     const model = new OpenAIModelPort({
       client: {
-        createStructured: async (): Promise<never> => {
+        createStructured: async (_request, options): Promise<never> => {
+          calls += 1;
+          expect(options).toEqual({ maxAttempts: 1 });
           throw new OpenAIResponsesError("truncated", 2);
         },
       },
@@ -54,5 +60,6 @@ describe("OpenAI model proposal adapter", () => {
       kind: "truncated",
       attempts: 2,
     });
+    expect(calls).toBe(2);
   });
 });

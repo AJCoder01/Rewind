@@ -10,6 +10,7 @@ import {
   ProviderSpikeFailureError,
   providerSpikeConfirmationPhrase,
   runControlledCalendarProviderSpike,
+  runControlledProviderModelSpikePhases,
   safeProviderSpikeFailureCode,
 } from "@/lib/services/provider-spike";
 import { OpenAIResponsesError } from "@/lib/ai/openai-responses";
@@ -106,5 +107,39 @@ describe("controlled provider spike boundary", () => {
     expect(safeProviderSpikeFailureCode(new GoogleOAuthProviderError("response_invalid"))).toBe("oauth_response_invalid");
     expect(safeProviderSpikeFailureCode(new OpenAIResponsesError("invalid_output", 2))).toBe("openai_invalid_output");
     expect(safeProviderSpikeFailureCode(new ModelSafetyError("recovery", "semantic_invalid", 2))).toBe("model_recovery_semantic_invalid");
+    expect(safeProviderSpikeFailureCode(new ModelSafetyError("initial", "forbidden", 1))).toBe("model_initial_forbidden");
+    expect(safeProviderSpikeFailureCode(new ModelSafetyError("initial", "timeout", 2))).toBe("model_initial_timeout");
+  });
+
+  it("completes the non-effecting model phase before Calendar and skips Calendar on model failure", async () => {
+    const calls: string[] = [];
+    await expect(
+      runControlledProviderModelSpikePhases({
+        runModel: async () => {
+          calls.push("model");
+          throw new ModelSafetyError("initial", "forbidden", 1);
+        },
+        runCalendar: async () => {
+          calls.push("calendar");
+          return "calendar-result";
+        },
+      }),
+    ).rejects.toMatchObject({ kind: "forbidden" });
+    expect(calls).toEqual(["model"]);
+
+    calls.length = 0;
+    await expect(
+      runControlledProviderModelSpikePhases({
+        runModel: async () => {
+          calls.push("model");
+          return "model-result";
+        },
+        runCalendar: async () => {
+          calls.push("calendar");
+          return "calendar-result";
+        },
+      }),
+    ).resolves.toEqual({ model: "model-result", calendar: "calendar-result" });
+    expect(calls).toEqual(["model", "calendar"]);
   });
 });
