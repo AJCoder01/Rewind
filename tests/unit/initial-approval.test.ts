@@ -60,7 +60,7 @@ describe("S051 initial approval, cancellation, and replan", () => {
     }
   });
 
-  it("stores the exact actor/time/version/digest approval without creating action rows", async () => {
+  it("stores the exact actor/time/version/digest approval and prepares three planned action rows", async () => {
     const { created, pointer } = await createPreview();
     const result = await approve(created.response.worldPrId, pointer);
 
@@ -75,7 +75,14 @@ describe("S051 initial approval, cancellation, and replan", () => {
       actorId: "test:operator",
       approvedAt: fixedNow().toISOString(),
     });
-    await expect(memoryExecutionStore.listActions(pointer.planId)).resolves.toHaveLength(0);
+    const actionRows = await memoryExecutionStore.listActions(pointer.planId);
+    expect(actionRows).toHaveLength(3);
+    expect(actionRows.map((action) => action.actionKey)).toEqual([
+      "initial.artifact.account_brief",
+      "initial.calendar.move",
+      "initial.mail.notify",
+    ]);
+    expect(actionRows.every((action) => action.status === "planned")).toBe(true);
     expect(result.view.timeline).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: "approval.recorded", label: "Initial plan approved; no external action has started.", status: "preview_ready" }),
     ]));

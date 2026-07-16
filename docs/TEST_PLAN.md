@@ -194,9 +194,13 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 
 ### 4.11 S051 initial approval/cancel/replan
 
-`tests/unit/initial-approval.test.ts` covers exact actor/time/version/digest approval persistence, no action rows before execution, duplicate approval replay, stale pointer rejection, different-actor and MCP refusal, approved-plan cancellation lock preservation, immutable unapproved preview supersession, replacement digest/tamper rejection, and the dashboard-only route boundary. `tests/unit/execution-persistence.test.ts` additionally proves that the execution-plan schema rejects a payload/digest mismatch. All S051 tests use the deterministic memory fixture and ledger; no provider, database, model, or external effect is claimed.
+`tests/unit/initial-approval.test.ts` covers exact actor/time/version/digest approval persistence, three planned rows before dispatch, duplicate approval replay, stale pointer rejection, different-actor and MCP refusal, approved-plan cancellation lock preservation, immutable unapproved preview supersession, replacement digest/tamper rejection, and the dashboard-only route boundary. `tests/unit/execution-persistence.test.ts` additionally proves that the execution-plan schema rejects a payload/digest mismatch. All S051 tests use the deterministic memory fixture and ledger; no provider, database, model, or external effect is claimed.
 
-### 4.12 Integration tests with deterministic adapters
+### 4.12 S052 durable action ledger
+
+`tests/unit/initial-execution.test.ts` covers idempotent preparation of exactly three rows, fixed action order, stable row identity, active lease/busy behavior, succeeded skip, retryable-only claims, dependency blocking, expired Gmail uncertainty, expired Calendar reconciliation stops, terminal conflict blocking, and approval/digest authorization. Existing execution-persistence tests retain the lower-level duplicate-claim and lease contract. No provider or external effect is claimed.
+
+### 4.13 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.

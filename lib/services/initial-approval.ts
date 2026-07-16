@@ -28,6 +28,7 @@ import {
 import { StoreError, type WorldPrStore } from "@/lib/db/store";
 import { sha256Digest } from "@/lib/domain/digest";
 import { createOpaqueId } from "@/lib/domain/ids";
+import { prepareInitialActionRows } from "@/lib/services/initial-execution";
 import { ServiceError } from "@/lib/services/world-pr";
 
 export type InitialPlanMutationInput = Readonly<{
@@ -71,6 +72,7 @@ export async function approveInitialPlan(
     const existing = await executionStore.getApproval(plan.planId);
     if (existing) {
       assertReplayApproval(existing, input.actorId, parsedRequest);
+      await prepareInitialActionRows(plan, executionStore, { now: dependencies.now });
       const repaired = await ensureApprovalTimeline(worldStore, current, existing);
       return mutationResult(repaired, input.requestId, true);
     }
@@ -94,9 +96,11 @@ export async function approveInitialPlan(
       const raced = await executionStore.getApproval(plan.planId);
       if (!raced) throw error;
       assertReplayApproval(raced, input.actorId, parsedRequest);
+      await prepareInitialActionRows(plan, executionStore, { now: dependencies.now });
       const repaired = await ensureApprovalTimeline(worldStore, current, raced);
       return mutationResult(repaired, input.requestId, true);
     }
+    await prepareInitialActionRows(plan, executionStore, { now: dependencies.now });
     const nextView = await ensureApprovalTimeline(worldStore, current, persisted.approval);
     return mutationResult(nextView, input.requestId, persisted.replay);
   } catch (error) {

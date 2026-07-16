@@ -334,9 +334,9 @@ Request:
 }
 ```
 
-The approval mutation is dashboard-only and runs its durable approval write synchronously. MCP may create and read safe status, but may never approve or replan. At the S051 boundary this endpoint records the exact actor/time/plan-version/digest and returns the still-reviewable `preview_ready` state; it creates no action rows and calls no provider. S052–S055 extend this same approved-plan boundary with durable action preparation and execution. It does not return `202` and continue an unobserved background task.
+The approval mutation is dashboard-only and runs its durable approval write and action-ledger preparation synchronously. MCP may create and read safe status, but may never approve or replan. The endpoint records the exact actor/time/plan-version/digest, materializes exactly three immutable `planned` action rows before any dispatch, and calls no provider. S053–S055 extend this same approved-plan boundary with exact artifact, Calendar, and Gmail execution. It does not return `202` and continue an unobserved background task.
 
-Success `200` at S051:
+Success `200` at S052:
 
 ```json
 {
@@ -347,7 +347,7 @@ Success `200` at S051:
 }
 ```
 
-The handler verifies session, CSRF, task state, the exact current plan ID/version/digest, and absence of an existing different approval. An identical approval replays without a second approval or timeline entry; another actor or any changed pointer/content fails closed. The approved plan cannot be cancelled or replanned, and the scenario lock is not released. Provider/recipient/template/version drift is rejected by the later execution preflight before any action row dispatch.
+The handler verifies session, CSRF, task state, the exact current plan ID/version/digest, and absence of an existing different approval. An identical approval replays without a second approval or timeline entry; another actor or any changed pointer/content fails closed. The approved plan cannot be cancelled or replanned, and the scenario lock is not released. Provider/recipient/template/version drift is rejected by the execution preflight before any action row claim or provider dispatch.
 
 If provider state differs before any action row starts, return `409 plan_stale`, mark the plan superseded, execute nothing, and direct the user to section 3.11.1. Never mutate an approved plan in place.
 
@@ -556,7 +556,7 @@ S036 extends the protected `demo_event_state.last_receipt` contract with a typed
 
 The service refetches the configured event, rechecks calendar/event identity, ownership, default type, non-recurring status, exact tag, organizer digest, attendee-set digest, time zone, and rolling ETag/`updated` version before writing. Restore is accepted only when the current event still equals the last verified move `after` state. The provider call is always an `If-Match` start/end-only update with `sendUpdates: "none"`; a successful verified response atomically replaces the rolling expected ETag/`updated` value in the state store. The immutable semantic baseline is never changed. Conflict and uncertainty are durable stopping points, not success or retry signals.
 
-Automated proof uses `FakeCalendarPort` and verifies pre-write persistence, move/restore state transitions, duration/time-zone retention, static-field preservation, stale-state refusal, provider-conflict refusal, unavailable/uncertain handling, and no-rebase behavior. Product approval/action-ledger integration remains S046/S052 work.
+Automated proof uses `FakeCalendarPort` and verifies pre-write persistence, move/restore state transitions, duration/time-zone retention, static-field preservation, stale-state refusal, provider-conflict refusal, unavailable/uncertain handling, and no-rebase behavior. Product approval/action-ledger preparation is complete through S052; exact artifact, Calendar, and Gmail execution remains S053–S055 work.
 
 ### 3.21 Controlled provider/model spike report
 
@@ -575,7 +575,7 @@ The complete G1 v1 error-code-to-HTTP mapping, implemented route inventory, froz
 | Endpoint | Success state | Principal typed errors |
 |---|---|---|
 | Create | `201 preview_ready` or `clarification_required`; replay `200` | `unsupported_request`, `idempotency_conflict`, `scenario_busy`, `candidate_set_invalid` |
-| Initial approval | `200 completed` or durable attention | `plan_digest_mismatch`, `plan_stale`, `invalid_task_state`, `provider_conflict` |
+| Initial approval | `200 preview_ready` with three planned action rows | `plan_digest_mismatch`, `plan_stale`, `invalid_task_state`, `provider_conflict` |
 | Resume | current completed/recovered/attention state | `action_not_retryable`, `plan_digest_mismatch`, `invalid_task_state` |
 | Submit context | `200 recovery_ready` | `clarification_required`, `provider_conflict`, `model_output_invalid`, `invalid_task_state` |
 | Recovery approval | `200 recovered` or durable attention | `plan_digest_mismatch`, `plan_stale`, `provider_conflict`, `invalid_task_state` |
@@ -947,6 +947,8 @@ interface ArtifactProvenance {
 The Zod implementation mirrors this discriminated union, rejects unknown properties, and separately derives an MCP-safe read view that omits provider IDs, addresses, bodies, and snapshots. The authenticated approval view intentionally shows exact controlled recipients and content.
 
 S046 freezes the runtime persistence contract as `execution-persistence.v1`. `ExecutionPlan` stores the complete immutable payload and its `sha256:` digest; `ApprovalRecord` binds actor, timestamp, plan ID/version, and the same digest; and `ActionExecutionRecord` stores the closed action type, stable operation key, attempts, lease, Gmail dispatch marker, typed receipt, and redacted error. `MemoryExecutionPersistenceStore` and `PostgresExecutionPersistenceStore` share the same behavior: identical inserts replay, mutations fail closed, `(plan_id, action_key)` rows are created before dispatch, succeeded/uncertain/conflict/permanent rows are never claimed again, and an expired Gmail lease is durable uncertainty. An expired Calendar lease is not blindly retried and instead requires provider-state reconciliation. This extends the existing foundation tables; it does not replace or bypass them.
+
+S052 adds `initial-execution.v1` preparation and claim coordination over the execution ledger. The approved initial payload is converted into exactly three fixed action rows with stable operation keys and redacted target references; preparation is idempotent and immutable. Claims require the authenticated approval and exact plan digest, enforce artifact → Calendar → Gmail ordering, return succeeded rows as `skipped`, report an active lease as `busy`, permit only `retryable_failed` retry, convert expired Gmail leases to `delivery_uncertain`, and stop expired Calendar leases for provider reconciliation. No provider call occurs in this boundary.
 
 ## 8. Recovery model-output contract
 

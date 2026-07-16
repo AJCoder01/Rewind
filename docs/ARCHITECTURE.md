@@ -76,6 +76,8 @@ S050 makes the exact plan/view pair explicit. `InitialPlanViewSchema` now carrie
 
 S051 adds the `initial-approval.v1` mutation boundary. The dashboard-only approval service validates the active plan pointer, verifies the full payload digest and exact execution-plan binding, persists an immutable actor/time/version/digest approval, repairs/replays the approval timeline without duplicating it, and refuses approval through MCP. Cancellation checks the approval ledger before delegating to the World PR store; PostgreSQL repeats that check while holding the task row lock, so an approved plan cannot release its scenario lock. An unapproved preview may be superseded into a new immutable plan/view version; the HTTP caller cannot inject replacement action data. No provider call or action dispatch occurs in S051; provider-state drift remains an execution-preflight concern.
 
+S052 connects approval to the durable action ledger without opening an effect path. `initial-execution.v1` materializes the fixed artifact → Calendar → Gmail tuple as three immutable planned rows with stable operation keys before any provider call. The claim coordinator rechecks approval and digest, enforces the fixed dependency order, distinguishes active leases from succeeded replay, permits only explicit retryable failures, marks expired Gmail work uncertain, and stops expired Calendar work for provider reconciliation. Provider invocation and before/after receipt persistence remain the S053–S055 service boundaries.
+
 ## 3. Intended source layout
 
 ```text
