@@ -60,6 +60,8 @@ S041 adds three model-only schema factories over the exact supplied universe for
 
 S042 adds the deterministic model-safety boundary after schema parsing. Initial proposals must match the provider-ranked candidate and exact dependency map; recovery proposals require an explicit trusted corrected candidate, all and only succeeded initial actions, compatible `restore`/`correct`/`preserve` outcomes, and both fixed new-action templates; prevention proposals remain bound to the completed source task. Account-brief output is checked for scenario-dimension leakage, and recovery recipients are expanded only from the server-owned team allowlist. The validation runner makes at most two model-port attempts, rejects fallback metadata, records only redacted typed failures, and has no deterministic success fallback. The `eval:model-safety` harness is synthetic and non-effecting; the complete 25-paraphrase recovery gate remains a later task.
 
+S043 adds `OpenAIModelPort` and the versioned synthetic spike prompt. It binds each of the three model-only schema contracts to the server-selected model, `store: false`, and the S042 validator; trusted deterministic facts are separate from the model response and no model field can create a provider call. `runControlledCalendarProviderSpike` is a TTY-only low-level proof service: it preflights both events, sends one stale `If-Match` request that must conflict, moves/restores one event with `sendUpdates=none`, and requires a final two-event preflight. Its redacted `provider-spike.v1` report exposes only statuses, counts, schema versions, attempt counts, and response fingerprints. It has no HTTP/MCP entry point and does not invoke product execution or reset.
+
 ## 3. Intended source layout
 
 ```text

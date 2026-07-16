@@ -1,0 +1,98 @@
+import { describe, expect, it } from "vitest";
+import { FakeCalendarPort } from "@/lib/adapters/calendar";
+import { sha256Text } from "@/lib/domain/digest";
+import { MemoryDemoEventStateStore } from "@/lib/db/demo-event-state";
+import { ProviderSpikeReportSchema } from "@/lib/contracts/provider-spike";
+import { seedControlledCalendar } from "@/lib/services/calendar-demo";
+import {
+  assertProviderSpikeExecutionDisabled,
+  ProviderSpikeGuardError,
+  providerSpikeConfirmationPhrase,
+  runControlledCalendarProviderSpike,
+} from "@/lib/services/provider-spike";
+import type { CalendarDemoConfiguration } from "@/lib/domain/calendar-demo";
+
+const configuration: CalendarDemoConfiguration = {
+  calendarId: "demo-calendar-2026",
+  demoDate: "2026-08-20",
+  expectedEmail: "owner@example.com",
+  recipients: { UK: ["uk-team@example.com"], US: ["us-team@example.com"] },
+};
+
+describe("controlled provider spike boundary", () => {
+  it("proves a two-event preflight, stale conditional conflict, move, restore, and final preflight", async () => {
+    const calendar = new FakeCalendarPort({ events: [], organizerDigest: sha256Text(configuration.expectedEmail) });
+    const state = new MemoryDemoEventStateStore();
+    await seedControlledCalendar({ calendar, state, configuration, runId: "seed-spike-001" });
+
+    const result = await runControlledCalendarProviderSpike({
+      calendar,
+      state,
+      configuration,
+      runId: "run-spike-001",
+    });
+
+    expect(result.preflightBefore).toMatchObject({ candidateCount: 2, baselineCount: 2, expectedVersionCount: 2 });
+    expect(result.staleConflict).toEqual({ status: "conflict", reason: "provider_conflict" });
+    expect(result.move).toEqual({ status: "succeeded" });
+    expect(result.restore).toEqual({ status: "succeeded" });
+    expect(result.preflightAfter).toMatchObject({ candidateCount: 2, baselineCount: 2, expectedVersionCount: 2 });
+    expect(result.partialReceiptStatuses).toEqual({ uk: ["succeeded", "succeeded"], us: ["conflict"] });
+    expect(await calendar.getControlledEvent({ calendarId: configuration.calendarId, providerEventId: "fake-seeded-event-uk" })).toMatchObject({
+      start: { instant: "2026-08-20T14:00:00.000Z" },
+    });
+    expect(await calendar.getControlledEvent({ calendarId: configuration.calendarId, providerEventId: "fake-seeded-event-us" })).toMatchObject({
+      start: { instant: "2026-08-20T15:00:00.000Z" },
+    });
+  });
+
+  it("requires the explicit live flag and rejects attempts to enable product effects", () => {
+    const expectGuard = (environment: Readonly<Record<string, string | undefined>>, kind: string): void => {
+      expect(() => assertProviderSpikeExecutionDisabled(environment)).toThrowError(ProviderSpikeGuardError);
+      try {
+        assertProviderSpikeExecutionDisabled(environment);
+      } catch (error) {
+        expect(error).toMatchObject({ kind });
+      }
+    };
+    expectGuard({}, "live_flag_required");
+    expectGuard({ LIVE_INTEGRATION_TESTS: "1", REWIND_PRODUCT_EXECUTION_ENABLED: "true" }, "execution_enabled");
+    expectGuard({ LIVE_INTEGRATION_TESTS: "1", REWIND_PRODUCT_RESET_ENABLED: "1" }, "reset_enabled");
+    expect(() => assertProviderSpikeExecutionDisabled({ LIVE_INTEGRATION_TESTS: "1" })).not.toThrow();
+  });
+
+  it("keeps the exact target only in the private confirmation phrase", () => {
+    expect(providerSpikeConfirmationPhrase("run-spike-001", "calendar-123")).toBe(
+      "CONFIRM PROVIDER SPIKE run-spike-001 CALENDAR calendar-123",
+    );
+  });
+
+  it("accepts only the redacted report shape and fixed operation schema versions", () => {
+    const report = {
+      status: "ok",
+      operation: "provider_model_spikes",
+      contractVersion: "provider-spike.v1",
+      calendar: {
+        preflightBefore: { status: "ok", contractVersion: "calendar-demo.v1", candidateCount: 2, baselineCount: 2, expectedVersionCount: 2 },
+        staleConflict: { status: "conflict", reason: "provider_conflict" },
+        move: { status: "succeeded" },
+        restore: { status: "succeeded" },
+        preflightAfter: { status: "ok", contractVersion: "calendar-demo.v1", candidateCount: 2, baselineCount: 2, expectedVersionCount: 2 },
+        partialReceiptStatuses: { uk: ["succeeded", "succeeded"], us: ["conflict"] },
+      },
+      model: {
+        operations: [
+          { operation: "initial", status: "validated", schemaVersion: "initial-reasoning.v1", attempts: 1, model: "test-model", responseIdFingerprint: "sha256:0000000000000000" },
+          { operation: "recovery", status: "validated", schemaVersion: "recovery-proposal.v1", attempts: 1, model: "test-model", responseIdFingerprint: "sha256:1111111111111111" },
+          { operation: "prevention_rule", status: "validated", schemaVersion: "prevention-rule-proposal.v1", attempts: 1, model: "test-model", responseIdFingerprint: "sha256:2222222222222222" },
+        ],
+      },
+      productExecution: "disabled",
+      productReset: "disabled",
+      externalEffects: "calendar_move_restore_only",
+    } as const;
+    expect(ProviderSpikeReportSchema.parse(report)).toEqual(report);
+    expect(ProviderSpikeReportSchema.safeParse({ ...report, model: { operations: report.model.operations.map((item, index) => index === 0 ? { ...item, schemaVersion: "recovery-proposal.v1" } : item) } }).success).toBe(false);
+    expect(ProviderSpikeReportSchema.safeParse({ ...report, rawProviderResponse: "forbidden" }).success).toBe(false);
+  });
+});

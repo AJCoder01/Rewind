@@ -176,6 +176,12 @@ S039 covers versioned source binding, exact source/content hashes, independent-a
 
 `lib/ai/model-safety.ts` parses each S041 proposal through its strict operation schema, then validates deterministic ranking/dependency semantics, explicit trusted recovery targets, exact succeeded-action decision coverage, compatible `restore`/`correct`/`preserve` outcomes, fixed new-action templates, independent artifact content, source-bound rule proposals, and server-owned recipient expansion. `requestValidated*Proposal` makes at most two model-port attempts, rejects fallback metadata, and has no deterministic success path after the second failure. `tests/unit/model-safety.test.ts` and `npm run eval:model-safety` cover valid output, malformed/unknown fields and IDs/templates/recipient injection, semantic rejection, unsafe preserve, prompt-injection-like context, refusal/truncation, retry bounds, redacted errors, and zero adapter/live-effect calls. The complete 25-paraphrase recovery gate remains S070/S091.
 
+### 4.8 S043 controlled provider/model spikes
+
+`tests/unit/provider-spike.test.ts` uses only `FakeCalendarPort` and `MemoryDemoEventStateStore` to prove the two-event preflight, stale `If-Match` conflict, reversible move/restore, final preflight, partial receipt summary, live-flag guard, and explicit product-effect disablement. `tests/unit/openai-model.test.ts` verifies the versioned synthetic prompt, strict JSON Schema request, model metadata projection, and absence of address-like fixture data from the request.
+
+The human checkpoint is `LIVE_INTEGRATION_TESTS=1 npm run prove:provider-spikes` in a TTY. Its Calendar effects are limited to one controlled UK move and one restore; the deliberate US stale patch must not mutate the event. The command validates all three strict model-only outputs with the S042 validator and reports no raw provider data. Existing S035 OAuth/lookup and S038 Gmail success/replay reports are linked rather than duplicated. Product execution and reset remain disabled.
+
 ### 4.7 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.

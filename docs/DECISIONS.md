@@ -47,6 +47,7 @@ This file records why a decision was made and which choices remain open. Accepte
 | ADR-026 | Verify Google identity locally and bind the configured account | Accepted |
 | ADR-027 | Freeze explicit provider ports and deterministic fakes | Accepted |
 | ADR-028 | Keep Calendar setup live-only, TTY-gated, and baseline-first | Accepted |
+| ADR-029 | Isolate S043 provider/model spikes from product execution/reset | Accepted |
 
 ## Accepted decisions
 
@@ -273,6 +274,14 @@ This file records why a decision was made and which choices remain open. Accepte
 **Why:** Calendar setup is the first boundary where provider identity, account ownership, calendar targeting, database state, and real writes meet. A command that could run from CI, production, an implicit `primary` calendar, or a fixture store could create uncontrolled state or make a partial seed look successful.
 
 **Consequence:** The safe code and negative tests can land before live access exists, while the human owner must still configure the private environment and run the TTY-confirmed OAuth refresh/Calendar seed/preflight. Partial, ambiguous, stale, or persistence-failed setup remains visible and requires deliberate human recovery; the command never silently retries or substitutes fixture output.
+
+### ADR-029 — Isolate S043 provider/model spikes from product execution/reset
+
+**Decision:** S043 uses a separate TTY/live-flagged command and `provider-spike.v1` report. It calls the low-level Calendar and model ports directly under the narrow setup/live-spike exception; it does not expose or invoke product approval, execution, recovery, reset, lock, artifact, or rule paths. The controlled Calendar proof performs one deliberately stale US precondition request plus one reversible UK move/restore, while the model proof uses synthetic closed-universe fixtures.
+
+**Why:** G2 must retire OAuth, ETag, provider receipt, and strict-output risk before G3 product execution exists. Combining this risk probe with a partially implemented product saga would make live success ambiguous and could turn a spike into an unapproved external action.
+
+**Consequence:** S043 can prove real provider behavior with honest, redacted receipts while product execution and reset remain disabled. Existing S035 OAuth/lookup and S038 Gmail/replay evidence are reused, avoiding duplicate live mail.
 
 ## Rejected alternatives
 

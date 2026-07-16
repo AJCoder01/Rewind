@@ -516,6 +516,12 @@ The service refetches the configured event, rechecks calendar/event identity, ow
 
 Automated proof uses `FakeCalendarPort` and verifies pre-write persistence, move/restore state transitions, duration/time-zone retention, static-field preservation, stale-state refusal, provider-conflict refusal, unavailable/uncertain handling, and no-rebase behavior. Product approval/action-ledger integration remains S046/S052 work.
 
+### 3.21 Controlled provider/model spike report
+
+`provider-spike.v1` is an admin-only, redacted report contract for S043. The report records two exact Calendar preflight counts before and after the spike, one deliberate stale-provider conflict, one verified move, one verified restore, and the per-candidate partial receipt statuses. It records only validated model operation names, schema versions, bounded attempt counts, configured model names, and SHA-256 response-ID fingerprints; it never stores model prompts, outputs, raw provider responses, credentials, Calendar IDs, recipients, event IDs, message IDs, or ETags.
+
+`prove:provider-spikes` requires the same non-production PostgreSQL/TTY/live-flag guard as the setup commands and rejects explicit product execution/reset enablement. It calls the low-level provider ports directly under the setup/live-spike exception, not through an HTTP/MCP product path. The stale wrapper changes only the `If-Match` value sent for the deliberate conflict request; no retry or rebase is allowed. The command performs one reversible UK move and one restore, then requires the final two-event preflight to pass. S035's OAuth/lookup evidence and S038's allowlisted Gmail/replay evidence remain separate human checkpoints.
+
 ### 3.21 Mutation response and error matrix
 
 Every success/attention response includes `requestId`; task mutations use `TaskMutationResponse` unless a richer shape is shown above. A durable attention outcome is HTTP `200` because the request was recorded and needs operator action; request/precondition conflicts use `409`; validation/clarification uses `422`; auth uses `401/403`.

@@ -16,6 +16,7 @@
     "eval:recovery": "tsx scripts/eval-recovery.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "preflight:demo": "tsx scripts/preflight-demo.ts",
+    "prove:provider-spikes": "tsx scripts/prove-provider-spikes.ts",
     "prove:gmail": "tsx scripts/prove-gmail.ts",
     "reset:demo": "tsx scripts/reset-demo.ts",
     "db:migrate": "tsx scripts/migrate.ts",
