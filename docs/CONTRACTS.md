@@ -1048,6 +1048,26 @@ The registry is a closed discriminated union. Unknown templates are rejected bef
 
 ## 11. Prevention rule contract
 
+The model-only proposal omits server-generated identity, lifecycle status, and digest fields:
+
+```typescript
+interface PreventionRuleProposalV1 {
+  schemaVersion: "prevention-rule-proposal.v1";
+  type: "calendar_company_region_ambiguity";
+  company: "Acme";
+  minimumMatches: 2;
+  disambiguationField: "region";
+  protectedActions: ["calendar.move", "mail.notify"];
+  requiredAction: "ask_for_confirmation";
+  scope: "demo_workspace";
+  sourceTaskId: string; // exactly the supplied completed source task
+  displayText: string;
+  rationale: string;
+}
+```
+
+Deterministic code validates this proposal, supplies `ruleId`, `version`, `status`, and `digest`, and never accepts a free-form predicate or action.
+
 ```typescript
 interface PreventionRuleV1 {
   schemaVersion: "prevention-rule.v1";
@@ -1098,7 +1118,11 @@ interface OpenAIResponsesMetadataV1 {
 }
 ```
 
-The client sends `store: false` and `text.format: { type: "json_schema", strict: true, ... }`. It returns parsed JSON only after finding an output-text item, and maps refusal, incomplete/truncated, malformed, and provider failures to a safe typed error. It retries once at most; no operation-specific model proposal is accepted until S041 schemas and semantic validators parse it.
+The client sends `store: false` and `text.format: { type: "json_schema", strict: true, ... }`. It returns parsed JSON only after finding an output-text item, and maps refusal, incomplete/truncated, malformed, and provider failures to a safe typed error. It retries once at most; no operation-specific model proposal is accepted until an S041 schema parses it and S042 semantic validation accepts it.
+
+### S041 model-only output schemas
+
+`createInitialReasoningSchemaContract`, `createRecoveryProposalSchemaContract`, and `createPreventionRuleProposalSchemaContract` each return a strict runtime Zod schema and the corresponding strict JSON Schema for the Responses request. Dynamic candidate, executed-action, and source-task IDs are enums populated only from the validated operation input. Action keys, recovery outcomes, new-action templates, assumption IDs, rule type, and rule action are closed literals. These proposal schemas contain no provider event/calendar IDs, recipients, mail bodies, headers, times, ETags, or raw provider arguments. S042 owns complete cross-field semantic validation, adversarial fixtures, and the one-retry evaluation harness.
 
 ```typescript
 interface ModelMetadata {
