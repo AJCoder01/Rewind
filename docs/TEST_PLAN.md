@@ -40,10 +40,13 @@ npm run test:integration:live
 npm run eval:recovery
 npm run seed:demo
 npm run preflight:demo
+npm run prove:gmail
 npm run reset:demo
 ```
 
 Live tests require explicit environment gating, controlled accounts, and a confirmation such as `LIVE_INTEGRATION_TESTS=1` so ordinary CI cannot send mail.
+
+The S038 command is run only as `LIVE_INTEGRATION_TESTS=1 npm run prove:gmail` in a human TTY. Automated tests invoke only its pure guards/repository fakes and separately prove that a non-TTY invocation returns `tty_required` before database/provider work.
 
 ## 3. Phase-gated must-pass risks
 

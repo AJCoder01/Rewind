@@ -136,12 +136,12 @@ export class GmailDeliveryService {
   }
 
   private identityFor(request: GmailDeliveryRequest, message: GmailApprovedMessage): GmailDispatchIdentity {
+    const digests = gmailMessageIdentityDigests(message);
     return GmailDispatchIdentitySchema.parse({
       actionId: request.actionId,
       planId: request.planId,
       actionKey: request.actionKey,
-      messageHash: sha256Digest({ subject: message.subject, bodyHash: message.bodyHash, runId: message.runId }),
-      recipientDigest: sha256Digest(message.to.map((recipient) => recipient.toLowerCase()).sort()),
+      ...digests,
     });
   }
 
@@ -149,6 +149,14 @@ export class GmailDeliveryService {
     const allowed = new Set([...allowlist.UK, ...allowlist.US].map((recipient) => recipient.toLowerCase()));
     if (recipients.some((recipient) => !allowed.has(recipient.toLowerCase()))) throw new GmailDeliveryError("recipient_not_allowed");
   }
+}
+
+export function gmailMessageIdentityDigests(message: GmailApprovedMessage): Readonly<{ messageHash: string; recipientDigest: string }> {
+  const parsed = GmailApprovedMessageSchema.parse(message);
+  return {
+    messageHash: sha256Digest({ subject: parsed.subject, bodyHash: parsed.bodyHash, runId: parsed.runId }),
+    recipientDigest: sha256Digest(parsed.to.map((recipient) => recipient.toLowerCase()).sort()),
+  };
 }
 
 function resultForReceipt(receipt: GmailSendReceipt, replay: boolean, dispatchStartedAt: string | null): GmailDeliveryResult {

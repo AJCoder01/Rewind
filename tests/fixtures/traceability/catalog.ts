@@ -119,8 +119,8 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   }),
   current({
     id: "FR-15", kind: "FR", title: "Allowlisted Gmail notification", planTasks: ["S037", "S038", "S055"],
-    codePaths: ["lib/config/environment.ts", "lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/domain/gmail-template.ts", "lib/adapters/gmail.ts", "lib/google/gmail.ts", "lib/db/gmail-dispatch.ts", "lib/services/gmail-delivery.ts"],
-    testPaths: ["tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/provider-ports.test.ts"],
+    codePaths: ["lib/config/environment.ts", "lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/gmail-live-proof.ts", "lib/domain/gmail-template.ts", "lib/adapters/gmail.ts", "lib/google/gmail.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts", "scripts/prove-gmail.ts"],
+    testPaths: ["tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/gmail-live-proof.test.ts", "tests/unit/gmail-live-proof-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/provider-ports.test.ts"],
     fixtureIds: ["traceability.v1"], evidencePaths: [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md"], status: "partial",
     note: "S037 proves the deterministic allowlist/template/MIME boundary, marker-before-handoff persistence hook, typed provider outcomes, and no-redispatch replay; one human-confirmed live success/replay remains S038 and full product action integration remains S046/S055.",
   }),
@@ -174,8 +174,8 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   planned("SAFE-06", "SAFE", "Calendar ETag conflict protection", ["S036", "S054", "S067"], "Calendar conditional execution is future work."),
   current({
     id: "SAFE-07", kind: "SAFE", title: "Ambiguous Gmail delivery is not retried", planTasks: ["S034", "S037", "S055", "S069"],
-    codePaths: ["lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/google/gmail.ts", "lib/db/gmail-dispatch.ts", "lib/services/gmail-delivery.ts"],
-    testPaths: ["tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/provider-ports.test.ts"],
+    codePaths: ["lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/gmail-live-proof.ts", "lib/google/gmail.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts", "scripts/prove-gmail.ts"],
+    testPaths: ["tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/gmail-live-proof.test.ts", "tests/unit/gmail-live-proof-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/provider-ports.test.ts"],
     fixtureIds: ["traceability.v1"], evidencePaths: [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md"], status: "partial",
     note: "S037 classifies permanent 4xx and every post-marker ambiguous class, persists the stopping receipt, and replays it without a second dispatch; live Gmail proof and full action-ledger lease reconciliation remain S038/S046/S055/S069.",
   }),
@@ -198,7 +198,7 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   planned("NFR-01", "NFR", "Five consecutive live runs", ["S093", "S096"], "Live rehearsal is a final release gate."),
   current({
     id: "NFR-02", kind: "NFR", title: "Replay cannot duplicate work", planTasks: ["S006", "S021", "S027", "S037", "S052"],
-    codePaths: ["lib/db/store.ts", "lib/db/memory-store.ts", "lib/db/postgres-store.ts", "lib/db/gmail-dispatch.ts", "lib/services/gmail-delivery.ts"], testPaths: ["tests/unit/world-pr.test.ts", "tests/unit/g1-memory-store.test.ts", "tests/unit/postgres-store.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts"], fixtureIds: ["fixture-initial.v1", "traceability.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md"], status: "partial",
+    codePaths: ["lib/db/store.ts", "lib/db/memory-store.ts", "lib/db/postgres-store.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts"], testPaths: ["tests/unit/world-pr.test.ts", "tests/unit/g1-memory-store.test.ts", "tests/unit/postgres-store.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/gmail-live-proof.test.ts", "tests/unit/gmail-live-proof-store.test.ts"], fixtureIds: ["fixture-initial.v1", "traceability.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md"], status: "partial",
     note: "Create replay and the S037 Gmail terminal/retryable/uncertain replay rules are covered without a second send; complete Calendar/artifact/action-ledger replay remains S052.",
   }),
   planned("NFR-03", "NFR", "Stale Calendar changes never overwrite", ["S036", "S054", "S067"], "Provider stale-state proof is future work."),
