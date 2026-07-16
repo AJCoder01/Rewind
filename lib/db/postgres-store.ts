@@ -153,6 +153,32 @@ export class PostgresWorldPrStore implements WorldPrStore {
     return record.view;
   }
 
+  async getInitialPlanPayload(worldPrId: string, planId: string): Promise<InitialPlanPayload | null> {
+    const result = await this.pool.query<{ payload: unknown }>(
+      `SELECT payload FROM plans
+        WHERE id = $1 AND task_id = $2 AND kind = 'initial'`,
+      [planId, worldPrId],
+    );
+    if (result.rowCount !== 1) return null;
+    return VerifiedInitialPlanPayloadSchema.parse(result.rows[0].payload);
+  }
+
+  async updateView(worldPrId: string, view: WorldPrView): Promise<void> {
+    const parsed = WorldPrViewSchema.parse(view);
+    const result = await this.pool.query(
+      `UPDATE tasks
+          SET status = $2,
+              run_id = $3,
+              planning_lease_until = NULL,
+              attention_reason = $4::jsonb,
+              read_model = $5::jsonb,
+              updated_at = now()
+        WHERE id = $1`,
+      [parsed.worldPrId, parsed.status, parsed.runId ?? null, parsed.attention ? JSON.stringify(parsed.attention) : null, JSON.stringify(parsed)],
+    );
+    if (result.rowCount !== 1) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+  }
+
   async cancel(input: CancelWorldPrStoreInput): Promise<CancelWorldPrStoreResult> {
     const claim = await this.pool.query(
       `INSERT INTO idempotency_records

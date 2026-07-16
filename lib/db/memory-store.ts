@@ -30,6 +30,7 @@ type ScenarioLock = {
 
 export class MemoryFixtureWorldPrStore implements WorldPrStore {
   private readonly byWorldPrId = new Map<string, WorldPrView>();
+  private readonly byPlanId = new Map<string, { worldPrId: string; planPayload: NonNullable<CreateWorldPrStoreResult["planPayload"]> }>();
   private readonly byOwner = new Map<string, string>();
   private readonly byIdempotency = new Map<string, IdempotencyRecord>();
   private scenarioLock: ScenarioLock | undefined;
@@ -106,6 +107,7 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
       });
       const result: CreateWorldPrStoreResult & { kind: "create" } = { kind: "create", view, planPayload: record.planPayload, response, replay: false };
       this.byWorldPrId.set(view.worldPrId, view);
+      this.byPlanId.set(record.planPayload.planId, { worldPrId: view.worldPrId, planPayload: record.planPayload });
       this.byIdempotency.set(idempotencyId, { bodyHash: input.bodyHash, status: "completed", result });
       return result;
     } catch (error) {
@@ -125,6 +127,19 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
   async get(worldPrId: string, actorId?: string): Promise<WorldPrView | null> {
     this.assertScope(worldPrId, actorId);
     return this.byWorldPrId.get(worldPrId) ?? null;
+  }
+
+  async getInitialPlanPayload(worldPrId: string, planId: string): Promise<NonNullable<CreateWorldPrStoreResult["planPayload"]> | null> {
+    const record = this.byPlanId.get(planId);
+    if (!record || record.worldPrId !== worldPrId) return null;
+    return structuredClone(record.planPayload);
+  }
+
+  async updateView(worldPrId: string, view: WorldPrView): Promise<void> {
+    if (view.worldPrId !== worldPrId) throw new StoreError("internal_error", "The durable World PR view identifier changed.");
+    WorldPrViewSchema.parse(view);
+    if (!this.byWorldPrId.has(worldPrId)) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+    this.byWorldPrId.set(worldPrId, structuredClone(view));
   }
 
   async cancel(input: CancelWorldPrStoreInput): Promise<CancelWorldPrStoreResult> {
@@ -163,6 +178,7 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
 
   clear(): void {
     this.byWorldPrId.clear();
+    this.byPlanId.clear();
     this.byOwner.clear();
     this.byIdempotency.clear();
     this.scenarioLock = undefined;

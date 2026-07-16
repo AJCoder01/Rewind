@@ -110,7 +110,7 @@ G3 admission is now an executable invariant: `npm run verify:g2-closure` must re
 
 ### G3 — Initial World PR, approval, and execution
 
-- [ ] **S046 — Finalize execution persistence.** Extend the foundation tables without replacing them; enforce immutable versioned plans/approvals, durable action rows, leases, typed receipts/errors, and unique `(plan_id, action_key)`.
+- [x] **S046 — Finalize execution persistence.** Added the strict `execution-persistence.v1` plan/approval/action/lease/receipt/error boundary and deterministic memory/PostgreSQL ledger over the existing foundation tables. Immutable plan versions, approval binding, idempotent action-row creation, short claims, terminal outcomes, Gmail lease uncertainty, and Calendar reconciliation stops are covered by [the S046 report](../artifacts/test-runs/2026-07-16-s046-execution-persistence.md). S047 is next.
 - [ ] **S047 — Implement live candidate resolution.** Retrieve exactly the two tagged candidates, run the pre-lock rule port, acquire the scenario lock only for planning, rank UK deterministically, show US as alternative, and support stale refresh/supersession.
 - [ ] **S048 — Implement initial reasoning.** Prompt for one bounded assumption, dependency edges, and the parent-account brief; capture model metadata and reject any output outside the closed candidate/action universe.
 - [ ] **S049 — Deterministically expand the initial plan.** Validate evidence, ranking, provenance, recipients, time conversion, templates, dependencies, and action order; build exact artifact → Calendar → Gmail actions and hash the full immutable payload.

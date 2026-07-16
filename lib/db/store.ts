@@ -73,6 +73,8 @@ export type CancelWorldPrStoreResult = {
 export interface WorldPrStore {
   createInitial(input: CreateWorldPrStoreInput): Promise<CreateWorldPrStoreResult>;
   get(worldPrId: string, actorId?: string): Promise<WorldPrView | null>;
+  getInitialPlanPayload(worldPrId: string, planId: string): Promise<InitialPlanPayload | null>;
+  updateView(worldPrId: string, view: WorldPrView): Promise<void>;
   cancel(input: CancelWorldPrStoreInput): Promise<CancelWorldPrStoreResult>;
 }
 

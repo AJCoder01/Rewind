@@ -1,11 +1,11 @@
 # Rewind MVP progress
 
-Current status: master-plan tasks `S001`–`S045` are complete. S035’s deployed OAuth connection and human Calendar preflight passed with exactly two candidates, two persisted baselines, and two rolling provider versions. S038’s human Gmail proof sent exactly one message and verified replay without redispatch. S039–S042 close the artifact, strict model transport/schema, and deterministic semantic boundaries. The unfunded OpenAI S043 path failed closed and remains recorded honestly. By explicit zero-spend user decision, Rewind now supports a loopback-only, cloud-model-rejecting Ollama runtime; the human combined S043 receipt records three validated strict local model operations, one deliberate Calendar conflict, one move/restore, and a passing final two-event preflight. The deployed non-effecting MCP → API → PostgreSQL → dashboard proof passed, the v1 interface packet is frozen, and G1 is closed. S044 exposes honest connection/preflight state while keeping product execution/reset disabled. S045 now records a passed `g2-closure.v1` report with all six risks green and G3 admission unlocked; S046 is next.
+Current status: master-plan tasks `S001`–`S046` are complete. S035’s deployed OAuth connection and human Calendar preflight passed with exactly two candidates, two persisted baselines, and two rolling provider versions. S038’s human Gmail proof sent exactly one message and verified replay without redispatch. S039–S042 close the artifact, strict model transport/schema, and deterministic semantic boundaries. The unfunded OpenAI S043 path failed closed and remains recorded honestly. By explicit zero-spend user decision, Rewind now supports a loopback-only, cloud-model-rejecting Ollama runtime; the human combined S043 receipt records three validated strict local model operations, one deliberate Calendar conflict, one move/restore, and a passing final two-event preflight. The deployed non-effecting MCP → API → PostgreSQL → dashboard proof passed, the v1 interface packet is frozen, and G1 is closed. S044 exposes honest connection/preflight state while keeping product execution/reset disabled. S045 records a passed `g2-closure.v1` report with all six risks green and G3 admission unlocked. S046 now freezes the execution persistence boundary over the existing foundation tables; S047 is next.
 
 | Field | Value |
 |---|---|
 | Status | Live checklist |
-| Current phase | G2 closed by S045; S046 execution persistence is next |
+| Current phase | G3 started by S046; S047 candidate resolution is next |
 | Last updated | 2026-07-16 |
 | Implementation update | S043 explicitly supports OpenAI or zero-cost local Ollama evidence; S044 adds `connection-preflight.v1`; S045 adds `g2-closure.v1`, fixed evidence-marker/redaction checks, and a fail-closed G3 admission invariant. |
 
@@ -124,7 +124,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 | G0 | `S001`–`S018`: foundation, credentials, migration, CI, contracts, fixtures, traceability | Complete | [S018 G0 report](../artifacts/test-runs/2026-07-15-s018-g0.md); hosted Node 24 CI and ephemeral migration replay passed |
 | G1 | `S019`–`S030`: non-effecting MCP → API → PostgreSQL → dashboard | Complete | [S030 G1 closure report](../artifacts/test-runs/2026-07-16-s030-g1-close.md); S001–S030 complete in sequence |
 | G2 | `S031`–`S045`: OAuth, Calendar/Gmail/artifact/model primitives and live spikes | Complete | [S045 G2 closure report](../artifacts/test-runs/2026-07-16-s045-g2-closure.md); all six risk categories green and G3 admission unlocked |
-| G3 | `S046`–`S059`: initial World PR, approval, execution, receipts | Not started | TBD |
+| G3 | `S046`–`S059`: initial World PR, approval, execution, receipts | In progress | [S046 execution persistence report](../artifacts/test-runs/2026-07-16-s046-execution-persistence.md); S047 is next |
 | G4 | `S060`–`S074`: late context, Causal Revert, recovery execution/evals | Not started | TBD |
 | G5 | `S075`–`S086`: prevention rule, clarification proof, approved reset | Not started | TBD |
 | G6 | `S087`–`S096`: hardening, accessibility, five-run evidence, freeze | Not started | TBD |
@@ -133,6 +133,7 @@ The single ordered task queue and gate criteria live in `IMPLEMENTATION_PLAN.md`
 ### Current phase actions
 
 - [x] `S001`–`S006`: repository, decisions, scaffold, minimal contracts/migration, and local fixture slice.
+- [x] `S046`: strict execution-persistence contract and deterministic memory/PostgreSQL ledger; S047 candidate resolution is next.
 - [x] `S007`: Supabase PostgreSQL provisioned and hardened in Mumbai; private transaction/session URLs and live TLS/role/ACL checks passed. Evidence: [sanitized S007 report](../artifacts/test-runs/2026-07-15-s007-supabase.md).
 - [x] `S008`: real migration applied atomically and repeatably; exact live catalog, constraints, grants, TLS, rollback-only probes, and readiness passed. Evidence: [sanitized S008 report](../artifacts/test-runs/2026-07-15-s008-migration.md).
 - [x] `S009`: Vercel production origin, Node 24, Fluid Compute/Mumbai, private Production environment, health/readiness, and secure-cookie checkpoint passed. Evidence: [sanitized S009 evidence](../artifacts/test-runs/2026-07-15-s009-vercel.md).
@@ -234,6 +235,7 @@ Add entries only after work is actually complete:
 | 2026-07-16 | S043 combined provider/model spike | [S043 combined success receipt](../artifacts/test-runs/2026-07-16-s043-provider-model-spike-success.md): sanitized human receipt for two-event preflight before/after, deliberate stale conflict, controlled move/restore, and three strict local Ollama operations | Passed; Calendar returned to its recorded baseline, product execution/reset remained disabled, and S044 is next | User + Codex |
 | 2026-07-16 | S044 connection/preflight UI | [S044 connection/preflight UI report](../artifacts/test-runs/2026-07-16-s044-connection-preflight-ui.md): strict status contract, authenticated read-only route, safe configuration/identity/database/runtime projections, failed/not-run preflight states, focused tests, build, lint, typecheck, and browser smoke | Passed; no provider/model command or external effect; S045 is next | Codex |
 | 2026-07-16 | S045 G2 closure and G3 admission | [S045 G2 closure report](../artifacts/test-runs/2026-07-16-s045-g2-closure.md): strict report contract, fixed sanitized evidence manifest, six risk checks, redaction codes, blocked-admission test, focused/full verification, and read-only gate command | Passed; all six risks green, `g3Admission: unlocked`, no provider/database/external effect; S046 is next | Codex |
+| 2026-07-16 | S046 execution persistence | [S046 report](../artifacts/test-runs/2026-07-16-s046-execution-persistence.md): strict immutable plan/approval/action contracts, idempotent action rows, leases, typed receipts/errors, memory ledger tests, full unit suite, typecheck, lint, and diff check | Passed locally with deterministic persistence only; no live database/provider/external effect; S047 is next | Codex |
 
 ## MVP definition of done
 

@@ -932,6 +932,8 @@ interface ArtifactProvenance {
 
 The Zod implementation mirrors this discriminated union, rejects unknown properties, and separately derives an MCP-safe read view that omits provider IDs, addresses, bodies, and snapshots. The authenticated approval view intentionally shows exact controlled recipients and content.
 
+S046 freezes the runtime persistence contract as `execution-persistence.v1`. `ExecutionPlan` stores the complete immutable payload and its `sha256:` digest; `ApprovalRecord` binds actor, timestamp, plan ID/version, and the same digest; and `ActionExecutionRecord` stores the closed action type, stable operation key, attempts, lease, Gmail dispatch marker, typed receipt, and redacted error. `MemoryExecutionPersistenceStore` and `PostgresExecutionPersistenceStore` share the same behavior: identical inserts replay, mutations fail closed, `(plan_id, action_key)` rows are created before dispatch, succeeded/uncertain/conflict/permanent rows are never claimed again, and an expired Gmail lease is durable uncertainty. An expired Calendar lease is not blindly retried and instead requires provider-state reconciliation. This extends the existing foundation tables; it does not replace or bypass them.
+
 ## 8. Recovery model-output contract
 
 Use strict Structured Outputs and reject additional properties.
