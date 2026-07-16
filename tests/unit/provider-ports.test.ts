@@ -8,6 +8,7 @@ import {
   ACCOUNT_BRIEF_SOURCE_ID,
   ACCOUNT_BRIEF_TITLE,
   ACCOUNT_BRIEF_VALIDATOR_VERSION,
+  CONTROLLED_CONTENT_VERSION,
   PARENT_ACCOUNT_NOTES_FIXTURE,
 } from "@/lib/domain/account-brief";
 import { sha256Text } from "@/lib/domain/digest";
@@ -67,6 +68,7 @@ const artifact = {
   contentHash: sha256Text(ACCOUNT_BRIEF_CONTENT_FIXTURE),
   provenance: {
     sourceId: ACCOUNT_BRIEF_SOURCE_ID,
+    sourceVersion: CONTROLLED_CONTENT_VERSION,
     sourceDigest: sha256Text(PARENT_ACCOUNT_NOTES_FIXTURE),
     excludedDimensions: ["calendar_event", "region", "attendees", "meeting_time"] as const,
     validatorVersion: ACCOUNT_BRIEF_VALIDATOR_VERSION,

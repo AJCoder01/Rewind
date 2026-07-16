@@ -29,6 +29,7 @@ describe("controlled content inventory", () => {
     expect(brief.content).toBe(ACCOUNT_BRIEF_CONTENT_FIXTURE);
     expect(brief.contentHash).toBe(sha256Text(ACCOUNT_BRIEF_CONTENT_FIXTURE));
     expect(brief.provenance.sourceId).toBe(ACCOUNT_BRIEF_SOURCE_ID);
+    expect(brief.provenance.sourceVersion).toBe(CONTROLLED_CONTENT_VERSION);
     expect(brief.provenance.sourceDigest).toBe(sha256Text(PARENT_ACCOUNT_NOTES_FIXTURE));
     expect(brief.provenance.validatorVersion).toBe(ACCOUNT_BRIEF_VALIDATOR_VERSION);
   });

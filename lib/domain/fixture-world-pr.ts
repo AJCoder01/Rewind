@@ -10,14 +10,7 @@ import {
 import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import { sha256Digest, sha256Text } from "@/lib/domain/digest";
 import { createOpaqueId } from "@/lib/domain/ids";
-import {
-  ACCOUNT_BRIEF_CONTENT_FIXTURE,
-  ACCOUNT_BRIEF_SOURCE_ID,
-  ACCOUNT_BRIEF_TITLE,
-  ACCOUNT_BRIEF_VALIDATOR_VERSION,
-  PARENT_ACCOUNT_NOTES_FIXTURE,
-  assertAccountBriefIndependent,
-} from "@/lib/domain/account-brief";
+import { CONTROLLED_ACCOUNT_BRIEF_PLANNING_INPUT, generateAccountBriefForPlanning } from "@/lib/services/account-brief";
 
 const demoDate = "2026-08-20";
 const timeZone = "America/New_York";
@@ -36,7 +29,6 @@ export interface FixtureWorldPrRecord {
 }
 
 export function buildFixtureWorldPrRecord(request: string, now = new Date()): FixtureWorldPrRecord {
-  assertAccountBriefIndependent(ACCOUNT_BRIEF_CONTENT_FIXTURE);
   const worldPrId = createOpaqueId("wpr_");
   const runId = createOpaqueId("run_");
   const planId = createOpaqueId("plan_");
@@ -56,27 +48,13 @@ export function buildFixtureWorldPrRecord(request: string, now = new Date()): Fi
     ownedByConnectedAccount: true as const,
     privateTags: { rewind_demo: "acme-renewal" as const, region: "UK" as const },
   };
+  const accountBrief = generateAccountBriefForPlanning(CONTROLLED_ACCOUNT_BRIEF_PLANNING_INPUT);
   const artifact = {
     actionKey: "initial.artifact.account_brief" as const,
     type: "artifact.account_brief" as const,
     dependsOnAssumptionIds: [] as never[],
     externalEffect: false as const,
-    desired: {
-      title: ACCOUNT_BRIEF_TITLE,
-      content: ACCOUNT_BRIEF_CONTENT_FIXTURE,
-      contentHash: sha256Text(ACCOUNT_BRIEF_CONTENT_FIXTURE),
-      provenance: {
-        sourceId: ACCOUNT_BRIEF_SOURCE_ID,
-        sourceDigest: sha256Text(PARENT_ACCOUNT_NOTES_FIXTURE),
-        excludedDimensions: ["calendar_event", "region", "attendees", "meeting_time"] as [
-          "calendar_event",
-          "region",
-          "attendees",
-          "meeting_time",
-        ],
-        validatorVersion: ACCOUNT_BRIEF_VALIDATOR_VERSION,
-      },
-    },
+    desired: accountBrief,
   };
   const calendar = {
     actionKey: "initial.calendar.move" as const,
