@@ -29,8 +29,10 @@ const modelEvidence = [
   ...artifactEvidence,
   "artifacts/test-runs/2026-07-16-s040-openai-responses.md",
   "artifacts/test-runs/2026-07-16-s041-model-schemas.md",
+  "artifacts/test-runs/2026-07-16-s042-model-safety.md",
 ];
 const initialFixtures: TraceabilityFixtureId[] = ["fixture-initial.v1", "controlled-content.v1", "artifact-independence.v1"];
+const modelSafetyFixtures: TraceabilityFixtureId[] = ["traceability.v1", "model-safety.v1"];
 const intakeCode = ["app/page.tsx", "app/api/v1/world-prs/route.ts", "lib/services/world-pr.ts", "mcp/server.ts"];
 const intakeTests = ["tests/unit/world-pr.test.ts", "tests/unit/g1-routes-auth.test.ts", "tests/unit/g1-mcp.test.ts", "scripts/test-e2e.ts"];
 
@@ -141,22 +143,26 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   planned("FR-19", "FR", "Late context only after completed execution", ["S060"], "Initial execution and late-context intake are not implemented."),
   planned("FR-20", "FR", "Explicit corrected target and provider grounding", ["S060", "S061"], "Recovery planning is not implemented."),
   current({
-    id: "FR-21", kind: "FR", title: "Strict recovery proposal universe", planTasks: ["S041", "S062", "S063"],
-    codePaths: ["lib/contracts/provider-ports.ts", "lib/ai/model-schemas.ts"], testPaths: ["tests/unit/model-schemas.test.ts", "tests/unit/provider-ports.test.ts"],
-    fixtureIds: ["traceability.v1"], evidencePaths: modelEvidence, status: "partial",
-    note: "S041 closes recovery output over supplied candidate, succeeded-action, outcome, and registered-template universes and excludes executable provider fields; complete semantic validation and product recovery planning remain S042/S062–S063.",
+    id: "FR-21", kind: "FR", title: "Strict recovery proposal universe", planTasks: ["S041", "S042", "S062", "S063"],
+    codePaths: ["lib/contracts/provider-ports.ts", "lib/ai/model-schemas.ts", "lib/ai/model-safety.ts"], testPaths: ["tests/unit/model-schemas.test.ts", "tests/unit/model-safety.test.ts", "tests/unit/provider-ports.test.ts"],
+    fixtureIds: modelSafetyFixtures, evidencePaths: modelEvidence, status: "partial",
+    note: "S041 closes the recovery shape and S042 validates explicit targets, succeeded-action coverage, compatible outcomes, safe preserve, fixed templates, and allowlisted deterministic recipient expansion; complete recovery planning remains S062–S063.",
   }),
-  planned("FR-22", "FR", "Complete recovery decision validation", ["S063"], "Recovery semantic validation is future work."),
+  current({
+    id: "FR-22", kind: "FR", title: "Complete recovery decision validation", planTasks: ["S042", "S063"],
+    codePaths: ["lib/ai/model-safety.ts"], testPaths: ["tests/unit/model-safety.test.ts"], fixtureIds: modelSafetyFixtures, evidencePaths: modelEvidence, status: "partial",
+    note: "S042 proves deterministic cross-field validation and bounded retry/failure behavior for the model proposal; provider-grounded recovery expansion and product integration remain S063.",
+  }),
   planned("FR-23", "FR", "Fixed Causal Revert visualization", ["S065"], "The current UI has no recovery graph."),
   planned("FR-24", "FR", "Recovery cancel/revise", ["S065", "S072"], "Recovery mutation routes are future work."),
   planned("FR-25", "FR", "Recovery approval digest binding", ["S064", "S066"], "Recovery approval is future work."),
   planned("FR-26", "FR", "Recovery preflight and fixed order", ["S067", "S068"], "Recovery provider execution is future work."),
   planned("FR-27", "FR", "Honest recovery attention states", ["S069", "S072"], "Recovery attention handling is future work."),
   current({
-    id: "FR-28", kind: "FR", title: "Typed prevention-rule proposal", planTasks: ["S041", "S075"],
-    codePaths: ["lib/ai/model-schemas.ts", "lib/contracts/v1.ts"], testPaths: ["tests/unit/model-schemas.test.ts", "tests/unit/g1-contracts.test.ts"],
-    fixtureIds: ["traceability.v1"], evidencePaths: modelEvidence, status: "partial",
-    note: "S041 permits only the fixed Acme ambiguity proposal and keeps rule identity/status/digest deterministic; generation, persistence, and separate activation remain S075–S076.",
+    id: "FR-28", kind: "FR", title: "Typed prevention-rule proposal", planTasks: ["S041", "S042", "S075"],
+    codePaths: ["lib/ai/model-schemas.ts", "lib/ai/model-safety.ts", "lib/contracts/v1.ts"], testPaths: ["tests/unit/model-schemas.test.ts", "tests/unit/model-safety.test.ts", "tests/unit/g1-contracts.test.ts"],
+    fixtureIds: modelSafetyFixtures, evidencePaths: modelEvidence, status: "partial",
+    note: "S041 closes the one typed Acme rule shape and S042 binds its source task while rejecting extra executable fields; generation, persistence, and separate activation remain S075–S076.",
   }),
   planned("FR-29", "FR", "Separate rule activation", ["S076"], "Rule activation is future work."),
   current({
@@ -196,9 +202,9 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     note: "S037 classifies permanent 4xx and every post-marker ambiguous class, persists the stopping receipt, and replays it without a second dispatch; live Gmail proof and full action-ledger lease reconciliation remain S038/S046/S055/S069.",
   }),
   current({
-    id: "SAFE-08", kind: "SAFE", title: "Closed strict model/action boundary", planTasks: ["S004", "S006", "S034", "S040", "S041"],
-    codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/domain/fixture-world-pr.ts", "lib/ai/model.ts", "lib/ai/openai-responses.ts", "lib/ai/model-schemas.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/model-schemas.test.ts"], fixtureIds: initialFixtures, evidencePaths: modelEvidence, status: "partial",
-    note: "Strict lifecycle/plan/provider contracts, the S040 Responses transport, and S041 model-only schemas reject unknown fields and close every supplied ID/outcome/template universe; complete cross-field semantic validation remains S042 work.",
+    id: "SAFE-08", kind: "SAFE", title: "Closed strict model/action boundary", planTasks: ["S004", "S006", "S034", "S040", "S041", "S042"],
+    codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/domain/fixture-world-pr.ts", "lib/ai/model.ts", "lib/ai/openai-responses.ts", "lib/ai/model-schemas.ts", "lib/ai/model-safety.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/model-schemas.test.ts", "tests/unit/model-safety.test.ts"], fixtureIds: [...initialFixtures, "model-safety.v1"], evidencePaths: modelEvidence, status: "partial",
+    note: "Strict lifecycle/plan/provider contracts, the S040 Responses transport, S041 closed proposal schemas, and S042 cross-field validators reject unknown fields/IDs/templates, unsafe dependencies, recipient injection, ambiguous targets, and fallback success; product action integration remains future work.",
   }),
   current({
     id: "SAFE-09", kind: "SAFE", title: "Server-only private environment boundary", planTasks: ["S003", "S012", "S013", "S031", "S032", "S033"],
@@ -220,10 +226,14 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   planned("NFR-03", "NFR", "Stale Calendar changes never overwrite", ["S036", "S054", "S067"], "Provider stale-state proof is future work."),
   current({
     id: "NFR-04", kind: "NFR", title: "Unknown inputs never reach adapters", planTasks: ["S004", "S006", "S023", "S034", "S035", "S037", "S039", "S040", "S041", "S042"],
-    codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/calendar-demo.ts", "lib/services/world-pr.ts", "lib/services/calendar-demo.ts", "lib/services/gmail-delivery.ts", "lib/services/account-brief.ts", "lib/ai/openai-responses.ts", "lib/ai/model-schemas.ts", "lib/db/memory-store.ts", "lib/db/demo-event-state.ts", "lib/db/gmail-dispatch.ts", "lib/adapters/calendar.ts", "lib/google/calendar.ts", "lib/adapters/gmail.ts", "lib/google/gmail.ts", "lib/adapters/artifact.ts", "lib/ai/model.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/calendar-demo.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/account-brief.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/model-schemas.test.ts", "tests/unit/g1-memory-store.test.ts"], fixtureIds: initialFixtures, evidencePaths: modelEvidence, status: "partial",
-    note: "Closed fixture, Calendar, Gmail, artifact, Responses, and S041 proposal contracts reject unknown IDs/templates/fields before adapter behavior; complete cross-field and live-service semantic validation remains planned.",
+    codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/calendar-demo.ts", "lib/services/world-pr.ts", "lib/services/calendar-demo.ts", "lib/services/gmail-delivery.ts", "lib/services/account-brief.ts", "lib/ai/openai-responses.ts", "lib/ai/model-schemas.ts", "lib/ai/model-safety.ts", "lib/db/memory-store.ts", "lib/db/demo-event-state.ts", "lib/db/gmail-dispatch.ts", "lib/adapters/calendar.ts", "lib/google/calendar.ts", "lib/adapters/gmail.ts", "lib/google/gmail.ts", "lib/adapters/artifact.ts", "lib/ai/model.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/calendar-demo.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/account-brief.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/model-schemas.test.ts", "tests/unit/model-safety.test.ts", "tests/unit/g1-memory-store.test.ts"], fixtureIds: [...initialFixtures, "model-safety.v1"], evidencePaths: modelEvidence, status: "partial",
+    note: "Closed fixture, Calendar, Gmail, artifact, Responses, S041 proposal, and S042 semantic contracts reject unknown IDs/templates/fields, unsafe preserve, ambiguous targets, and non-allowlisted recipients before any provider adapter; live product-service integration remains planned.",
   }),
-  planned("NFR-05", "NFR", "Recovery paraphrase and negative safety gates", ["S070", "S071", "S091"], "Recovery evaluation fixtures are future work."),
+  current({
+    id: "NFR-05", kind: "NFR", title: "Recovery paraphrase and negative safety gates", planTasks: ["S042", "S070", "S071", "S091"],
+    codePaths: ["lib/ai/model-safety.ts", "scripts/eval-model-safety.ts"], testPaths: ["tests/unit/model-safety.test.ts"], fixtureIds: modelSafetyFixtures, evidencePaths: modelEvidence, status: "partial",
+    note: "S042 records representative valid/schema/semantic/injection/refusal/fallback checks with zero unsafe adapter calls; the complete 25-paraphrase and 100%-negative release gates remain S070/S071/S091.",
+  }),
   current({
     id: "NFR-06", kind: "NFR", title: "Digest/actor/action traceability", planTasks: ["S004", "S005", "S006", "S015", "S046"],
     codePaths: ["lib/domain/digest.ts", "lib/db/migrate.ts", "lib/db/postgres-store.ts", "lib/db/store.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/migration-contract.test.ts", "tests/unit/postgres-store.test.ts", "tests/unit/g1-memory-store.test.ts"], fixtureIds: ["initial-plan.v1", "traceability.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-15-s015-traceability.md"], status: "partial",

@@ -58,6 +58,8 @@ S040 adds `OpenAIResponsesClient`, a server-only raw Responses API boundary. It 
 
 S041 adds three model-only schema factories over the exact supplied universe for each operation. Initial reasoning is limited to known candidate IDs, fixed assumption/dependency IDs, and the controlled account-brief source. Recovery is limited to known candidate and succeeded-action IDs, `restore | correct | preserve`, and the two registered apply templates. Prevention output can only propose the one fixed Acme ambiguity rule. Every runtime object and emitted JSON Schema rejects additional properties, while provider IDs, recipients, message bodies, headers, times, ETags, and provider calls remain deterministic server-owned fields. Complete cross-field semantic validation and adversarial evaluation remain S042 work.
 
+S042 adds the deterministic model-safety boundary after schema parsing. Initial proposals must match the provider-ranked candidate and exact dependency map; recovery proposals require an explicit trusted corrected candidate, all and only succeeded initial actions, compatible `restore`/`correct`/`preserve` outcomes, and both fixed new-action templates; prevention proposals remain bound to the completed source task. Account-brief output is checked for scenario-dimension leakage, and recovery recipients are expanded only from the server-owned team allowlist. The validation runner makes at most two model-port attempts, rejects fallback metadata, records only redacted typed failures, and has no deterministic success fallback. The `eval:model-safety` harness is synthetic and non-effecting; the complete 25-paraphrase recovery gate remains a later task.
+
 ## 3. Intended source layout
 
 ```text

@@ -15,6 +15,12 @@ import {
 
 export type ModelProviderFailureKind = "unavailable" | "refusal" | "truncated" | "invalid_output";
 
+export type ModelRetryContext = Readonly<{
+  attempt: 2;
+  reason: ModelProviderFailureKind | "schema_invalid" | "semantic_invalid" | "fallback_forbidden";
+  issues: readonly Readonly<{ code: string; path: string }>[];
+}>;
+
 export class ModelProviderError extends Error {
   readonly kind: ModelProviderFailureKind;
 
@@ -26,9 +32,9 @@ export class ModelProviderError extends Error {
 }
 
 export interface ModelProposalPort {
-  proposeInitial(input: InitialModelInput): Promise<ModelProposalResponse>;
-  proposeRecovery(input: RecoveryModelInput): Promise<ModelProposalResponse>;
-  proposePreventionRule(input: PreventionRuleModelInput): Promise<ModelProposalResponse>;
+  proposeInitial(input: InitialModelInput, retryContext?: ModelRetryContext): Promise<ModelProposalResponse>;
+  proposeRecovery(input: RecoveryModelInput, retryContext?: ModelRetryContext): Promise<ModelProposalResponse>;
+  proposePreventionRule(input: PreventionRuleModelInput, retryContext?: ModelRetryContext): Promise<ModelProposalResponse>;
 }
 
 export type FakeModelFailure = Readonly<{ operation: ModelOperation; kind: ModelProviderFailureKind }>;
@@ -52,15 +58,18 @@ export class FakeModelPort implements ModelProposalPort {
     this.metadata = options.metadata ?? {};
   }
 
-  async proposeInitial(input: InitialModelInput): Promise<ModelProposalResponse> {
+  async proposeInitial(input: InitialModelInput, retryContext?: ModelRetryContext): Promise<ModelProposalResponse> {
+    void retryContext;
     return this.run("initial", InitialModelInputSchema, input);
   }
 
-  async proposeRecovery(input: RecoveryModelInput): Promise<ModelProposalResponse> {
+  async proposeRecovery(input: RecoveryModelInput, retryContext?: ModelRetryContext): Promise<ModelProposalResponse> {
+    void retryContext;
     return this.run("recovery", RecoveryModelInputSchema, input);
   }
 
-  async proposePreventionRule(input: PreventionRuleModelInput): Promise<ModelProposalResponse> {
+  async proposePreventionRule(input: PreventionRuleModelInput, retryContext?: ModelRetryContext): Promise<ModelProposalResponse> {
+    void retryContext;
     return this.run("prevention_rule", PreventionRuleModelInputSchema, input);
   }
 
