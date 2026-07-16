@@ -5,7 +5,8 @@ import {
 } from "@/lib/ai/model-schemas";
 import { buildModelPrompt, MODEL_PROMPT_VERSION } from "@/lib/ai/prompts";
 import type { ModelProposalPort, ModelRetryContext } from "@/lib/ai/model";
-import { OpenAIResponsesClient, type OpenAIResponsesRequest } from "@/lib/ai/openai-responses";
+import { OpenAIResponsesClient, OpenAIResponsesError, type OpenAIResponsesRequest } from "@/lib/ai/openai-responses";
+import { ModelProviderError } from "@/lib/ai/model";
 import {
   ModelProposalResponseSchema,
   type InitialModelInput,
@@ -103,7 +104,13 @@ export class OpenAIModelPort implements ModelProposalPort {
       reasoningEffort: this.reasoningEffort,
       maxOutputTokens: this.maxOutputTokens,
     };
-    const result = await this.client.createStructured(request);
+    let result: Awaited<ReturnType<OpenAIResponsesClient["createStructured"]>>;
+    try {
+      result = await this.client.createStructured(request);
+    } catch (error) {
+      if (error instanceof OpenAIResponsesError) throw new ModelProviderError(error.kind);
+      throw error;
+    }
     const metadata: ModelMetadata = {
       provider: "openai",
       model: result.metadata.model,
