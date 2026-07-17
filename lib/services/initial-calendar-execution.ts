@@ -149,6 +149,7 @@ export async function executeApprovedInitialCalendar(
       actionExecutionId: claim.record.actionExecutionId,
       status: "in_progress",
       now: request.data.now,
+      claimFence: claimFenceFor(claim.record),
       beforeState,
     });
   } catch (error) {
@@ -225,11 +226,12 @@ export async function executeApprovedInitialCalendar(
       actionExecutionId: prepared.actionExecutionId,
       status: "succeeded",
       now: request.data.now,
+      claimFence: claimFenceFor(prepared),
       beforeState,
       afterState: InitialCalendarAfterStateSchema.parse({ snapshot: after }),
       receipt,
     });
-    return calendarResult("succeeded", succeeded, receipt);
+    return calendarResultFromRecord(succeeded);
   } catch (error) {
     throw toInitialCalendarServiceError(error, "The Calendar moved, but its verified receipt could not be recorded; reconciliation is required.");
   }
@@ -339,12 +341,12 @@ async function terminalCalendarResult(
       actionExecutionId: current.actionExecutionId,
       status,
       now,
+      claimFence: claimFenceFor(current),
       ...(beforeState ? { beforeState } : {}),
       ...(afterState ? { afterState } : {}),
       error,
     });
-    const decision = status === "retryable_failed" ? "retryable_failed" : status === "permanently_failed" ? "permanently_failed" : "conflict";
-    return calendarResult(decision, record, undefined, reason);
+    return calendarResultFromRecord(record, reason);
   } catch (persistenceError) {
     throw toInitialCalendarServiceError(persistenceError, "The Calendar outcome could not be persisted safely; automatic retry is not allowed.");
   }
@@ -373,6 +375,30 @@ function calendarActionFromPlan(plan: ExecutionPlan): CalendarMoveAction {
 function calendarReceiptFromRecord(record: ActionExecutionRecord): InitialCalendarMoveReceipt | undefined {
   const parsed = InitialCalendarMoveReceiptSchema.safeParse(record.receipt);
   return parsed.success ? parsed.data : undefined;
+}
+
+function claimFenceFor(record: ActionExecutionRecord): { attempts: number; leaseUntil: string } {
+  if (record.status !== "in_progress" || !record.leaseUntil) {
+    throw new ServiceError("invalid_task_state", "The Calendar action no longer holds a durable execution claim.");
+  }
+  return { attempts: record.attempts, leaseUntil: record.leaseUntil };
+}
+
+function calendarResultFromRecord(
+  record: ActionExecutionRecord,
+  preferredReason?: InitialCalendarExecutionResult["reason"],
+): InitialCalendarExecutionResult {
+  if (record.status === "succeeded") {
+    const receipt = calendarReceiptFromRecord(record);
+    if (!receipt) throw new ServiceError("invalid_task_state", "The durable Calendar success record is missing its matching typed receipt.");
+    return calendarResult("succeeded", record, receipt);
+  }
+  if (record.status === "retryable_failed") return calendarResult("retryable_failed", record, undefined, preferredReason ?? "provider_unavailable");
+  if (record.status === "permanently_failed") return calendarResult("permanently_failed", record, undefined, preferredReason ?? "permanently_failed");
+  if (record.status === "conflict") return calendarResult("conflict", record, undefined, preferredReason ?? "conflict");
+  if (record.status === "delivery_uncertain") return calendarResult("blocked", record, undefined, "reconciliation_required");
+  if (record.status === "in_progress") return calendarResult("busy", record, undefined, "active_lease");
+  throw new ServiceError("invalid_task_state", "The Calendar action did not persist a terminal state.");
 }
 
 function calendarResult(

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { memoryExecutionStore } from "@/lib/db";
+import { MemoryExecutionPersistenceStore } from "@/lib/db/execution-store";
 import { memoryFixtureStore } from "@/lib/db/memory-store";
 import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import { SUPPORTED_SCENARIO_REQUEST } from "@/lib/domain/scenario";
@@ -15,7 +16,7 @@ const originalEnvironment = {
   REWIND_STORAGE_MODE: process.env.REWIND_STORAGE_MODE,
 };
 
-async function createApproved() {
+async function createApproved(executionStore: MemoryExecutionPersistenceStore = memoryExecutionStore) {
   const created = await createWorldPr({
     actorId: "test:operator",
     source: "dashboard",
@@ -31,10 +32,16 @@ async function createApproved() {
     requestId: "req_s052_test_0001",
     worldPrId: created.response.worldPrId,
     request: { planId: pointer.planId, planVersion: pointer.version, planDigest: pointer.digest },
-  }, { now: () => new Date(now) });
-  const plan = await memoryExecutionStore.getPlan(pointer.planId);
+  }, { now: () => new Date(now), worldStore: memoryFixtureStore, executionStore });
+  const plan = await executionStore.getPlan(pointer.planId);
   if (!plan) throw new Error("Expected the approved execution plan.");
   return { created, pointer, plan };
+}
+
+class MissingArtifactLedgerStore extends MemoryExecutionPersistenceStore {
+  override async listActions(planId: string) {
+    return (await super.listActions(planId)).filter((action) => action.actionKey !== "initial.artifact.account_brief");
+  }
 }
 
 function claimInput(plan: { planId: string; digest: string }, actionKey: "initial.artifact.account_brief" | "initial.calendar.move" | "initial.mail.notify", overrides: Record<string, string> = {}) {
@@ -97,6 +104,7 @@ describe("S052 initial durable action preparation and claim coordination", () =>
       actionExecutionId: artifact.actionExecutionId,
       status: "succeeded",
       now: "2026-07-16T12:00:10.000Z",
+      claimFence: { attempts: artifact.attempts, leaseUntil: artifact.leaseUntil! },
       receipt: {
         artifactId: "fake-artifact-account-brief-v1",
         contentHash: payload.actions[0].desired.contentHash,
@@ -124,6 +132,12 @@ describe("S052 initial durable action preparation and claim coordination", () =>
 
     const second = await createApproved();
     await expect(claimApprovedInitialAction(claimInput(second.plan, "initial.calendar.move"), memoryExecutionStore)).rejects.toMatchObject({ code: "invalid_task_state" });
+  });
+
+  it("fails closed when an earlier action ledger row is missing", async () => {
+    const executionStore = new MissingArtifactLedgerStore();
+    const { plan } = await createApproved(executionStore);
+    await expect(claimApprovedInitialAction(claimInput(plan, "initial.calendar.move"), executionStore)).rejects.toMatchObject({ code: "invalid_task_state" });
   });
 
   it("turns an expired Gmail lease into durable uncertainty and stops an expired Calendar lease for reconciliation", async () => {
@@ -159,7 +173,8 @@ describe("S052 initial durable action preparation and claim coordination", () =>
     }), memoryExecutionStore);
     expect(conflict.decision).toBe("blocked");
     expect(conflict.reason).toBe("reconciliation_required");
-    expect(conflict.record.status).toBe("in_progress");
+    expect(conflict.record.status).toBe("conflict");
+    expect(conflict.record.error).toMatchObject({ code: "reconciliation_required", retryable: false });
   });
 
   it("never retries terminal conflict or ambiguous actions", async () => {

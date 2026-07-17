@@ -112,8 +112,14 @@ export async function claimApprovedInitialAction(
     if (action.leaseUntil && Date.parse(action.leaseUntil) > Date.parse(request.now)) return claimResult("busy", action);
     try {
       const reconciled = await executionStore.reconcileExpiredLease(action.actionExecutionId, request.now);
+      if (reconciled.status === "succeeded") return claimResult("skipped", reconciled);
+      if (reconciled.status === "in_progress") return claimResult("busy", reconciled);
       if (reconciled.status === "delivery_uncertain") return claimResult("blocked", reconciled, "delivery_uncertain");
-      return claimResult("blocked", reconciled, "reconciliation_required");
+      if (reconciled.status === "permanently_failed") return claimResult("blocked", reconciled, "permanently_failed");
+      if (reconciled.status === "conflict") {
+        return claimResult("blocked", reconciled, reconciled.error?.code === "reconciliation_required" ? "reconciliation_required" : "conflict");
+      }
+      throw new ServiceError("action_not_retryable", "The expired action did not reconcile to a durable terminal state.");
     } catch (error) {
       if (error instanceof ExecutionPersistenceError && error.code === "lease_reconciliation_required") return claimResult("blocked", action, "reconciliation_required");
       throw toInitialExecutionServiceError(error);
@@ -180,8 +186,9 @@ function assertDependenciesSatisfied(payload: InitialPlanPayload, actions: reado
   const index = payload.executionOrder.indexOf(action.actionKey as (typeof payload.executionOrder)[number]);
   if (index < 0) throw new ServiceError("unknown_action", "The action is not in the approved execution order.");
   const priorKeys: ReadonlySet<string> = new Set<string>(payload.executionOrder.slice(0, index));
-  const missing = actions.some((candidate) => priorKeys.has(candidate.actionKey) && candidate.status !== "succeeded");
-  if (missing) throw new ServiceError("invalid_task_state", "The approved action order requires every earlier action to succeed first.");
+  const actionsByKey = new Map(actions.map((candidate) => [candidate.actionKey, candidate]));
+  const unsatisfied = [...priorKeys].some((key) => actionsByKey.get(key)?.status !== "succeeded");
+  if (unsatisfied) throw new ServiceError("invalid_task_state", "The approved action order requires every earlier action ledger row to exist and succeed first.");
 }
 
 function claimResult(decision: InitialActionClaimResult["decision"], record: ActionExecutionRecord, reason?: InitialActionClaimResult["reason"]): InitialActionClaimResult {

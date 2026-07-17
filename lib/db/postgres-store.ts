@@ -18,6 +18,7 @@ import {
   buildPlanningLeaseExpiredView,
 } from "@/lib/domain/fixture-world-pr";
 import { canonicalJson } from "@/lib/domain/digest";
+import { createOpaqueId } from "@/lib/domain/ids";
 import {
   FakeProviderConfigurationError,
   StoreError,
@@ -25,6 +26,11 @@ import {
   type CancelWorldPrStoreResult,
   type CreateWorldPrStoreInput,
   type CreateWorldPrStoreResult,
+  type InitialPlanPointer,
+  type MutationIdempotencyClaim,
+  type MutationIdempotencyLease,
+  type MutationIdempotencyFailure,
+  type MutationIdempotencyInput,
   type WorldPrStore,
   sharesWorldPrScope,
 } from "@/lib/db/store";
@@ -39,6 +45,28 @@ interface IdempotencyRow {
   response: unknown;
   resource_id: string | null;
   status: "in_progress" | "completed" | "failed";
+}
+
+function replayMutationClaim(record: IdempotencyRow): Exclude<MutationIdempotencyClaim, { kind: "claimed" }> {
+  if (record.status === "in_progress") {
+    if (!record.response || typeof record.response !== "object" || Array.isArray(record.response)) {
+      throw new StoreError("internal_error", "The pending mutation idempotency record has no durable claim fence.");
+    }
+    const claimToken = (record.response as Record<string, unknown>).claimToken;
+    if (typeof claimToken !== "string" || claimToken.length === 0) {
+      throw new StoreError("internal_error", "The pending mutation idempotency record has an invalid durable claim fence.");
+    }
+    return { kind: "replay_pending", claimToken };
+  }
+  if (!record.response) throw new StoreError("internal_error", "The mutation idempotency record has no durable result.");
+  if (record.status === "completed") {
+    const response = TaskMutationResponseSchema.safeParse(record.response);
+    if (!response.success) throw new StoreError("internal_error", "The completed mutation result is not a valid safe response.");
+    return { kind: "replay_completed", response: response.data };
+  }
+  const failure = IdempotencyFailureSchema.safeParse(record.response);
+  if (!failure.success) throw new StoreError("internal_error", "The failed mutation result is not a valid safe error.");
+  return { kind: "replay_failed", failure: failure.data };
 }
 
 export class PostgresWorldPrStore implements WorldPrStore {
@@ -153,6 +181,92 @@ export class PostgresWorldPrStore implements WorldPrStore {
     return record.view;
   }
 
+  async claimMutation(input: MutationIdempotencyInput): Promise<MutationIdempotencyClaim> {
+    const claimToken = createOpaqueId("idem_");
+    const claim = await this.pool.query(
+      `INSERT INTO idempotency_records
+        (actor_id, endpoint, key, body_hash, status, resource_id, response, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'in_progress', $5, $6::jsonb, now(), now())
+       ON CONFLICT (actor_id, endpoint, key) DO NOTHING
+       RETURNING key`,
+      [input.actorId, input.endpoint, input.idempotencyKey, input.bodyHash, input.worldPrId, JSON.stringify({ claimToken })],
+    );
+    if (claim.rowCount === 1) return { kind: "claimed", claimToken };
+    const existing = await this.readIdempotency(input.actorId, input.endpoint, input.idempotencyKey);
+    if (!existing) throw new StoreError("internal_error", "The mutation idempotency claim disappeared before it could be read.");
+    if (existing.body_hash !== input.bodyHash) throw new StoreError("idempotency_conflict", "This idempotency key was already used for a different request.");
+    if (existing.status === "in_progress") {
+      const reclaimedToken = createOpaqueId("idem_");
+      const reclaimed = await this.pool.query(
+        `UPDATE idempotency_records
+            SET response = $5::jsonb, updated_at = now()
+          WHERE actor_id = $1
+            AND endpoint = $2
+            AND key = $3
+            AND body_hash = $4
+            AND status = 'in_progress'
+            AND updated_at <= now() - interval '60 seconds'
+          RETURNING key`,
+        [input.actorId, input.endpoint, input.idempotencyKey, input.bodyHash, JSON.stringify({ claimToken: reclaimedToken })],
+      );
+      if (reclaimed.rowCount === 1) return { kind: "claimed", claimToken: reclaimedToken };
+      const latest = await this.readIdempotency(input.actorId, input.endpoint, input.idempotencyKey);
+      if (!latest || latest.body_hash !== input.bodyHash) {
+        throw new StoreError("internal_error", "The mutation idempotency claim changed before it could be replayed safely.");
+      }
+      return replayMutationClaim(latest);
+    }
+    return replayMutationClaim(existing);
+  }
+
+  async completeMutation(input: MutationIdempotencyLease, response: TaskMutationResponse): Promise<void> {
+    const parsedResponse = TaskMutationResponseSchema.parse(response);
+    const result = await this.pool.query(
+      `UPDATE idempotency_records
+          SET status = 'completed', response = $4::jsonb, updated_at = now()
+        WHERE actor_id = $1
+          AND endpoint = $2
+          AND key = $3
+          AND body_hash = $5
+          AND status = 'in_progress'
+          AND (response ->> 'claimToken') = $6`,
+      [input.actorId, input.endpoint, input.idempotencyKey, JSON.stringify(parsedResponse), input.bodyHash, input.claimToken],
+    );
+    if (result.rowCount !== 1) throw new StoreError("internal_error", "The mutation idempotency result could not be completed safely.");
+  }
+
+  async recoverMutation(input: MutationIdempotencyLease, response: TaskMutationResponse): Promise<void> {
+    const parsedResponse = TaskMutationResponseSchema.parse(response);
+    const result = await this.pool.query(
+      `UPDATE idempotency_records
+          SET status = 'completed', response = $4::jsonb, updated_at = now()
+        WHERE actor_id = $1
+          AND endpoint = $2
+          AND key = $3
+           AND body_hash = $5
+           AND status = 'in_progress'
+           AND (response ->> 'claimToken') = $6`,
+      [input.actorId, input.endpoint, input.idempotencyKey, JSON.stringify(parsedResponse), input.bodyHash, input.claimToken],
+    );
+    if (result.rowCount !== 1) throw new StoreError("internal_error", "The pending mutation idempotency record could not be recovered safely.");
+  }
+
+  async failMutation(input: MutationIdempotencyLease, failure: MutationIdempotencyFailure): Promise<void> {
+    const parsedFailure = IdempotencyFailureSchema.parse(failure);
+    const result = await this.pool.query(
+      `UPDATE idempotency_records
+          SET status = 'failed', response = $4::jsonb, updated_at = now()
+        WHERE actor_id = $1
+          AND endpoint = $2
+          AND key = $3
+          AND body_hash = $5
+          AND status = 'in_progress'
+          AND (response ->> 'claimToken') = $6`,
+      [input.actorId, input.endpoint, input.idempotencyKey, JSON.stringify(parsedFailure), input.bodyHash, input.claimToken],
+    );
+    if (result.rowCount !== 1) throw new StoreError("internal_error", "The mutation idempotency failure could not be recorded safely.");
+  }
+
   async getInitialPlanPayload(worldPrId: string, planId: string): Promise<InitialPlanPayload | null> {
     const result = await this.pool.query<{ payload: unknown }>(
       `SELECT payload FROM plans
@@ -163,10 +277,19 @@ export class PostgresWorldPrStore implements WorldPrStore {
     return VerifiedInitialPlanPayloadSchema.parse(result.rows[0].payload);
   }
 
-  async persistInitialPlanVersion(worldPrId: string, payload: InitialPlanPayload, view: WorldPrView): Promise<void> {
+  async persistInitialPlanVersion(worldPrId: string, payload: InitialPlanPayload, view: WorldPrView, expectedPointer: InitialPlanPointer): Promise<void> {
     const parsedPayload = VerifiedInitialPlanPayloadSchema.parse(payload);
     const parsedView = WorldPrViewSchema.parse(view);
-    if (parsedPayload.taskId !== worldPrId || parsedView.worldPrId !== worldPrId || !parsedView.activePlan || !isInitialPlanView(parsedView.activePlan) || parsedView.activePlan.pointer.planId !== parsedPayload.planId) {
+    if (
+      parsedPayload.taskId !== worldPrId ||
+      parsedView.worldPrId !== worldPrId ||
+      parsedView.status !== "preview_ready" ||
+      !parsedView.activePlan ||
+      !isInitialPlanView(parsedView.activePlan) ||
+      parsedView.activePlan.pointer.planId !== parsedPayload.planId ||
+      parsedView.activePlan.pointer.version !== parsedPayload.version ||
+      parsedView.activePlan.pointer.digest !== parsedPayload.digest
+    ) {
       throw new StoreError("internal_error", "The refreshed plan does not belong to the World PR.");
     }
     const client = await this.pool.connect();
@@ -174,6 +297,23 @@ export class PostgresWorldPrStore implements WorldPrStore {
       await client.query("BEGIN");
       const current = await client.query<{ read_model: unknown }>("SELECT read_model FROM tasks WHERE id = $1 FOR UPDATE", [worldPrId]);
       if (!current.rowCount) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+      const currentView = WorldPrViewSchema.parse(current.rows[0].read_model);
+      if (currentView.status !== "preview_ready" || !currentView.activePlan || !isInitialPlanView(currentView.activePlan) || !sameInitialPointer(currentView.activePlan.pointer, expectedPointer)) {
+        throw new StoreError("invalid_task_state", "The World PR changed while the replacement plan was being prepared.");
+      }
+      if (parsedPayload.version !== currentView.activePlan.pointer.version + 1 || parsedPayload.planId === currentView.activePlan.pointer.planId || parsedPayload.digest === currentView.activePlan.pointer.digest) {
+        throw new StoreError("invalid_task_state", "The replacement plan must be the next immutable version of the active preview.");
+      }
+      const approvedPlan = await client.query(
+        `SELECT 1
+           FROM approvals
+           JOIN plans ON plans.id = approvals.plan_id
+          WHERE plans.task_id = $1
+            AND plans.kind = 'initial'
+          LIMIT 1`,
+        [worldPrId],
+      );
+      if (approvedPlan.rowCount) throw new StoreError("invalid_task_state", "An approved initial plan cannot be superseded.");
       const existingPlan = await client.query<{ payload: unknown }>("SELECT payload FROM plans WHERE id = $1 AND task_id = $2 AND kind = 'initial'", [parsedPayload.planId, worldPrId]);
       if (existingPlan.rowCount === 1) {
         if (canonicalJson(VerifiedInitialPlanPayloadSchema.parse(existingPlan.rows[0].payload)) !== canonicalJson(parsedPayload)) {
@@ -506,6 +646,10 @@ function assertStoredRecordConsistency(record: StoredWorldPrRecord): void {
   ) {
     throw new StoreError("internal_error", "Stored World PR read model does not match its immutable plan payload.");
   }
+}
+
+function sameInitialPointer(left: InitialPlanPointer, right: InitialPlanPointer): boolean {
+  return left.planId === right.planId && left.version === right.version && left.digest === right.digest;
 }
 
 function worldPrResponse(view: WorldPrView, input: CreateWorldPrStoreInput): CreateWorldPrResponse {

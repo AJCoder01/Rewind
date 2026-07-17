@@ -119,16 +119,20 @@ describe("S056 durable execution timeline", () => {
     const payload = VerifiedInitialPlanPayloadSchema.parse(plan.payload);
     const artifact = await action(pointer.planId, "initial.artifact.account_brief");
     const calendar = await action(pointer.planId, "initial.calendar.move");
+    const artifactClaim = await memoryExecutionStore.claimAction({ actionExecutionId: artifact.actionExecutionId, now: fixedNow, leaseUntil: "2026-07-16T12:01:00.000Z" });
     await memoryExecutionStore.recordActionState({
       actionExecutionId: artifact.actionExecutionId,
       status: "succeeded",
       now: later,
+      claimFence: { attempts: artifactClaim.record.attempts, leaseUntil: artifactClaim.record.leaseUntil! },
       receipt: { artifactId: "fake-artifact-account-brief-v1", contentHash: payload.actions[0].desired.contentHash, storedAt: later },
     });
+    const calendarClaim = await memoryExecutionStore.claimAction({ actionExecutionId: calendar.actionExecutionId, now: fixedNow, leaseUntil: "2026-07-16T12:01:00.000Z" });
     await memoryExecutionStore.recordActionState({
       actionExecutionId: calendar.actionExecutionId,
       status: "conflict",
       now: later,
+      claimFence: { attempts: calendarClaim.record.attempts, leaseUntil: calendarClaim.record.leaseUntil! },
       error: { code: "provider_conflict", retryable: false, safeMessage: "Calendar state changed and requires a new preflight." },
     });
     const timeline = await getExecutionTimeline(created.response.worldPrId, "demo-operator", { worldStore: memoryFixtureStore, executionStore: memoryExecutionStore });
@@ -148,22 +152,28 @@ describe("S056 durable execution timeline", () => {
     const artifact = await action(pointer.planId, "initial.artifact.account_brief");
     const calendar = await action(pointer.planId, "initial.calendar.move");
     const mail = await action(pointer.planId, "initial.mail.notify");
+    const artifactClaim = await memoryExecutionStore.claimAction({ actionExecutionId: artifact.actionExecutionId, now: fixedNow, leaseUntil: "2026-07-16T12:01:00.000Z" });
     await memoryExecutionStore.recordActionState({
       actionExecutionId: artifact.actionExecutionId,
       status: "succeeded",
       now: later,
+      claimFence: { attempts: artifactClaim.record.attempts, leaseUntil: artifactClaim.record.leaseUntil! },
       receipt: { artifactId: "fake-artifact-account-brief-v1", contentHash: payload.actions[0].desired.contentHash, storedAt: later },
     });
+    const calendarClaim = await memoryExecutionStore.claimAction({ actionExecutionId: calendar.actionExecutionId, now: fixedNow, leaseUntil: "2026-07-16T12:01:00.000Z" });
     await memoryExecutionStore.recordActionState({
       actionExecutionId: calendar.actionExecutionId,
       status: "succeeded",
       now: later,
+      claimFence: { attempts: calendarClaim.record.attempts, leaseUntil: calendarClaim.record.leaseUntil! },
       receipt: { provider: "google_calendar", operation: "move", providerEventId: payload.actions[1].target.providerEventId, resultingEtag: "fixture-uk-etag-v2", verified: true },
     });
+    const mailClaim = await memoryExecutionStore.claimAction({ actionExecutionId: mail.actionExecutionId, now: fixedNow, leaseUntil: "2026-07-16T12:01:00.000Z", dispatchStartedAt: later });
     await memoryExecutionStore.recordActionState({
       actionExecutionId: mail.actionExecutionId,
       status: "delivery_uncertain",
       now: later,
+      claimFence: { attempts: mailClaim.record.attempts, leaseUntil: mailClaim.record.leaseUntil! },
       dispatchStartedAt: later,
       receipt: { status: "delivery_uncertain", reason: "transport_timeout" },
       error: { code: "gmail_delivery_uncertain", retryable: false, safeMessage: "The Gmail delivery outcome is uncertain and must not be automatically retried." },
@@ -183,9 +193,12 @@ describe("S056 durable execution timeline", () => {
     const artifact = await action(pointer.planId, "initial.artifact.account_brief");
     const calendar = await action(pointer.planId, "initial.calendar.move");
     const mail = await action(pointer.planId, "initial.mail.notify");
-    await memoryExecutionStore.recordActionState({ actionExecutionId: artifact.actionExecutionId, status: "succeeded", now: later, receipt: { artifactId: "fake-artifact-account-brief-v1", contentHash: payload.actions[0].desired.contentHash, storedAt: later } });
-    await memoryExecutionStore.recordActionState({ actionExecutionId: calendar.actionExecutionId, status: "succeeded", now: later, receipt: { provider: "google_calendar", operation: "move", providerEventId: payload.actions[1].target.providerEventId, resultingEtag: "fixture-uk-etag-v2", verified: true } });
-    await memoryExecutionStore.recordActionState({ actionExecutionId: mail.actionExecutionId, status: "succeeded", now: later, dispatchStartedAt: later, receipt: { status: "sent", messageId: "fake-gmail-message-1", threadId: "fake-gmail-thread-1" } });
+    const artifactClaim = await memoryExecutionStore.claimAction({ actionExecutionId: artifact.actionExecutionId, now: fixedNow, leaseUntil: "2026-07-16T12:01:00.000Z" });
+    await memoryExecutionStore.recordActionState({ actionExecutionId: artifact.actionExecutionId, status: "succeeded", now: later, claimFence: { attempts: artifactClaim.record.attempts, leaseUntil: artifactClaim.record.leaseUntil! }, receipt: { artifactId: "fake-artifact-account-brief-v1", contentHash: payload.actions[0].desired.contentHash, storedAt: later } });
+    const calendarClaim = await memoryExecutionStore.claimAction({ actionExecutionId: calendar.actionExecutionId, now: fixedNow, leaseUntil: "2026-07-16T12:01:00.000Z" });
+    await memoryExecutionStore.recordActionState({ actionExecutionId: calendar.actionExecutionId, status: "succeeded", now: later, claimFence: { attempts: calendarClaim.record.attempts, leaseUntil: calendarClaim.record.leaseUntil! }, receipt: { provider: "google_calendar", operation: "move", providerEventId: payload.actions[1].target.providerEventId, resultingEtag: "fixture-uk-etag-v2", verified: true } });
+    const mailClaim = await memoryExecutionStore.claimAction({ actionExecutionId: mail.actionExecutionId, now: fixedNow, leaseUntil: "2026-07-16T12:01:00.000Z", dispatchStartedAt: later });
+    await memoryExecutionStore.recordActionState({ actionExecutionId: mail.actionExecutionId, status: "succeeded", now: later, claimFence: { attempts: mailClaim.record.attempts, leaseUntil: mailClaim.record.leaseUntil! }, dispatchStartedAt: later, receipt: { status: "sent", messageId: "fake-gmail-message-1", threadId: "fake-gmail-thread-1" } });
     const timeline = await getExecutionTimeline(created.response.worldPrId, "demo-operator", { worldStore: memoryFixtureStore, executionStore: memoryExecutionStore });
 
     expect(timeline?.overallStatus).toBe("completed");

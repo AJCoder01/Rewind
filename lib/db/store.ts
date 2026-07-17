@@ -1,5 +1,6 @@
 import type {
   CreateWorldPrResponse,
+  InitialPlanView,
   InitialPlanPayload,
   TaskMutationResponse,
   WorldPrView,
@@ -70,13 +71,46 @@ export type CancelWorldPrStoreResult = {
   replay: boolean;
 };
 
+export type InitialPlanPointer = Pick<InitialPlanView["pointer"], "planId" | "version" | "digest">;
+
+export type MutationIdempotencyInput = Readonly<{
+  actorId: string;
+  endpoint: string;
+  idempotencyKey: string;
+  bodyHash: string;
+  worldPrId: string;
+  requestId: string;
+  claimedAt: string;
+}>;
+
+export type MutationIdempotencyLease = MutationIdempotencyInput & Readonly<{
+  claimToken: string;
+}>;
+
+export type MutationIdempotencyFailure = Readonly<{
+  code: string;
+  message: string;
+  retryable: boolean;
+  requestId: string;
+}>;
+
+export type MutationIdempotencyClaim =
+  | { kind: "claimed"; claimToken: string }
+  | { kind: "replay_pending"; claimToken: string }
+  | { kind: "replay_completed"; response: TaskMutationResponse }
+  | { kind: "replay_failed"; failure: MutationIdempotencyFailure };
+
 export interface WorldPrStore {
   createInitial(input: CreateWorldPrStoreInput): Promise<CreateWorldPrStoreResult>;
   get(worldPrId: string, actorId?: string): Promise<WorldPrView | null>;
   getInitialPlanPayload(worldPrId: string, planId: string): Promise<InitialPlanPayload | null>;
-  persistInitialPlanVersion(worldPrId: string, payload: InitialPlanPayload, view: WorldPrView): Promise<void>;
+  persistInitialPlanVersion(worldPrId: string, payload: InitialPlanPayload, view: WorldPrView, expectedPointer: InitialPlanPointer): Promise<void>;
   updateView(worldPrId: string, view: WorldPrView): Promise<void>;
   cancel(input: CancelWorldPrStoreInput): Promise<CancelWorldPrStoreResult>;
+  claimMutation(input: MutationIdempotencyInput): Promise<MutationIdempotencyClaim>;
+  completeMutation(input: MutationIdempotencyLease, response: TaskMutationResponse): Promise<void>;
+  recoverMutation(input: MutationIdempotencyLease, response: TaskMutationResponse): Promise<void>;
+  failMutation(input: MutationIdempotencyLease, failure: MutationIdempotencyFailure): Promise<void>;
 }
 
 export function requestBodyHash(request: string): string {

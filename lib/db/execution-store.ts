@@ -11,6 +11,7 @@ import {
   stableOperationKey,
 } from "@/lib/contracts/execution-persistence";
 import { createOpaqueId } from "@/lib/domain/ids";
+import { WorldPrViewSchema } from "@/lib/contracts/v1";
 
 export type ExecutionPersistenceErrorCode =
   | "plan_immutable_conflict"
@@ -52,6 +53,7 @@ export type RecordActionStateInput = Readonly<{
   actionExecutionId: string;
   status: ActionExecutionRecord["status"];
   now: string;
+  claimFence?: Readonly<{ attempts: number; leaseUntil: string }>;
   beforeState?: Record<string, unknown>;
   afterState?: Record<string, unknown>;
   receipt?: ExecutionReceipt;
@@ -86,6 +88,66 @@ function cloneAction(action: ActionExecutionRecord): ActionExecutionRecord {
 
 function isTerminal(status: ActionExecutionRecord["status"]): boolean {
   return status === "succeeded" || status === "delivery_uncertain" || status === "conflict" || status === "permanently_failed";
+}
+
+function sameInitialPointer(left: { planId: string; version: number; digest: string }, right: { planId: string; version: number; digest: string }): boolean {
+  return left.planId === right.planId && left.version === right.version && left.digest === right.digest;
+}
+
+function assertActionTransition(current: ActionExecutionRecord, input: RecordActionStateInput): void {
+  const allowed = current.status === "planned"
+    ? ["in_progress", "retryable_failed", "conflict", "permanently_failed"]
+    : current.status === "retryable_failed"
+      ? ["in_progress"]
+      : current.status === "in_progress"
+        ? ["in_progress", "succeeded", "retryable_failed", "delivery_uncertain", "conflict", "permanently_failed"]
+        : [];
+  if (!allowed.includes(input.status)) {
+    throw new ExecutionPersistenceError("action_not_claimable", "The requested action state transition is not safe.");
+  }
+  if (
+    current.status === "in_progress" &&
+    (!input.claimFence || input.claimFence.attempts !== current.attempts || input.claimFence.leaseUntil !== current.leaseUntil)
+  ) {
+    throw new ExecutionPersistenceError("action_not_claimable", "The action outcome does not hold the current execution claim fence.");
+  }
+  if (input.receipt && !receiptMatchesActionType(current.type, input.receipt)) {
+    throw new ExecutionPersistenceError("action_immutable_conflict", "The execution receipt does not match the immutable action type.");
+  }
+  if (input.status === "succeeded" && !input.receipt) {
+    throw new ExecutionPersistenceError("action_immutable_conflict", "A successful action requires a matching durable receipt.");
+  }
+  if (input.status === "retryable_failed" && (!input.error || !input.error.retryable)) {
+    throw new ExecutionPersistenceError("action_immutable_conflict", "A retryable action failure requires a retryable redacted error.");
+  }
+  if ((input.status === "delivery_uncertain" || input.status === "conflict" || input.status === "permanently_failed") && !input.error) {
+    throw new ExecutionPersistenceError("action_immutable_conflict", "A stopped action requires a redacted error.");
+  }
+  if (input.receipt && current.type !== "mail.notify" && current.type !== "mail.correct" && input.status !== "succeeded") {
+    throw new ExecutionPersistenceError("action_immutable_conflict", "Only successful non-mail actions may persist a provider receipt.");
+  }
+  if (input.receipt && (current.type === "mail.notify" || current.type === "mail.correct")) {
+    if (!("status" in input.receipt)) {
+      throw new ExecutionPersistenceError("action_immutable_conflict", "The Gmail action requires a Gmail delivery receipt.");
+    }
+    const expectedStatus = input.status === "succeeded"
+      ? "sent"
+      : input.status === "permanently_failed"
+        ? "permanent_failed"
+        : input.status === "delivery_uncertain"
+          ? "delivery_uncertain"
+          : undefined;
+    if (!expectedStatus || input.receipt.status !== expectedStatus) {
+      throw new ExecutionPersistenceError("action_immutable_conflict", "The Gmail receipt does not match the durable terminal action status.");
+    }
+  }
+}
+
+function receiptMatchesActionType(type: ActionExecutionRecord["type"], receipt: ExecutionReceipt): boolean {
+  if (type === "artifact.account_brief") return "artifactId" in receipt;
+  if (type === "calendar.move") return "provider" in receipt && receipt.provider === "google_calendar" && receipt.operation === "move";
+  if (type === "calendar.restore") return "provider" in receipt && receipt.provider === "google_calendar" && receipt.operation === "restore";
+  return "status" in receipt;
 }
 
 function actionRecord(input: PlannedActionInput): ActionExecutionRecord {
@@ -161,11 +223,21 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
 
   async createApproval(input: CreateApprovalInput): Promise<{ approval: ApprovalRecord; replay: boolean }> {
     const approval = ApprovalRecordSchema.parse(input);
-    if (!this.plans.has(approval.planId)) throw new ExecutionPersistenceError("plan_not_found", "The approved plan does not exist.");
+    const plan = this.plans.get(approval.planId);
+    if (!plan) throw new ExecutionPersistenceError("plan_not_found", "The approved plan does not exist.");
+    if (plan.version !== approval.planVersion || plan.digest !== approval.planDigest) {
+      throw new ExecutionPersistenceError("approval_conflict", "Approval does not match the immutable plan version and digest.");
+    }
     const existing = this.approvals.get(approval.planId);
     if (existing) {
       if (JSON.stringify(existing) !== JSON.stringify(approval)) throw new ExecutionPersistenceError("approval_conflict", "This plan already has a different immutable approval.");
       return { approval: cloneApproval(existing), replay: true };
+    }
+    for (const [approvedPlanId] of this.approvals) {
+      const approvedPlan = this.plans.get(approvedPlanId);
+      if (approvedPlan && approvedPlan.taskId === plan.taskId && approvedPlan.kind === "initial" && approvedPlan.planId !== plan.planId) {
+        throw new ExecutionPersistenceError("approval_conflict", "Another immutable initial plan is already approved for this World PR.");
+      }
     }
     this.approvals.set(approval.planId, cloneApproval(approval));
     return { approval: cloneApproval(approval), replay: false };
@@ -179,6 +251,7 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
   async ensureActionRows(inputs: readonly PlannedActionInput[]): Promise<readonly ActionExecutionRecord[]> {
     const result: ActionExecutionRecord[] = [];
     for (const input of inputs) {
+      if (!this.plans.has(input.planId)) throw new ExecutionPersistenceError("plan_not_found", "The action plan does not exist.");
       const candidate = actionRecord(input);
       const key = `${candidate.planId}:${candidate.actionKey}`;
       const existingId = this.actionKeys.get(key);
@@ -209,10 +282,8 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
     const current = this.actions.get(input.actionExecutionId);
     if (!current) throw new ExecutionPersistenceError("action_not_found", "The action ledger row does not exist.");
     if (isTerminal(current.status)) return { claimed: false, record: cloneAction(current) };
-    if (current.status === "in_progress" && current.leaseUntil && Date.parse(current.leaseUntil) > Date.parse(input.now)) {
-      return { claimed: false, record: cloneAction(current) };
-    }
-    if (current.status !== "planned" && current.status !== "retryable_failed" && current.status !== "in_progress") {
+    if (current.status === "in_progress") return { claimed: false, record: cloneAction(current) };
+    if (current.status !== "planned" && current.status !== "retryable_failed") {
       throw new ExecutionPersistenceError("action_not_claimable", "The action is not in a known-safe state for execution.");
     }
     const claimed = ActionExecutionRecordSchema.parse({
@@ -233,7 +304,8 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
   async recordActionState(input: RecordActionStateInput): Promise<ActionExecutionRecord> {
     const current = this.actions.get(input.actionExecutionId);
     if (!current) throw new ExecutionPersistenceError("action_not_found", "The action ledger row does not exist.");
-    if (isTerminal(current.status) && input.status !== current.status) return cloneAction(current);
+    if (isTerminal(current.status)) return cloneAction(current);
+    assertActionTransition(current, input);
     const next = ActionExecutionRecordSchema.parse({
       ...current,
       status: input.status,
@@ -258,11 +330,22 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
         actionExecutionId,
         status: "delivery_uncertain",
         now,
+        claimFence: { attempts: current.attempts, leaseUntil: current.leaseUntil },
         receipt: { status: "delivery_uncertain", reason: "process_interrupted" },
         error: { code: "delivery_uncertain", retryable: false, safeMessage: "Gmail handoff could not be reconciled after the execution lease expired." },
       });
     }
-    throw new ExecutionPersistenceError("lease_reconciliation_required", "An expired non-mail action requires provider-state reconciliation before retry.");
+    return this.recordActionState({
+      actionExecutionId,
+      status: "conflict",
+      now,
+      claimFence: { attempts: current.attempts, leaseUntil: current.leaseUntil },
+      error: {
+        code: "reconciliation_required",
+        retryable: false,
+        safeMessage: "An expired non-mail action has an unresolved provider outcome and requires provider-state reconciliation before any retry.",
+      },
+    });
   }
 
   clear(): void {
@@ -420,8 +503,8 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const plan = await client.query<{ version: number; digest: string; task_id: string; status: string }>(
-        `SELECT plans.version, plans.digest, plans.task_id, tasks.status
+      const plan = await client.query<{ version: number; digest: string; task_id: string; status: string; read_model: unknown }>(
+        `SELECT plans.version, plans.digest, plans.task_id, tasks.status, tasks.read_model
            FROM plans JOIN tasks ON tasks.id = plans.task_id
           WHERE plans.id = $1
           FOR UPDATE OF plans, tasks`,
@@ -433,6 +516,18 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
       }
       if (plan.rows[0].status !== "preview_ready") {
         throw new ExecutionPersistenceError("approval_conflict", "The World PR is no longer an unapproved preview.");
+      }
+      const currentView = WorldPrViewSchema.parse(plan.rows[0].read_model);
+      if (
+        !currentView.activePlan ||
+        currentView.activePlan.pointer.kind !== "initial" ||
+        !sameInitialPointer(currentView.activePlan.pointer, {
+          planId: approval.planId,
+          version: approval.planVersion,
+          digest: approval.planDigest,
+        })
+      ) {
+        throw new ExecutionPersistenceError("approval_conflict", "Approval does not match the active immutable World PR plan.");
       }
       const existing = await client.query<ApprovalRow>(
         `SELECT approvals.id, approvals.plan_id, plans.version AS plan_version, approvals.plan_digest, approvals.actor_id, approvals.approved_at
@@ -447,6 +542,17 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
         await client.query("COMMIT");
         return { approval, replay: true };
       }
+      const otherApproval = await client.query(
+        `SELECT 1
+           FROM approvals
+           JOIN plans ON plans.id = approvals.plan_id
+          WHERE plans.task_id = $1
+            AND plans.kind = 'initial'
+            AND approvals.plan_id <> $2
+          LIMIT 1`,
+        [plan.rows[0].task_id, approval.planId],
+      );
+      if (otherApproval.rowCount) throw new ExecutionPersistenceError("approval_conflict", "Another immutable initial plan is already approved for this World PR.");
       await client.query(
         `INSERT INTO approvals (id, plan_id, plan_digest, actor_id, approved_at) VALUES ($1, $2, $3, $4, $5::timestamptz)`,
         [approval.approvalId, approval.planId, approval.planDigest, approval.actorId, approval.approvedAt],
@@ -488,6 +594,8 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
       const records: ActionExecutionRecord[] = [];
       for (const input of inputs) {
         const candidate = actionRecord(input);
+        const plan = await client.query<{ id: string }>("SELECT id FROM plans WHERE id = $1 FOR KEY SHARE", [candidate.planId]);
+        if (!plan.rowCount) throw new ExecutionPersistenceError("plan_not_found", "The action plan does not exist.");
         await client.query(
           `INSERT INTO action_executions (id, plan_id, action_key, type, target_ref, status, action, attempts)
            VALUES ($1, $2, $3, $4, $5, 'planned', $6::jsonb, 0)
@@ -555,26 +663,47 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
   }
 
   async recordActionState(input: RecordActionStateInput): Promise<ActionExecutionRecord> {
-    const existing = await this.getAction(input.actionExecutionId);
-    if (!existing) throw new ExecutionPersistenceError("action_not_found", "The action ledger row does not exist.");
-    if (isTerminal(existing.status) && input.status !== existing.status) return existing;
-    const result = await this.pool.query<ActionRow>(
-      `UPDATE action_executions
-          SET status = $2,
-              before_state = COALESCE($3::jsonb, before_state),
-              after_state = COALESCE($4::jsonb, after_state),
-              receipt = $5::jsonb,
-              error = $6::jsonb,
-              dispatch_started_at = COALESCE($7::timestamptz, dispatch_started_at),
-              lease_until = CASE WHEN $2 = 'in_progress' THEN lease_until ELSE NULL END,
-              finished_at = CASE WHEN $2 = 'in_progress' THEN NULL ELSE $8::timestamptz END
-        WHERE id = $1
-        RETURNING id, plan_id, action_key, type, target_ref, status, action, before_state, after_state,
-                  receipt, attempts, lease_until, dispatch_started_at, error, started_at, finished_at`,
-      [input.actionExecutionId, input.status, input.beforeState ? JSON.stringify(input.beforeState) : null, input.afterState ? JSON.stringify(input.afterState) : null, input.receipt ? JSON.stringify(input.receipt) : null, input.error ? JSON.stringify(errorFor(input.error.code, input.error.retryable, input.error.safeMessage)) : null, input.dispatchStartedAt ?? null, input.now],
-    );
-    if (result.rowCount !== 1) throw new ExecutionPersistenceError("persistence_failure", "The action outcome could not be persisted safely.");
-    return rowToAction(result.rows[0]);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const existing = await client.query<ActionRow>(
+        `SELECT id, plan_id, action_key, type, target_ref, status, action, before_state, after_state,
+                receipt, attempts, lease_until, dispatch_started_at, error, started_at, finished_at
+           FROM action_executions WHERE id = $1 FOR UPDATE`,
+        [input.actionExecutionId],
+      );
+      if (existing.rowCount !== 1) throw new ExecutionPersistenceError("action_not_found", "The action ledger row does not exist.");
+      const current = rowToAction(existing.rows[0]);
+      if (isTerminal(current.status)) {
+        await client.query("COMMIT");
+        return current;
+      }
+      assertActionTransition(current, input);
+      const result = await client.query<ActionRow>(
+        `UPDATE action_executions
+            SET status = $2,
+                before_state = COALESCE($3::jsonb, before_state),
+                after_state = COALESCE($4::jsonb, after_state),
+                receipt = $5::jsonb,
+                error = $6::jsonb,
+                dispatch_started_at = COALESCE($7::timestamptz, dispatch_started_at),
+                lease_until = CASE WHEN $2 = 'in_progress' THEN lease_until ELSE NULL END,
+                finished_at = CASE WHEN $2 = 'in_progress' THEN NULL ELSE $8::timestamptz END
+          WHERE id = $1
+          RETURNING id, plan_id, action_key, type, target_ref, status, action, before_state, after_state,
+                    receipt, attempts, lease_until, dispatch_started_at, error, started_at, finished_at`,
+        [input.actionExecutionId, input.status, input.beforeState ? JSON.stringify(input.beforeState) : null, input.afterState ? JSON.stringify(input.afterState) : null, input.receipt ? JSON.stringify(input.receipt) : null, input.error ? JSON.stringify(errorFor(input.error.code, input.error.retryable, input.error.safeMessage)) : null, input.dispatchStartedAt ?? null, input.now],
+      );
+      if (result.rowCount !== 1) throw new ExecutionPersistenceError("persistence_failure", "The action outcome could not be persisted safely.");
+      await client.query("COMMIT");
+      return rowToAction(result.rows[0]);
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      if (error instanceof ExecutionPersistenceError) throw error;
+      throw new ExecutionPersistenceError("persistence_failure", "The action outcome could not be persisted safely.", { cause: error });
+    } finally {
+      client.release();
+    }
   }
 
   async reconcileExpiredLease(actionExecutionId: string, now: string): Promise<ActionExecutionRecord> {
@@ -586,10 +715,21 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
         actionExecutionId,
         status: "delivery_uncertain",
         now,
+        claimFence: { attempts: current.attempts, leaseUntil: current.leaseUntil },
         receipt: { status: "delivery_uncertain", reason: "process_interrupted" },
         error: { code: "delivery_uncertain", retryable: false, safeMessage: "Gmail handoff could not be reconciled after the execution lease expired." },
       });
     }
-    throw new ExecutionPersistenceError("lease_reconciliation_required", "An expired non-mail action requires provider-state reconciliation before retry.");
+    return this.recordActionState({
+      actionExecutionId,
+      status: "conflict",
+      now,
+      claimFence: { attempts: current.attempts, leaseUntil: current.leaseUntil },
+      error: {
+        code: "reconciliation_required",
+        retryable: false,
+        safeMessage: "An expired non-mail action has an unresolved provider outcome and requires provider-state reconciliation before any retry.",
+      },
+    });
   }
 }

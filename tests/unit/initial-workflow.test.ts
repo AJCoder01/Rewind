@@ -305,7 +305,7 @@ describe("S057 deterministic initial workflow verification", () => {
 
     expect(uncertain).toMatchObject({ decision: "blocked", reason: "delivery_uncertain", record: { status: "delivery_uncertain", dispatchStartedAt: now } });
     expect(gmail.attempts).toBe(0);
-    expect(reconciled).toMatchObject({ decision: "blocked", reason: "reconciliation_required", record: { status: "in_progress" } });
+    expect(reconciled).toMatchObject({ decision: "blocked", reason: "reconciliation_required", record: { status: "conflict", error: { code: "reconciliation_required" } } });
     expect(updateCalls).toBe(0);
   });
 

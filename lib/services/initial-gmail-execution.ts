@@ -145,6 +145,7 @@ export async function executeApprovedInitialGmail(
       actionExecutionId: claim.record.actionExecutionId,
       status: "in_progress",
       now: request.data.now,
+      claimFence: claimFenceFor(claim.record),
       beforeState,
     });
   } catch (error) {
@@ -237,6 +238,7 @@ async function persistGmailOutcome(
 ): Promise<InitialGmailExecutionResult> {
   const parsedReceipt = GmailSendReceiptSchema.parse(receipt);
   const status: GmailTerminalStatus = parsedReceipt.status === "sent" ? "succeeded" : parsedReceipt.status === "permanent_failed" ? "permanently_failed" : "delivery_uncertain";
+  const claimFence = claimFenceFor(current);
   const error = parsedReceipt.status === "sent"
     ? undefined
     : parsedReceipt.status === "permanent_failed"
@@ -247,14 +249,13 @@ async function persistGmailOutcome(
       actionExecutionId: current.actionExecutionId,
       status,
       now,
+      ...(claimFence ? { claimFence } : {}),
       beforeState,
       afterState: InitialGmailAfterStateSchema.parse({ receipt: parsedReceipt, recordedAt: now }),
       receipt: parsedReceipt,
       ...(error ? { error } : {}),
     });
-    if (status === "succeeded") return gmailResult("succeeded", record, parsedReceipt);
-    if (status === "permanently_failed") return gmailResult("permanently_failed", record, parsedReceipt, "provider_permanent_failure");
-    return gmailResult("delivery_uncertain", record, parsedReceipt, "delivery_uncertain");
+    return gmailResultFromRecord(record);
   } catch (error) {
     throw toInitialGmailServiceError(error, "The Gmail outcome could not be recorded safely; reconciliation is required.");
   }
@@ -271,17 +272,17 @@ async function terminalGmailResult(
   afterState?: never,
 ): Promise<InitialGmailExecutionResult> {
   try {
+    const claimFence = claimFenceFor(current);
     const record = await store.recordActionState({
       actionExecutionId: current.actionExecutionId,
       status,
       now,
+      ...(claimFence ? { claimFence } : {}),
       ...(beforeState ? { beforeState } : {}),
       ...(afterState ? { afterState } : {}),
       error,
     });
-    return status === "retryable_failed"
-      ? gmailResult("retryable_failed", record, undefined, reason)
-      : gmailResult("blocked", record, undefined, reason);
+    return gmailResultFromRecord(record, reason);
   } catch (persistenceError) {
     throw toInitialGmailServiceError(persistenceError, "The Gmail pre-handoff outcome could not be persisted safely; no send was attempted.");
   }
@@ -318,6 +319,33 @@ function mailActionFromPlan(plan: ExecutionPlan): InitialMailAction {
 function gmailReceiptFromRecord(record: ActionExecutionRecord): GmailSendReceipt | undefined {
   const parsed = GmailSendReceiptSchema.safeParse(record.receipt);
   return parsed.success ? parsed.data : undefined;
+}
+
+function claimFenceFor(record: ActionExecutionRecord): { attempts: number; leaseUntil: string } | undefined {
+  if (record.status !== "in_progress") return undefined;
+  if (!record.leaseUntil) {
+    throw new ServiceError("invalid_task_state", "The Gmail action no longer holds a durable execution claim.");
+  }
+  return { attempts: record.attempts, leaseUntil: record.leaseUntil };
+}
+
+function gmailResultFromRecord(
+  record: ActionExecutionRecord,
+  preferredReason?: InitialGmailExecutionResult["reason"],
+): InitialGmailExecutionResult {
+  const receipt = gmailReceiptFromRecord(record);
+  if (record.status === "succeeded") {
+    if (!receipt || receipt.status !== "sent") {
+      throw new ServiceError("invalid_task_state", "The durable Gmail success record is missing its matching sent receipt.");
+    }
+    return gmailResult("succeeded", record, receipt);
+  }
+  if (record.status === "retryable_failed") return gmailResult("retryable_failed", record, receipt, preferredReason ?? "local_preparation");
+  if (record.status === "permanently_failed") return gmailResult("permanently_failed", record, receipt, preferredReason ?? "provider_permanent_failure");
+  if (record.status === "delivery_uncertain") return gmailResult("delivery_uncertain", record, receipt, preferredReason ?? "delivery_uncertain");
+  if (record.status === "conflict") return gmailResult("blocked", record, receipt, preferredReason ?? "conflict");
+  if (record.status === "in_progress") return gmailResult("busy", record, undefined, "active_lease");
+  throw new ServiceError("invalid_task_state", "The Gmail action did not persist a terminal state.");
 }
 
 function gmailResult(

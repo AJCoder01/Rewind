@@ -73,6 +73,27 @@ class FailingGmailBeforeStore extends MemoryExecutionPersistenceStore {
   }
 }
 
+class LateTerminalGmailStore extends MemoryExecutionPersistenceStore {
+  replaceNextSuccessfulGmailOutcome = false;
+
+  override async recordActionState(input: Parameters<MemoryExecutionPersistenceStore["recordActionState"]>[0]) {
+    if (this.replaceNextSuccessfulGmailOutcome && input.status === "succeeded") {
+      this.replaceNextSuccessfulGmailOutcome = false;
+      await super.recordActionState({
+        ...input,
+        status: "delivery_uncertain",
+        receipt: { status: "delivery_uncertain", reason: "process_interrupted" },
+        error: {
+          code: "delivery_uncertain",
+          retryable: false,
+          safeMessage: "A concurrent terminal outcome was already recorded before the Gmail success receipt could be saved.",
+        },
+      });
+    }
+    return super.recordActionState(input);
+  }
+}
+
 type Setup = {
   store: MemoryExecutionPersistenceStore;
   calendar: FakeCalendarPort;
@@ -259,6 +280,26 @@ describe("S055 exact approved Gmail execution", () => {
     port.sendFailure = new Error("transport failed");
     const result = await executeApprovedInitialGmail(executionInput(plan), { executionStore: store, gmail: port, expectedSenderGoogleSub: planConfiguration.senderGoogleSub, allowlist });
     expect(result).toMatchObject({ decision: "delivery_uncertain", record: { status: "delivery_uncertain", dispatchStartedAt: now }, receipt: { status: "delivery_uncertain", reason: "transport_error" } });
+    expect(port.attempts).toBe(1);
+  });
+
+  it("reports the durable terminal Gmail outcome when a late writer wins the ledger race", async () => {
+    const store = new LateTerminalGmailStore();
+    const { plan } = await createApproved({ store });
+    store.replaceNextSuccessfulGmailOutcome = true;
+    const port = new RecordingGmailPort();
+    const result = await executeApprovedInitialGmail(executionInput(plan), {
+      executionStore: store,
+      gmail: port,
+      expectedSenderGoogleSub: planConfiguration.senderGoogleSub,
+      allowlist,
+    });
+    expect(result).toMatchObject({
+      decision: "delivery_uncertain",
+      reason: "delivery_uncertain",
+      record: { status: "delivery_uncertain" },
+      receipt: { status: "delivery_uncertain", reason: "process_interrupted" },
+    });
     expect(port.attempts).toBe(1);
   });
 

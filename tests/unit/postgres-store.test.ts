@@ -186,6 +186,55 @@ describe("PostgresWorldPrStore", () => {
     expect(calls.some(({ sql }) => sql.includes("SET status = 'failed'"))).toBe(true);
   });
 
+  it("uses the current durable mutation-claim token when replaying or recovering a pending approval", async () => {
+    const stored = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
+    const bodyHash = sha256Digest({ worldPrId: stored.view.worldPrId, request: { planId: stored.planPayload.planId, planVersion: 1, planDigest: stored.planPayload.digest } });
+    const calls: QueryCall[] = [];
+    let reads = 0;
+    const poolQuery = vi.fn(async (sql: string, params: readonly unknown[] = []) => {
+      calls.push({ sql, params });
+      if (sql.includes("INSERT INTO idempotency_records")) return { rowCount: 0, rows: [] };
+      if (sql.includes("SELECT body_hash, response, resource_id, status")) {
+        reads += 1;
+        return {
+          rowCount: 1,
+          rows: [{
+            body_hash: bodyHash,
+            response: { claimToken: reads === 1 ? "idem_old_claim" : "idem_current_claim" },
+            resource_id: stored.view.worldPrId,
+            status: "in_progress",
+          }],
+        };
+      }
+      if (sql.includes("SET response = $5::jsonb, updated_at = now()")) return { rowCount: 0, rows: [] };
+      if (sql.includes("SET status = 'completed'")) return { rowCount: params.at(-1) === "idem_current_claim" ? 1 : 0, rows: [] };
+      throw new Error(`Unexpected SQL in mutation-claim test: ${sql}`);
+    });
+    const store = new PostgresWorldPrStore({ query: poolQuery } as unknown as Pool);
+    const input = {
+      actorId: "test:operator",
+      endpoint: `POST /api/v1/world-prs/${stored.view.worldPrId}/approvals/initial`,
+      idempotencyKey: "postgres-mutation-claim-fence-0001",
+      bodyHash,
+      worldPrId: stored.view.worldPrId,
+      requestId: "req_postgres_claim_fence_0001",
+      claimedAt: "2026-07-16T12:00:00.000Z",
+    };
+    const claim = await store.claimMutation(input);
+    expect(claim).toEqual({ kind: "replay_pending", claimToken: "idem_current_claim" });
+    if (claim.kind !== "replay_pending") throw new Error("Expected the current pending mutation claim.");
+    const response = {
+      worldPrId: stored.view.worldPrId,
+      status: "preview_ready" as const,
+      activePlan: stored.view.activePlan!.pointer,
+      requestId: input.requestId,
+    };
+
+    await expect(store.recoverMutation({ ...input, claimToken: "idem_old_claim" }, response)).rejects.toThrow("could not be recovered safely");
+    await expect(store.recoverMutation({ ...input, claimToken: claim.claimToken }, response)).resolves.toBeUndefined();
+    expect(calls.some(({ sql }) => sql.includes("(response ->> 'claimToken') = $6"))).toBe(true);
+  });
+
   it("durably marks an expired reclaimable planning lease failed before admitting the next scenario", async () => {
     const expired = buildFixtureWorldPrRecord(SUPPORTED_SCENARIO_REQUEST, new Date("2026-07-14T00:00:00.000Z"));
     const clientCalls: QueryCall[] = [];

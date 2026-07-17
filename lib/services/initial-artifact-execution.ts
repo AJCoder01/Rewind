@@ -67,6 +67,7 @@ export async function executeApprovedInitialArtifact(
       actionExecutionId: claim.record.actionExecutionId,
       status: "in_progress",
       now: request.data.now,
+      claimFence: claimFenceFor(claim.record),
       beforeState,
     });
   } catch (error) {
@@ -130,6 +131,7 @@ export async function executeApprovedInitialArtifact(
       actionExecutionId: prepared.actionExecutionId,
       status: "succeeded",
       now: request.data.now,
+      claimFence: claimFenceFor(prepared),
       beforeState,
       afterState,
       receipt,
@@ -137,7 +139,7 @@ export async function executeApprovedInitialArtifact(
   } catch (error) {
     throw toInitialArtifactServiceError(error, "The artifact was persisted but its durable receipt could not be recorded; reconciliation is required.");
   }
-  return artifactResult("succeeded", succeeded, receipt);
+  return artifactResultFromRecord(succeeded);
 }
 
 async function terminalArtifactResult(
@@ -152,12 +154,12 @@ async function terminalArtifactResult(
       actionExecutionId: current.actionExecutionId,
       status,
       now,
+      claimFence: claimFenceFor(current),
       beforeState: current.beforeState,
       error,
     });
-    const decision = status === "retryable_failed" ? "retryable_failed" : status === "permanently_failed" ? "permanently_failed" : "conflict";
     const reason = status === "retryable_failed" ? "artifact_unavailable" : status === "permanently_failed" ? "artifact_invalid" : "artifact_persistence_uncertain";
-    return artifactResult(decision, record, undefined, reason);
+    return artifactResultFromRecord(record, reason);
   } catch (persistenceError) {
     throw toInitialArtifactServiceError(persistenceError, "The artifact outcome could not be persisted safely; no automatic retry is allowed.");
   }
@@ -183,6 +185,30 @@ function artifactFromPlan(payload: unknown): AccountBriefArtifactInput {
 function artifactReceiptFromRecord(record: ActionExecutionRecord): ArtifactReceipt | undefined {
   const parsed = ArtifactReceiptSchema.safeParse(record.receipt);
   return parsed.success ? parsed.data : undefined;
+}
+
+function claimFenceFor(record: ActionExecutionRecord): { attempts: number; leaseUntil: string } {
+  if (record.status !== "in_progress" || !record.leaseUntil) {
+    throw new ServiceError("invalid_task_state", "The artifact action no longer holds a durable execution claim.");
+  }
+  return { attempts: record.attempts, leaseUntil: record.leaseUntil };
+}
+
+function artifactResultFromRecord(
+  record: ActionExecutionRecord,
+  preferredReason?: InitialArtifactExecutionResult["reason"],
+): InitialArtifactExecutionResult {
+  if (record.status === "succeeded") {
+    const receipt = artifactReceiptFromRecord(record);
+    if (!receipt) throw new ServiceError("invalid_task_state", "The durable artifact success record is missing its matching typed receipt.");
+    return artifactResult("succeeded", record, receipt);
+  }
+  if (record.status === "retryable_failed") return artifactResult("retryable_failed", record, undefined, preferredReason ?? "artifact_unavailable");
+  if (record.status === "permanently_failed") return artifactResult("permanently_failed", record, undefined, preferredReason ?? "permanently_failed");
+  if (record.status === "conflict") return artifactResult("conflict", record, undefined, preferredReason ?? "conflict");
+  if (record.status === "delivery_uncertain") return artifactResult("blocked", record, undefined, "reconciliation_required");
+  if (record.status === "in_progress") return artifactResult("busy", record, undefined, "active_lease");
+  throw new ServiceError("invalid_task_state", "The artifact action did not persist a terminal state.");
 }
 
 function artifactResult(

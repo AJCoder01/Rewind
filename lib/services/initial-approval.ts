@@ -25,11 +25,17 @@ import {
   ExecutionPersistenceError,
   type ExecutionPersistenceStore,
 } from "@/lib/db/execution-store";
-import { StoreError, type WorldPrStore } from "@/lib/db/store";
+import {
+  StoreError,
+  type MutationIdempotencyClaim,
+  type MutationIdempotencyInput,
+  type MutationIdempotencyLease,
+  type WorldPrStore,
+} from "@/lib/db/store";
 import { sha256Digest } from "@/lib/domain/digest";
 import { createOpaqueId } from "@/lib/domain/ids";
 import { prepareInitialActionRows } from "@/lib/services/initial-execution";
-import { ServiceError } from "@/lib/services/world-pr";
+import { ServiceError, type ServiceErrorCode } from "@/lib/services/world-pr";
 
 export type InitialPlanMutationInput = Readonly<{
   actorId: string;
@@ -53,56 +59,46 @@ export type InitialReplanInput = InitialPlanMutationInput & Readonly<{
 
 const APPROVAL_LABEL = "Initial plan approved; no external action has started.";
 const REPLAN_LABEL = "Initial preview superseded with a new immutable plan version.";
+const initialMutationTails = new Map<string, Promise<void>>();
+
+type InitialMutationOperation = "approval" | "replan";
+type InitialMutationResult = { response: TaskMutationResponse; view: WorldPrView; replay: boolean };
 
 export async function approveInitialPlan(
   input: InitialPlanMutationInput,
   dependencies: InitialPlanServiceDependencies = {},
-): Promise<{ response: TaskMutationResponse; view: WorldPrView; replay: boolean }> {
+): Promise<InitialMutationResult> {
+  return withInitialPlanMutationLock(input.worldPrId, () => approveInitialPlanUnlocked(input, dependencies));
+}
+
+async function approveInitialPlanUnlocked(
+  input: InitialPlanMutationInput,
+  dependencies: InitialPlanServiceDependencies,
+): Promise<InitialMutationResult> {
   try {
     const parsedRequest = parseMutationRequest(input);
     assertDashboardApproval(input);
     const worldStore = dependencies.worldStore ?? getWorldPrStore();
     const executionStore = dependencies.executionStore ?? getExecutionPersistenceStore();
-    const current = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
-    assertCurrentPointer(current, parsedRequest);
-    const payload = await loadPayload(worldStore, current, parsedRequest);
-    const plan = await buildExecutionPlan(payload, executionStore, dependencies.now ?? (() => new Date()));
-    await executionStore.createPlan(plan);
+    const requestId = input.requestId ?? createOpaqueId("req_");
+    const claimedAt = (dependencies.now ?? (() => new Date()))().toISOString();
+    await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+    const mutation = initialMutationInput(input, "approval", parsedRequest, requestId, claimedAt);
+    const claim = await worldStore.claimMutation(mutation);
+    const replay = await resolveApprovalMutationReplay(claim, mutation, parsedRequest, input, worldStore, executionStore, dependencies, requestId);
+    if (replay) return replay;
+    const leasedMutation = mutationLease(mutation, claim);
 
-    const existing = await executionStore.getApproval(plan.planId);
-    if (existing) {
-      assertReplayApproval(existing, input.actorId, parsedRequest);
-      await prepareInitialActionRows(plan, executionStore, { now: dependencies.now });
-      const repaired = await ensureApprovalTimeline(worldStore, current, existing);
-      return mutationResult(repaired, input.requestId, true);
-    }
-
-    if (current.status !== "preview_ready") {
-      throw new ServiceError("invalid_task_state", "Only an unapproved preview can receive the initial approval.");
-    }
-    const approval = ApprovalRecordSchema.parse({
-      approvalId: createOpaqueId("appr_"),
-      planId: plan.planId,
-      planVersion: plan.version,
-      planDigest: plan.digest,
-      actorId: input.actorId,
-      approvedAt: (dependencies.now ?? (() => new Date()))().toISOString(),
-    });
-    let persisted: { approval: ApprovalRecord; replay: boolean };
+    let result: InitialMutationResult;
     try {
-      persisted = await executionStore.createApproval(approval);
+      result = await performInitialApproval(parsedRequest, input, worldStore, executionStore, dependencies, requestId);
     } catch (error) {
-      if (!(error instanceof ExecutionPersistenceError) || error.code !== "approval_conflict") throw error;
-      const raced = await executionStore.getApproval(plan.planId);
-      if (!raced) throw error;
-      assertReplayApproval(raced, input.actorId, parsedRequest);
-      await prepareInitialActionRows(plan, executionStore, { now: dependencies.now });
-      const repaired = await ensureApprovalTimeline(worldStore, current, raced);
-      return mutationResult(repaired, input.requestId, true);
+      const safe = toInitialServiceError(error);
+      if (shouldRecordMutationFailure(safe)) await recordMutationFailure(worldStore, leasedMutation, safe);
+      throw safe;
     }
-    await prepareInitialActionRows(plan, executionStore, { now: dependencies.now });
-    const nextView = await ensureApprovalTimeline(worldStore, current, persisted.approval);
-    return mutationResult(nextView, input.requestId, persisted.replay);
+    await completeMutation(worldStore, leasedMutation, result.response);
+    return result;
   } catch (error) {
     throw toInitialServiceError(error);
   }
@@ -111,43 +107,294 @@ export async function approveInitialPlan(
 export async function replanInitialPlan(
   input: InitialReplanInput,
   dependencies: InitialPlanServiceDependencies = {},
-): Promise<{ response: TaskMutationResponse; view: WorldPrView; replay: boolean }> {
+): Promise<InitialMutationResult> {
+  return withInitialPlanMutationLock(input.worldPrId, () => replanInitialPlanUnlocked(input, dependencies));
+}
+
+async function replanInitialPlanUnlocked(
+  input: InitialReplanInput,
+  dependencies: InitialPlanServiceDependencies,
+): Promise<InitialMutationResult> {
   try {
     const parsedRequest = parseMutationRequest(input);
     assertDashboardApproval(input);
     const worldStore = dependencies.worldStore ?? getWorldPrStore();
     const executionStore = dependencies.executionStore ?? getExecutionPersistenceStore();
-    const now = dependencies.now ?? (() => new Date());
-    const current = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
-    assertCurrentPointer(current, parsedRequest);
-    if (current.status !== "preview_ready") {
-      throw new ServiceError("invalid_task_state", "Only an unapproved preview can be replanned.");
-    }
-    const currentPayload = await loadPayload(worldStore, current, parsedRequest);
-    const existingApproval = await executionStore.getApproval(parsedRequest.planId);
-    if (existingApproval) {
-      throw new ServiceError("invalid_task_state", "An approved plan cannot be replanned; create a new review from current provider state.");
-    }
-    if ((await executionStore.listActions(parsedRequest.planId)).length > 0) {
-      throw new ServiceError("invalid_task_state", "A plan with durable action state cannot be replanned.");
-    }
+    const requestId = input.requestId ?? createOpaqueId("req_");
+    const claimedAt = (dependencies.now ?? (() => new Date()))().toISOString();
+    await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+    const mutation = initialMutationInput(
+      input,
+      "replan",
+      input.nextPayload === undefined ? parsedRequest : { request: parsedRequest, nextPayload: input.nextPayload },
+      requestId,
+      claimedAt,
+    );
+    const claim = await worldStore.claimMutation(mutation);
+    const replay = await resolveReplanMutationReplay(claim, mutation, parsedRequest, input, worldStore, requestId);
+    if (replay) return replay;
+    const leasedMutation = mutationLease(mutation, claim);
 
-    const nextPayload = input.nextPayload === undefined
-      ? supersedeInitialPlanPayload(currentPayload, createOpaqueId("plan_"))
-      : parseNextPayload(input.nextPayload, currentPayload);
-    const nextPlanView = initialPlanViewFromPayload(nextPayload);
-    const nextView = appendTimeline(current, {
-      eventId: createOpaqueId("evt_"),
-      type: "plan.superseded",
-      occurredAt: now().toISOString(),
-      label: REPLAN_LABEL,
-      status: "preview_ready",
-    }, nextPlanView);
-    await worldStore.persistInitialPlanVersion(input.worldPrId, nextPayload, nextView);
-    return mutationResult(nextView, input.requestId, false);
+    let result: InitialMutationResult;
+    try {
+      result = await performInitialReplan(parsedRequest, input, leasedMutation, worldStore, executionStore, dependencies, requestId);
+    } catch (error) {
+      const safe = toInitialServiceError(error);
+      if (shouldRecordMutationFailure(safe)) await recordMutationFailure(worldStore, leasedMutation, safe);
+      throw safe;
+    }
+    await completeMutation(worldStore, leasedMutation, result.response);
+    return result;
   } catch (error) {
     throw toInitialServiceError(error);
   }
+}
+
+async function performInitialApproval(
+  request: InitialPlanMutationRequest,
+  input: InitialPlanMutationInput,
+  worldStore: WorldPrStore,
+  executionStore: ExecutionPersistenceStore,
+  dependencies: InitialPlanServiceDependencies,
+  requestId: string,
+): Promise<InitialMutationResult> {
+  let current = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+  assertCurrentPointer(current, request);
+  const payload = await loadPayload(worldStore, current, request);
+  const plan = await buildExecutionPlan(payload, executionStore, dependencies.now ?? (() => new Date()));
+  await executionStore.createPlan(plan);
+
+  current = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+  assertCurrentPointer(current, request);
+  const existing = await executionStore.getApproval(plan.planId);
+  if (existing) {
+    assertReplayApproval(existing, input.actorId, request);
+    await prepareInitialActionRows(plan, executionStore, { now: dependencies.now });
+    const fresh = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+    assertCurrentPointer(fresh, request);
+    const repaired = await ensureApprovalTimeline(worldStore, fresh, existing);
+    return mutationResult(repaired, requestId, true);
+  }
+
+  if (current.status !== "preview_ready") {
+    throw new ServiceError("invalid_task_state", "Only an unapproved preview can receive the initial approval.");
+  }
+  const approval = ApprovalRecordSchema.parse({
+    approvalId: createOpaqueId("appr_"),
+    planId: plan.planId,
+    planVersion: plan.version,
+    planDigest: plan.digest,
+    actorId: input.actorId,
+    approvedAt: (dependencies.now ?? (() => new Date()))().toISOString(),
+  });
+  let persisted: { approval: ApprovalRecord; replay: boolean };
+  try {
+    persisted = await executionStore.createApproval(approval);
+  } catch (error) {
+    if (!(error instanceof ExecutionPersistenceError) || error.code !== "approval_conflict") throw error;
+    const raced = await executionStore.getApproval(plan.planId);
+    if (!raced) throw error;
+    assertReplayApproval(raced, input.actorId, request);
+    persisted = { approval: raced, replay: true };
+  }
+  await prepareInitialActionRows(plan, executionStore, { now: dependencies.now });
+  const fresh = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+  assertCurrentPointer(fresh, request);
+  const nextView = await ensureApprovalTimeline(worldStore, fresh, persisted.approval);
+  return mutationResult(nextView, requestId, persisted.replay);
+}
+
+async function performInitialReplan(
+  request: InitialPlanMutationRequest,
+  input: InitialReplanInput,
+  mutation: MutationIdempotencyInput,
+  worldStore: WorldPrStore,
+  executionStore: ExecutionPersistenceStore,
+  dependencies: InitialPlanServiceDependencies,
+  requestId: string,
+): Promise<InitialMutationResult> {
+  const now = dependencies.now ?? (() => new Date());
+  const current = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+  const currentPayload = await loadPayload(worldStore, current, request);
+  const nextPayload = replacementPayloadForMutation(currentPayload, input, mutation);
+  if (pointerMatchesPayload(current, nextPayload)) return mutationResult(current, requestId, true);
+  assertCurrentPointer(current, request);
+  if (current.status !== "preview_ready") {
+    throw new ServiceError("invalid_task_state", "Only an unapproved preview can be replanned.");
+  }
+  const existingApproval = await executionStore.getApproval(request.planId);
+  if (existingApproval) {
+    throw new ServiceError("invalid_task_state", "An approved plan cannot be replanned; create a new review from current provider state.");
+  }
+  if ((await executionStore.listActions(request.planId)).length > 0) {
+    throw new ServiceError("invalid_task_state", "A plan with durable action state cannot be replanned.");
+  }
+
+  const fresh = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+  assertCurrentPointer(fresh, request);
+  if (fresh.status !== "preview_ready") {
+    throw new ServiceError("invalid_task_state", "Only an unapproved preview can be replanned.");
+  }
+  const nextPlanView = initialPlanViewFromPayload(nextPayload);
+  const nextView = appendTimeline(fresh, {
+    eventId: `evt_${nextPayload.planId}_superseded`,
+    type: "plan.superseded",
+    occurredAt: now().toISOString(),
+    label: REPLAN_LABEL,
+    status: "preview_ready",
+  }, nextPlanView);
+  await worldStore.persistInitialPlanVersion(input.worldPrId, nextPayload, nextView, activeInitialPointer(fresh));
+  return mutationResult(nextView, requestId, false);
+}
+
+async function resolveApprovalMutationReplay(
+  claim: MutationIdempotencyClaim,
+  mutation: MutationIdempotencyInput,
+  request: InitialPlanMutationRequest,
+  input: InitialPlanMutationInput,
+  worldStore: WorldPrStore,
+  executionStore: ExecutionPersistenceStore,
+  dependencies: InitialPlanServiceDependencies,
+  requestId: string,
+): Promise<InitialMutationResult | null> {
+  if (claim.kind === "claimed") return null;
+  const current = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+  if (claim.kind === "replay_completed") return { response: claim.response, view: current, replay: true };
+  if (claim.kind === "replay_failed") throw replayFailure(claim.failure);
+  if (!pointerMatchesRequest(current, request)) return mutationResult(current, requestId, true, true);
+
+  const existing = await executionStore.getApproval(request.planId);
+  if (!existing) return mutationResult(current, requestId, true, true);
+  assertReplayApproval(existing, input.actorId, request);
+  const payload = await loadPayload(worldStore, current, request);
+  const plan = await buildExecutionPlan(payload, executionStore, dependencies.now ?? (() => new Date()));
+  await executionStore.createPlan(plan);
+  await prepareInitialActionRows(plan, executionStore, { now: dependencies.now });
+  const fresh = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+  assertCurrentPointer(fresh, request);
+  const repaired = await ensureApprovalTimeline(worldStore, fresh, existing);
+  const result = mutationResult(repaired, requestId, true);
+  await recoverMutation(worldStore, replayPendingMutationLease(mutation, claim), result.response);
+  return result;
+}
+
+async function resolveReplanMutationReplay(
+  claim: MutationIdempotencyClaim,
+  mutation: MutationIdempotencyInput,
+  request: InitialPlanMutationRequest,
+  input: InitialReplanInput,
+  worldStore: WorldPrStore,
+  requestId: string,
+): Promise<InitialMutationResult | null> {
+  if (claim.kind === "claimed") return null;
+  const current = await loadCurrentInitialView(worldStore, input.worldPrId, input.actorId);
+  if (claim.kind === "replay_completed") return { response: claim.response, view: current, replay: true };
+  if (claim.kind === "replay_failed") throw replayFailure(claim.failure);
+  const payload = await loadPayload(worldStore, current, request);
+  const expected = replacementPayloadForMutation(payload, input, mutation);
+  if (pointerMatchesPayload(current, expected)) {
+    const result = mutationResult(current, requestId, true);
+    await recoverMutation(worldStore, replayPendingMutationLease(mutation, claim), result.response);
+    return result;
+  }
+  return mutationResult(current, requestId, true, true);
+}
+
+function initialMutationInput(
+  input: InitialPlanMutationInput,
+  operation: InitialMutationOperation,
+  request: unknown,
+  requestId: string,
+  claimedAt: string,
+): MutationIdempotencyInput {
+  const endpoint = operation === "approval"
+    ? `POST /api/v1/world-prs/${input.worldPrId}/approvals/initial`
+    : `POST /api/v1/world-prs/${input.worldPrId}/plans/initial/refresh`;
+  return {
+    actorId: input.actorId,
+    endpoint,
+    idempotencyKey: input.idempotencyKey,
+    bodyHash: sha256Digest({ worldPrId: input.worldPrId, request }),
+    worldPrId: input.worldPrId,
+    requestId,
+    claimedAt,
+  };
+}
+
+function mutationLease(mutation: MutationIdempotencyInput, claim: MutationIdempotencyClaim): MutationIdempotencyLease {
+  if (claim.kind !== "claimed") throw new ServiceError("internal_error", "The idempotency mutation was not claimed before execution.");
+  return { ...mutation, claimToken: claim.claimToken };
+}
+
+function replayPendingMutationLease(mutation: MutationIdempotencyInput, claim: MutationIdempotencyClaim): MutationIdempotencyLease {
+  if (claim.kind !== "replay_pending") throw new ServiceError("internal_error", "The pending idempotency mutation did not retain its durable claim fence.");
+  return { ...mutation, claimToken: claim.claimToken };
+}
+
+async function completeMutation(worldStore: WorldPrStore, mutation: MutationIdempotencyLease, response: TaskMutationResponse): Promise<void> {
+  try {
+    await worldStore.completeMutation(mutation, response);
+  } catch (error) {
+    throw new ServiceError("provider_unavailable", "The plan mutation completed but its idempotency result could not be recorded safely for replay.", { cause: error });
+  }
+}
+
+async function recoverMutation(worldStore: WorldPrStore, mutation: MutationIdempotencyLease, response: TaskMutationResponse): Promise<void> {
+  try {
+    await worldStore.recoverMutation(mutation, response);
+  } catch (error) {
+    throw new ServiceError("provider_unavailable", "The durable mutation outcome could not be recovered safely for replay.", { cause: error });
+  }
+}
+
+async function recordMutationFailure(worldStore: WorldPrStore, mutation: MutationIdempotencyLease, error: ServiceError): Promise<void> {
+  try {
+    await worldStore.failMutation(mutation, {
+      code: error.code,
+      message: error.message,
+      retryable: false,
+      requestId: mutation.requestId,
+    });
+  } catch (failureError) {
+    throw new ServiceError("internal_error", "The failed plan mutation could not be recorded safely for idempotent replay.", { cause: failureError });
+  }
+}
+
+function replayFailure(failure: { code: string; message: string }): ServiceError {
+  return new ServiceError(failure.code as ServiceErrorCode, failure.message);
+}
+
+function shouldRecordMutationFailure(error: ServiceError): boolean {
+  return error.code !== "provider_unavailable" && error.code !== "internal_error";
+}
+
+function deterministicReplanPlanId(mutation: MutationIdempotencyInput): string {
+  return `plan_${sha256Digest({ endpoint: mutation.endpoint, bodyHash: mutation.bodyHash }).slice("sha256:".length)}`;
+}
+
+async function withInitialPlanMutationLock<T>(worldPrId: string, operation: () => Promise<T>): Promise<T> {
+  const previous = initialMutationTails.get(worldPrId) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const current = previous.catch(() => undefined).then(() => gate);
+  initialMutationTails.set(worldPrId, current);
+  await previous.catch(() => undefined);
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (initialMutationTails.get(worldPrId) === current) initialMutationTails.delete(worldPrId);
+  }
+}
+
+function replacementPayloadForMutation(
+  currentPayload: InitialPlanPayload,
+  input: InitialReplanInput,
+  mutation: MutationIdempotencyInput,
+): InitialPlanPayload {
+  return input.nextPayload === undefined
+    ? supersedeInitialPlanPayload(currentPayload, deterministicReplanPlanId(mutation))
+    : parseNextPayload(input.nextPayload, currentPayload);
 }
 
 export function initialPlanViewFromPayload(payload: InitialPlanPayload): InitialPlanView {
@@ -205,11 +452,29 @@ async function loadCurrentInitialView(worldStore: WorldPrStore, worldPrId: strin
 }
 
 function assertCurrentPointer(view: WorldPrView, request: InitialPlanMutationRequest): void {
-  if (!view.activePlan || !isInitialPlanView(view.activePlan)) throw new ServiceError("plan_not_found", "That World PR does not have an active initial plan.");
-  const pointer = view.activePlan.pointer;
+  const pointer = activeInitialPointer(view);
   if (pointer.planId !== request.planId || pointer.version !== request.planVersion || pointer.digest !== request.planDigest) {
     throw new ServiceError("plan_digest_mismatch", "The requested plan is no longer the active immutable preview.");
   }
+}
+
+function pointerMatchesRequest(view: WorldPrView, request: InitialPlanMutationRequest): boolean {
+  if (!view.activePlan || !isInitialPlanView(view.activePlan)) return false;
+  const pointer = view.activePlan.pointer;
+  return pointer.planId === request.planId && pointer.version === request.planVersion && pointer.digest === request.planDigest;
+}
+
+function pointerMatchesPayload(view: WorldPrView, payload: InitialPlanPayload): boolean {
+  if (!view.activePlan || !isInitialPlanView(view.activePlan)) return false;
+  const pointer = view.activePlan.pointer;
+  return pointer.planId === payload.planId && pointer.version === payload.version && pointer.digest === payload.digest;
+}
+
+function activeInitialPointer(view: WorldPrView): InitialPlanView["pointer"] {
+  if (!view.activePlan || !isInitialPlanView(view.activePlan)) {
+    throw new ServiceError("plan_not_found", "That World PR does not have an active initial plan.");
+  }
+  return view.activePlan.pointer;
 }
 
 async function loadPayload(worldStore: WorldPrStore, view: WorldPrView, request: InitialPlanMutationRequest): Promise<InitialPlanPayload> {
@@ -250,6 +515,10 @@ function assertReplayApproval(approval: ApprovalRecord, actorId: string, request
 }
 
 async function ensureApprovalTimeline(worldStore: WorldPrStore, current: WorldPrView, approval: ApprovalRecord): Promise<WorldPrView> {
+  const pointer = activeInitialPointer(current);
+  if (pointer.planId !== approval.planId || pointer.version !== approval.planVersion || pointer.digest !== approval.planDigest) {
+    throw new ServiceError("plan_digest_mismatch", "The approval no longer matches the active immutable preview.");
+  }
   if (current.timeline.some((item) => item.type === "approval.recorded" && item.label === APPROVAL_LABEL)) return current;
   const nextView = appendTimeline(current, {
     eventId: `evt_${approval.approvalId}`,
@@ -281,13 +550,14 @@ function parseNextPayload(value: unknown, current: InitialPlanPayload): InitialP
   }
 }
 
-function mutationResult(view: WorldPrView, requestId: string | undefined, replay: boolean): { response: TaskMutationResponse; view: WorldPrView; replay: boolean } {
+function mutationResult(view: WorldPrView, requestId: string, replay: boolean, replayPending = false): InitialMutationResult {
   const response = TaskMutationResponseSchema.parse({
     worldPrId: view.worldPrId,
     status: view.status,
     ...(view.activePlan ? { activePlan: view.activePlan.pointer } : {}),
     ...(view.attention ? { attention: view.attention } : {}),
-    requestId: requestId ?? createOpaqueId("req_"),
+    ...(replayPending ? { replayPending: true } : {}),
+    requestId,
   });
   return { response, view, replay };
 }
