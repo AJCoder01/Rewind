@@ -27,6 +27,7 @@ type ConfigurationState = Readonly<{
   calendarConfigured: boolean;
   demoDateConfigured: boolean;
   storageMode: "memory_fixture" | "postgres" | "unavailable";
+  modelRuntime: ConnectionPreflightSnapshot["runtime"]["modelRuntime"];
 }>;
 
 type DatabaseState = Readonly<{
@@ -45,6 +46,7 @@ function safeConfiguration(environment: Environment): ConfigurationState {
       calendarConfigured: Boolean(parsed.REWIND_GOOGLE_CALENDAR_ID),
       demoDateConfigured: parsed.REWIND_DEMO_DATE === "2026-08-20",
       storageMode: parsed.REWIND_STORAGE_MODE,
+      modelRuntime: modelRuntimeOf(parsed),
     };
   } catch (error) {
     const issues = error instanceof EnvironmentConfigError
@@ -58,6 +60,7 @@ function safeConfiguration(environment: Environment): ConfigurationState {
       calendarConfigured: Boolean(safeIdentifier(environment.REWIND_GOOGLE_CALENDAR_ID)),
       demoDateConfigured: environment.REWIND_DEMO_DATE === "2026-08-20",
       storageMode: storageModeOf(environment),
+      modelRuntime: modelRuntimeOf(environment),
     };
   }
 }
@@ -79,10 +82,12 @@ function safeIdentifier(value: string | undefined): string | undefined {
   return value.length > 0 ? value : undefined;
 }
 
-function modelRuntimeOf(environment: Environment): ConnectionPreflightSnapshot["runtime"]["modelRuntime"] {
-  const selectedRuntime = environment.REWIND_MODEL_RUNTIME
-    ?? environment.REWIND_S043_MODEL_RUNTIME
-    ?? (safeIdentifier(environment.OPENAI_MODEL) ? "openai_responses" : undefined);
+function modelRuntimeOf(environment: Readonly<{
+  REWIND_MODEL_RUNTIME?: string;
+  REWIND_LOCAL_MODEL?: string;
+  OPENAI_MODEL?: string;
+}>): ConnectionPreflightSnapshot["runtime"]["modelRuntime"] {
+  const selectedRuntime = environment.REWIND_MODEL_RUNTIME;
   if (selectedRuntime === "local_ollama" && safeIdentifier(environment.REWIND_LOCAL_MODEL)) return "local_ollama";
   if (selectedRuntime === "openai_responses" && safeIdentifier(environment.OPENAI_MODEL)) return "openai_responses";
   return "not_configured";
@@ -186,7 +191,7 @@ export async function readConnectionPreflightStatus(
     : configuration.storageMode === "postgres" && configuration.complete
       ? "live_capable"
       : "blocked";
-  const modelRuntime = modelRuntimeOf(environment);
+  const modelRuntime = configuration.modelRuntime;
   const workflowReady = runtimeMode === "live_capable"
     && configuration.complete
     && database.status === "ready"
@@ -213,7 +218,7 @@ export async function readConnectionPreflightStatus(
     workflow: {
       status: workflowReady ? "ready" : "disabled",
       message: workflowReady
-        ? "Provider-grounded planning is ready; exact dashboard approval and just-in-time preflight are still required before execution."
+        ? "Provider-grounded planning prerequisites are configured; model reachability, exact dashboard approval, and just-in-time preflight are still required before execution."
         : "Product execution remains disabled until every required configuration, storage, identity, Calendar, and model check is available.",
     },
   });

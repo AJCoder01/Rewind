@@ -4,7 +4,7 @@
 |---|---|
 | Status | Active |
 | Format | Lightweight ADRs |
-| Last updated | 2026-07-16 |
+| Last updated | 2026-07-17 |
 
 This file records why a decision was made and which choices remain open. Accepted behavior must also appear in the canonical PRD, Safety, Architecture, or Contracts document; this log alone does not define runtime behavior.
 
@@ -50,6 +50,7 @@ This file records why a decision was made and which choices remain open. Accepte
 | ADR-029 | Isolate S043 provider/model spikes from product execution/reset | Accepted |
 | ADR-030 | Use one model retry budget and sanitized transport categories | Accepted |
 | ADR-031 | Permit an explicitly labeled local Ollama model runtime | Accepted |
+| ADR-032 | Require independent fail-closed product and spike model selectors | Accepted |
 
 ## Accepted decisions
 
@@ -300,6 +301,14 @@ This file records why a decision was made and which choices remain open. Accepte
 **Why:** The configured OpenAI project returned HTTP 429 because its API credit balance is zero and the user explicitly declined paid API usage. ChatGPT/Codex product credits do not fund Platform API calls. A real local model preserves model-generated, schema-constrained reasoning without concealing the failed external integration or inventing a mock success.
 
 **Consequence:** The demo can run without model-provider spend on hardware with Ollama and the approved local model installed. Judges and evidence can distinguish local inference from external OpenAI proof. The local runtime does not expand executable effects: deterministic ranking, recipients, templates, provider calls, approvals, and Calendar/Gmail safety remain server-owned.
+
+### ADR-032 — Require independent fail-closed product and spike model selectors
+
+**Decision:** PostgreSQL product planning requires an explicit `REWIND_MODEL_RUNTIME`, and the S043 admin command separately requires `REWIND_S043_MODEL_RUNTIME`. Neither selector falls back to the other, omission never defaults to OpenAI, and stale provider credentials cannot infer a runtime. `prove:model-local` loads the same effective environment as the application and proves the exact product-selected local model. Standalone commands use Next environment precedence, configuration output reports both selectors, and CI verifies that explicit local mode remains fixed to loopback with zero external calls even when synthetic stale OpenAI values exist.
+
+**Why:** The mid-project OpenAI-to-Ollama change left three independent fallback implementations. A green local proof and “Local Ollama” dashboard could coexist with product planning that still instantiated OpenAI, while historical S043 configuration could leak into current product selection. That made the zero-credit claim configuration-dependent and difficult to audit.
+
+**Consequence:** Provider choice is deliberate and reviewable at every boundary. The optional funded OpenAI adapter remains supported, but only explicit OpenAI selection can instantiate it. Local Ollama works for local or same-host self-managed execution; a hosted Vercel process cannot reach a developer laptop through loopback and must not claim otherwise.
 
 ## Rejected alternatives
 

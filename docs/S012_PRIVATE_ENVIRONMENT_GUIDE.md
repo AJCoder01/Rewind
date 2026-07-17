@@ -20,7 +20,7 @@ Use the values already created in S007, S009, S010, and S011:
 - Supabase runtime transaction-pool `DATABASE_URL` using `rewind_app`, port `6543`, TLS parameters intact.
 - Supabase direct/session `DATABASE_MIGRATION_URL`, local/admin use only.
 - Google Web client ID and secret.
-- OpenAI project key and verified model `gpt-5.6-sol`.
+- Optional OpenAI project key and verified model `gpt-5.6-sol`; they are not needed for the local zero-credit profile.
 - Dedicated Google test-user email.
 
 Generate fresh values for these S012 secrets unless the team explicitly chooses to retain the S009 values:
@@ -50,6 +50,8 @@ REWIND_DASHBOARD_PASSCODE=<private generated value>
 MCP_BACKEND_TOKEN=<private generated value>
 REWIND_MODEL_RUNTIME=local_ollama
 REWIND_LOCAL_MODEL=qwen2.5-coder:latest
+# Optional outside the historical command; its run guide sets this inline:
+# REWIND_S043_MODEL_RUNTIME=local_ollama
 GOOGLE_CLIENT_ID=<private client ID>
 GOOGLE_CLIENT_SECRET=<private client secret>
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/v1/oauth/google/callback
@@ -59,16 +61,16 @@ REWIND_RECIPIENT_ALLOWLIST={"UK":["<private controlled UK address>"],"US":["<pri
 REWIND_DEMO_DATE=2026-08-20
 ```
 
-The local zero-credit path above does not require `OPENAI_API_KEY` or `OPENAI_MODEL`. To select the optional funded provider instead, use `REWIND_MODEL_RUNTIME=openai_responses` and supply both private OpenAI values. Never use a dummy key. Local Ollama is fixed to `127.0.0.1` and rejects model names ending in `:cloud`.
+The local zero-credit path above does not require `OPENAI_API_KEY` or `OPENAI_MODEL`. To select the optional funded provider instead, use `REWIND_MODEL_RUNTIME=openai_responses` and supply both private OpenAI values. Never use a dummy key. Local Ollama is fixed to `127.0.0.1` and rejects model names ending in `:cloud`. `REWIND_MODEL_RUNTIME` controls only product planning; `REWIND_S043_MODEL_RUNTIME` controls only the historical human-gated S043 command. Neither selector falls back to the other.
 
 If you are intentionally running the fixture-only local browser tests, use `REWIND_STORAGE_MODE=memory_fixture` in a separate local environment. Never use fixture mode for a deployed live claim.
 
-Leave these unset until later tasks produce verified values:
+At the historical S012 checkpoint these fields remained unset. The current post-OAuth product environment must use only the verified values produced by S031–S035; never invent them:
 
 ```text
-GOOGLE_REFRESH_TOKEN_CIPHERTEXT=
-REWIND_GOOGLE_EXPECTED_SUB=
-REWIND_GOOGLE_CALENDAR_ID=
+# GOOGLE_REFRESH_TOKEN_CIPHERTEXT=<verified encrypted value>
+# REWIND_GOOGLE_EXPECTED_SUB=<verified signed subject>
+# REWIND_GOOGLE_CALENDAR_ID=<verified controlled Calendar>
 ```
 
 ## 3. Configure Vercel Production
@@ -94,7 +96,7 @@ REWIND_RECIPIENT_ALLOWLIST={"UK":["<private controlled UK address>"],"US":["<pri
 REWIND_DEMO_DATE=2026-08-20
 ```
 
-Vercel cannot reach an Ollama server on your laptop through its own loopback interface. Keep hosted product execution disabled unless a funded approved model runtime is configured; use the local application for the zero-credit S058 flow.
+Vercel cannot reach an Ollama server on your laptop through its own loopback interface. The example above is an optional funded hosted profile: creating or refreshing a World PR in that profile makes OpenAI Responses calls and may incur cost. If no funded runtime is available, do not run hosted product planning; use the local application for the zero-credit S058 flow. Do not set hosted `local_ollama` merely to make the status panel green.
 
 Do **not** add `DATABASE_MIGRATION_URL` to Vercel. Do not add these deferred fields until later OAuth/provider work produces them:
 
@@ -114,7 +116,7 @@ From the repository root, run:
 npm run config:check
 ```
 
-Expected output contains only variable names and statuses. It must not include a value, key prefix, host, email, address, calendar ID, provider response, or SQL. A successful S012 check should identify the deferred OAuth fields as `deferred`, not fabricate them.
+Expected output contains only statuses, safe field names, `productModelRuntime`, and `providerSpikeModelRuntime`. For the zero-credit local product profile, `productModelRuntime` must be `local_ollama`; `providerSpikeModelRuntime` may be `not_configured` unless the historical S043 selector is intentionally stored. It must not include a value, key prefix, model name, host, email, address, calendar ID, provider response, or SQL.
 
 After a Production redeploy, recheck `/api/health`, `/api/ready`, and the secure dashboard cookie as in S009. Do not run a deployed create/review effect; that remains deferred to S023/S028.
 
@@ -128,7 +130,8 @@ S012 environment checkpoint
 - Production config names: present
 - Production storage mode: postgres
 - Production database readiness: HTTP status only
-- OpenAI model: gpt-5.6-sol
+- Product model runtime: local_ollama or explicitly funded openai_responses
+- Historical S043 runtime: not_configured, local_ollama, or explicitly funded openai_responses
 - Google redirect: exact production callback
 - Allowlist shape: UK one address, US one address
 - Demo date: 2026-08-20

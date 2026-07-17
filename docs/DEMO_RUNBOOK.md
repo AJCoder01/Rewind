@@ -72,7 +72,7 @@ Acme parent-account renewal risk brief
 - Protected deployed/local application and PostgreSQL are healthy.
 - Demo operator session and CSRF flow work.
 - Local Codex MCP server points to the same backend and has create/read-only auth.
-- OpenAI project can access the configured model and strict schema call passes.
+- The explicitly selected strict model runtime is reachable and its no-effect strict schema proof passes; the zero-credit profile uses local Ollama.
 - Google OAuth grant belongs to the configured test identity.
 - Calendar and Gmail APIs are enabled with only approved scopes.
 - Exactly two tagged events exist and both attendee sets are allowlisted.
@@ -89,7 +89,7 @@ Run the future `npm run preflight:demo` and require all checks green:
 1. application/database health;
 2. authenticated dashboard session;
 3. MCP create/read-only capability and backend identity;
-4. OpenAI strict-schema smoke and configured model metadata;
+4. selected-runtime strict-schema smoke and configured model metadata;
 5. Google token refresh and connected identity verified from the signed OIDC ID token, plus configured calendar identity;
 6. exact configured Calendar ID;
 7. exactly two tagged, owned, timed, non-recurring events;
@@ -141,7 +141,7 @@ Say:
 
 Add, if model behavior is not already obvious on screen:
 
-> GPT turns the supplied candidates, actions, and free-form context into typed assumptions, dependency mappings, recovery classifications, and a guardrail proposal. Deterministic validation controls every exact target, template, recipient, and provider effect.
+> The selected strict model turns the supplied candidates, actions, and free-form context into typed assumptions, dependency mappings, recovery classifications, and a guardrail proposal. Deterministic validation controls every exact target, template, recipient, and provider effect.
 
 Approve once.
 
@@ -222,7 +222,7 @@ Say:
 - If the UI shows `retryable_failed`, use only the provided safe resume control.
 - If it shows `delivery_uncertain`, `provider_conflict`, or `permanently_failed`, stop the run. Do not resend or edit the database.
 - If MCP fails before task creation, the dashboard path may demonstrate the same backend only if the failure is disclosed; the recorded primary flow still requires a successful MCP run.
-- If OpenAI output is invalid twice, show the safe failure during testing; do not enable or hide a deterministic fallback for recording.
+- If the selected model output is invalid twice, show the safe failure during testing; do not enable or hide a deterministic fallback for recording.
 - If any real integration is down, postpone recording. A mocked receipt is not an acceptable fallback.
 
 ## 7. Reset demo state

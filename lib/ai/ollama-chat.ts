@@ -200,9 +200,12 @@ export class OllamaChatClient {
     const receiptMaterial = [
       envelope.data.model,
       envelope.data.created_at,
+      request.promptVersion,
+      request.schemaVersion,
       envelope.data.total_duration ?? 0,
       envelope.data.prompt_eval_count ?? 0,
       envelope.data.eval_count ?? 0,
+      envelope.data.message.content,
     ].join("\0");
     return {
       parsed,

@@ -14,8 +14,8 @@ const validEnvironment = {
   REWIND_SESSION_SECRET: "session-secret-012345678901234567890123",
   REWIND_DASHBOARD_PASSCODE: "dashboard-passcode-1234",
   MCP_BACKEND_TOKEN: "mcp-token-01234567890123456789012345",
-  OPENAI_API_KEY: "sk-project-key-012345678901234",
-  OPENAI_MODEL: "gpt-5.6-sol",
+  REWIND_MODEL_RUNTIME: "local_ollama",
+  REWIND_LOCAL_MODEL: "qwen2.5-coder:latest",
   GOOGLE_CLIENT_ID: "1234567890-rewind.apps.googleusercontent.com",
   GOOGLE_CLIENT_SECRET: "GOCSPX-rewind-client-secret",
   GOOGLE_REDIRECT_URI: "http://localhost:3000/api/v1/oauth/google/callback",
@@ -77,10 +77,19 @@ describe("private environment contract", () => {
     expectConfigError(() => parseApplicationEnvironment(withEnvironment({ MCP_BACKEND_TOKEN: undefined })), [
       "MCP_BACKEND_TOKEN",
     ]);
-    expectConfigError(() => parseApplicationEnvironment(withEnvironment({ OPENAI_API_KEY: "change-me" })), [
+    expectConfigError(() => parseApplicationEnvironment(withEnvironment({
+      REWIND_MODEL_RUNTIME: "openai_responses",
+      REWIND_LOCAL_MODEL: undefined,
+      OPENAI_API_KEY: "change-me",
+      OPENAI_MODEL: "gpt-5.6-sol",
+    })), [
       "OPENAI_API_KEY",
     ]);
-    expectConfigError(() => parseApplicationEnvironment(withEnvironment({ OPENAI_API_KEY: undefined })), [
+    expectConfigError(() => parseApplicationEnvironment(withEnvironment({
+      REWIND_MODEL_RUNTIME: "openai_responses",
+      REWIND_LOCAL_MODEL: undefined,
+      OPENAI_MODEL: "gpt-5.6-sol",
+    })), [
       "OPENAI_API_KEY",
     ]);
   });
@@ -89,8 +98,6 @@ describe("private environment contract", () => {
     const parsed = parseApplicationEnvironment(withEnvironment({
       OPENAI_API_KEY: undefined,
       OPENAI_MODEL: undefined,
-      REWIND_MODEL_RUNTIME: "local_ollama",
-      REWIND_LOCAL_MODEL: "qwen2.5-coder:latest",
     }));
 
     expect(parsed.REWIND_MODEL_RUNTIME).toBe("local_ollama");
@@ -99,21 +106,36 @@ describe("private environment contract", () => {
     expect(parsed.OPENAI_MODEL).toBeUndefined();
   });
 
-  it("fails closed for a missing, cloud-backed, or conflicting local runtime", () => {
+  it("requires an explicit product runtime and keeps the S043 selector separate", () => {
+    expectConfigError(() => parseApplicationEnvironment(withEnvironment({
+      REWIND_MODEL_RUNTIME: undefined,
+      REWIND_S043_MODEL_RUNTIME: "local_ollama",
+    })), ["REWIND_MODEL_RUNTIME"]);
     expectConfigError(() => parseApplicationEnvironment(withEnvironment({
       OPENAI_API_KEY: undefined,
       OPENAI_MODEL: undefined,
       REWIND_MODEL_RUNTIME: "local_ollama",
+      REWIND_LOCAL_MODEL: undefined,
     })), ["REWIND_LOCAL_MODEL"]);
     expectConfigError(() => parseApplicationEnvironment(withEnvironment({
       REWIND_MODEL_RUNTIME: "local_ollama",
       REWIND_LOCAL_MODEL: "remote:cloud",
     })), ["REWIND_LOCAL_MODEL"]);
-    expectConfigError(() => parseApplicationEnvironment(withEnvironment({
+    expect(() => parseApplicationEnvironment(withEnvironment({
       REWIND_MODEL_RUNTIME: "local_ollama",
       REWIND_S043_MODEL_RUNTIME: "openai_responses",
       REWIND_LOCAL_MODEL: "qwen2.5-coder:latest",
-    })), ["REWIND_MODEL_RUNTIME"]);
+    }))).not.toThrow();
+  });
+
+  it("supports OpenAI only when the product runtime and provider fields are explicit", () => {
+    const parsed = parseApplicationEnvironment(withEnvironment({
+      REWIND_MODEL_RUNTIME: "openai_responses",
+      REWIND_LOCAL_MODEL: undefined,
+      OPENAI_API_KEY: "sk-project-key-012345678901234",
+      OPENAI_MODEL: "gpt-5.6-sol",
+    }));
+    expect(parsed.REWIND_MODEL_RUNTIME).toBe("openai_responses");
   });
 
   it("rejects production HTTP/local origins and fixture storage", () => {

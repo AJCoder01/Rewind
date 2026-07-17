@@ -14,6 +14,7 @@
     "test:e2e": "tsx scripts/test-e2e.ts",
     "eval:model-safety": "tsx scripts/eval-model-safety.ts",
     "prove:model-local": "tsx scripts/prove-local-model.ts",
+    "verify:zero-credit-runtime": "tsx scripts/verify-zero-credit-runtime.ts",
     "eval:recovery": "tsx scripts/eval-recovery.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "preflight:demo": "tsx scripts/preflight-demo.ts",
@@ -36,6 +37,7 @@
     "postcss": "8.5.10"
   },
   "dependencies": {
+    "@next/env": "15.5.20",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "next": "15.5.20",
     "pg": "8.16.3",

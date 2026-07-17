@@ -14,8 +14,8 @@ const baseEnvironment = {
   REWIND_SESSION_SECRET: "session-secret-012345678901234567890123",
   REWIND_DASHBOARD_PASSCODE: "dashboard-passcode-1234",
   MCP_BACKEND_TOKEN: "mcp-token-01234567890123456789012345",
-  OPENAI_API_KEY: "sk-project-key-012345678901234",
-  OPENAI_MODEL: "gpt-5.6-sol",
+  REWIND_MODEL_RUNTIME: "local_ollama",
+  REWIND_LOCAL_MODEL: "qwen2.5-coder:latest",
   GOOGLE_CLIENT_ID: "1234567890-rewind.apps.googleusercontent.com",
   GOOGLE_CLIENT_SECRET: "GOCSPX-rewind-client-secret",
   GOOGLE_REDIRECT_URI: "http://localhost:3000/api/v1/oauth/google/callback",
@@ -78,7 +78,7 @@ describe("S044 connection and preflight status", () => {
     expect(JSON.stringify(snapshot)).not.toContain(baseEnvironment.DATABASE_URL);
   });
 
-  it("shows a complete live-capable boundary while keeping Calendar preflight pending", async () => {
+  it("shows the explicit product runtime and ignores the separate S043 selector", async () => {
     const snapshot = await readConnectionPreflightStatus({
       environment: { ...baseEnvironment, REWIND_S043_MODEL_RUNTIME: "openai_responses" },
       checkDatabase: async () => ({ ready: true, migrationId: "0002_oauth_transaction" }),
@@ -93,7 +93,7 @@ describe("S044 connection and preflight status", () => {
       }),
     });
 
-    expect(snapshot.runtime).toMatchObject({ mode: "live_capable", modelRuntime: "openai_responses", productExecution: "enabled" });
+    expect(snapshot.runtime).toMatchObject({ mode: "live_capable", modelRuntime: "local_ollama", productExecution: "enabled" });
     expect(snapshot.identity).toEqual({ status: "connected", email: baseEnvironment.REWIND_GOOGLE_EXPECTED_EMAIL });
     expect(snapshot.database).toEqual({ status: "ready", schemaVersion: "0002_oauth_transaction" });
     expect(snapshot.calendar).toEqual({ status: "configured" });
@@ -157,6 +157,48 @@ describe("S044 connection and preflight status", () => {
     });
     expect(snapshot.workflow.status).toBe("ready");
     expect(JSON.stringify(snapshot)).not.toContain("OPENAI_API_KEY");
+  });
+
+  it("does not infer a product runtime from OpenAI fields or the S043 selector", async () => {
+    const snapshot = await readConnectionPreflightStatus({
+      environment: {
+        ...baseEnvironment,
+        REWIND_MODEL_RUNTIME: undefined,
+        REWIND_S043_MODEL_RUNTIME: "openai_responses",
+        OPENAI_API_KEY: "sk-project-key-012345678901234",
+        OPENAI_MODEL: "gpt-5.6-sol",
+      },
+      checkDatabase: async () => ({ ready: true, migrationId: "0002_oauth_transaction" }),
+      readCredential: async () => null,
+    });
+
+    expect(snapshot.configuration).toMatchObject({ status: "incomplete" });
+    expect(snapshot.configuration.issues).toContainEqual({ field: "REWIND_MODEL_RUNTIME", code: "required_for_postgres" });
+    expect(snapshot.runtime).toMatchObject({ modelRuntime: "not_configured", productExecution: "disabled" });
+  });
+
+  it("reports OpenAI only when it is explicitly selected for the product", async () => {
+    const snapshot = await readConnectionPreflightStatus({
+      environment: {
+        ...baseEnvironment,
+        REWIND_MODEL_RUNTIME: "openai_responses",
+        REWIND_LOCAL_MODEL: undefined,
+        OPENAI_API_KEY: "sk-project-key-012345678901234",
+        OPENAI_MODEL: "gpt-5.6-sol",
+      },
+      checkDatabase: async () => ({ ready: true, migrationId: "0002_oauth_transaction" }),
+      readCredential: async () => ({
+        provider: "google",
+        googleSub: baseEnvironment.REWIND_GOOGLE_EXPECTED_SUB,
+        email: baseEnvironment.REWIND_GOOGLE_EXPECTED_EMAIL,
+        refreshTokenCiphertext: "ciphertext-never-returned",
+        scopes: ["openid", "email", "https://www.googleapis.com/auth/calendar.events.owned", "https://www.googleapis.com/auth/gmail.send"],
+        createdAt: new Date("2026-07-16T00:00:00.000Z"),
+        updatedAt: new Date("2026-07-16T00:00:00.000Z"),
+      }),
+    });
+
+    expect(snapshot.runtime).toMatchObject({ modelRuntime: "openai_responses", productExecution: "enabled" });
   });
 
   it("fails closed on a stored account substitution without returning its email", async () => {

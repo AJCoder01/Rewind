@@ -116,6 +116,17 @@ describe("local Ollama structured-output client", () => {
     await expect(malformed.createStructured(request)).rejects.toMatchObject({ kind: "invalid_output" });
   });
 
+  it("binds the local receipt fingerprint to the exact structured output", async () => {
+    const first = await new OllamaChatClient({
+      fetchImpl: async () => jsonResponse(responseBody({ answer: "first" })),
+    }).createStructured(request);
+    const second = await new OllamaChatClient({
+      fetchImpl: async () => jsonResponse(responseBody({ answer: "second" })),
+    }).createStructured(request);
+
+    expect(first.metadata.responseId).not.toBe(second.metadata.responseId);
+  });
+
   it("strips unsupported string bounds while retaining cardinality, numeric bounds, closed structure, and enums", () => {
     expect(ollamaGrammarSchema({
       type: "object",

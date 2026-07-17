@@ -76,18 +76,29 @@ describe("controlled provider spike boundary", () => {
   });
 
   it("selects only explicit loopback Ollama or configured OpenAI model runtimes", () => {
-    expect(providerSpikeModelRuntime({}, "gpt-test")).toEqual({
+    expect(() => providerSpikeModelRuntime({}, "gpt-test")).toThrowError(ProviderSpikeFailureError);
+    expect(() => providerSpikeModelRuntime(
+      { REWIND_MODEL_RUNTIME: "local_ollama", REWIND_LOCAL_MODEL: "gemma3:4b" },
+      "gpt-test",
+    )).toThrowError(ProviderSpikeFailureError);
+    expect(providerSpikeModelRuntime({ REWIND_S043_MODEL_RUNTIME: "openai_responses" }, "gpt-test")).toEqual({
       runtime: "openai_responses",
       evidenceClass: "external_openai",
       provider: "openai",
       model: "gpt-test",
     });
-    expect(providerSpikeModelRuntime({ REWIND_S043_MODEL_RUNTIME: "local_ollama" }, "unused")).toEqual({
+    expect(providerSpikeModelRuntime({
+      REWIND_S043_MODEL_RUNTIME: "local_ollama",
+      REWIND_LOCAL_MODEL: "qwen2.5-coder:latest",
+    }, "unused")).toEqual({
       runtime: "local_ollama",
       evidenceClass: "local_model",
       provider: "ollama",
       model: "qwen2.5-coder:latest",
     });
+    expect(() => providerSpikeModelRuntime({ REWIND_S043_MODEL_RUNTIME: "local_ollama" }, "unused")).toThrowError(
+      ProviderSpikeFailureError,
+    );
     expect(() => providerSpikeModelRuntime({ REWIND_S043_MODEL_RUNTIME: "local_ollama", REWIND_LOCAL_MODEL: "remote:cloud" }, "unused")).toThrowError(
       ProviderSpikeFailureError,
     );

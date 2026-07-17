@@ -69,13 +69,15 @@ export function providerSpikeModelRuntime(
   environment: Readonly<Record<string, string | undefined>>,
   openAiModel: string | undefined,
 ): ProviderSpikeModelRuntime {
-  const runtime = environment.REWIND_S043_MODEL_RUNTIME ?? "openai_responses";
+  const runtime = environment.REWIND_S043_MODEL_RUNTIME;
+  if (!runtime) throw new ProviderSpikeFailureError("model_runtime_invalid");
   if (runtime === "openai_responses") {
     if (!openAiModel) throw new ProviderSpikeFailureError("model_runtime_invalid");
     return { runtime, evidenceClass: "external_openai", provider: "openai", model: openAiModel };
   }
   if (runtime !== "local_ollama") throw new ProviderSpikeFailureError("model_runtime_invalid");
-  const model = environment.REWIND_LOCAL_MODEL ?? "qwen2.5-coder:latest";
+  const model = environment.REWIND_LOCAL_MODEL;
+  if (!model) throw new ProviderSpikeFailureError("model_runtime_invalid");
   const parsed = OllamaChatRequestSchema.shape.model.safeParse(model);
   if (!parsed.success) throw new ProviderSpikeFailureError("model_runtime_invalid");
   return { runtime, evidenceClass: "local_model", provider: "ollama", model: parsed.data };

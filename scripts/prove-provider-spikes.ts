@@ -109,7 +109,7 @@ async function main(): Promise<void> {
     const confirmation = providerSpikeConfirmationPhrase(runId, configuration.calendarId, modelRuntime);
     const readline = createInterface({ input: process.stdin, output: process.stdout });
     const answer = await readline.question(
-      `S043 will run one stale Calendar precondition check, one controlled Calendar move/restore, and three synthetic strict ${modelRuntime.runtime} model calls (target fingerprint ${fingerprint}). Type "${confirmation}" to continue: `,
+      `S043 will run one stale Calendar precondition check, one controlled Calendar move/restore, and three synthetic strict ${modelRuntime.runtime} model operations (up to six provider requests if bounded semantic retries are needed; target fingerprint ${fingerprint}). Type "${confirmation}" to continue: `,
     );
     readline.close();
     if (answer.trim() !== confirmation) {

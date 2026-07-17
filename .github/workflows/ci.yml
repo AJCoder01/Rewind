@@ -66,6 +66,18 @@ jobs:
       - name: Production fake-provider guard
         run: npm run verify:fake-production
 
+      - name: Zero-credit product runtime guard
+        run: npm run verify:zero-credit-runtime
+
+      - name: Requirement traceability
+        run: npm run traceability:check
+
+      - name: G2 evidence closure
+        run: npm run verify:g2-closure
+
+      - name: Deterministic model safety evaluation
+        run: npm run eval:model-safety
+
       - name: Ephemeral PostgreSQL migration apply and replay
         run: npm run db:verify:ephemeral
 

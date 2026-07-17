@@ -9,8 +9,6 @@ const productionFixtureEnvironment = {
   REWIND_SESSION_SECRET: "fixture-session-0123456789abcdef0123456789",
   REWIND_DASHBOARD_PASSCODE: "fixture-passcode-1234",
   MCP_BACKEND_TOKEN: "fixture-mcp-token-0123456789abcdef0123456789",
-  OPENAI_API_KEY: "fixture-openai-key-0123456789",
-  OPENAI_MODEL: "gpt-5.6-sol",
   GOOGLE_CLIENT_ID: "1234567890-rewind.apps.googleusercontent.com",
   GOOGLE_CLIENT_SECRET: "fixture-google-secret-0123456",
   GOOGLE_REDIRECT_URI: "https://rewind.example.test/api/v1/oauth/google/callback",
