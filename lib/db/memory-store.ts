@@ -1,8 +1,10 @@
 import {
   CancelWorldPrRequestSchema,
   CreateWorldPrResponseSchema,
+  IdempotencyFailureSchema,
   TaskMutationResponseSchema,
   WorldPrViewSchema,
+  type TaskMutationResponse,
   type WorldPrView,
 } from "@/lib/contracts/v1";
 import { buildFixtureAnalyzingView, buildFixtureClarificationView, buildFixtureWorldPrRecord, buildPlanningLeaseExpiredView } from "@/lib/domain/fixture-world-pr";
@@ -13,14 +15,27 @@ import {
   type CancelWorldPrStoreResult,
   type CreateWorldPrStoreInput,
   type CreateWorldPrStoreResult,
+  type InitialPlanPointer,
+  type MutationIdempotencyClaim,
+  type MutationIdempotencyFailure,
+  type MutationIdempotencyInput,
+  type MutationIdempotencyLease,
   type WorldPrStore,
   sharesWorldPrScope,
 } from "@/lib/db/store";
+import { createOpaqueId } from "@/lib/domain/ids";
 
 type IdempotencyRecord =
   | { bodyHash: string; status: "in_progress"; result: CreateWorldPrStoreResult | CancelWorldPrStoreResult }
   | { bodyHash: string; status: "completed"; result: CreateWorldPrStoreResult | CancelWorldPrStoreResult }
   | { bodyHash: string; status: "failed"; error: StoreError };
+
+type MutationIdempotencyRecord =
+  | { bodyHash: string; status: "in_progress"; worldPrId: string; claimToken: string; claimedAt: string }
+  | { bodyHash: string; status: "completed"; worldPrId: string; response: TaskMutationResponseSchemaType }
+  | { bodyHash: string; status: "failed"; worldPrId: string; failure: MutationIdempotencyFailure };
+
+type TaskMutationResponseSchemaType = ReturnType<typeof TaskMutationResponseSchema.parse>;
 
 type ScenarioLock = {
   worldPrId: string;
@@ -30,8 +45,10 @@ type ScenarioLock = {
 
 export class MemoryFixtureWorldPrStore implements WorldPrStore {
   private readonly byWorldPrId = new Map<string, WorldPrView>();
+  private readonly byPlanId = new Map<string, { worldPrId: string; planPayload: NonNullable<CreateWorldPrStoreResult["planPayload"]> }>();
   private readonly byOwner = new Map<string, string>();
   private readonly byIdempotency = new Map<string, IdempotencyRecord>();
+  private readonly byMutationIdempotency = new Map<string, MutationIdempotencyRecord>();
   private scenarioLock: ScenarioLock | undefined;
   private activeRule = false;
   private planningDelayMs = 0;
@@ -106,6 +123,7 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
       });
       const result: CreateWorldPrStoreResult & { kind: "create" } = { kind: "create", view, planPayload: record.planPayload, response, replay: false };
       this.byWorldPrId.set(view.worldPrId, view);
+      this.byPlanId.set(record.planPayload.planId, { worldPrId: view.worldPrId, planPayload: record.planPayload });
       this.byIdempotency.set(idempotencyId, { bodyHash: input.bodyHash, status: "completed", result });
       return result;
     } catch (error) {
@@ -125,6 +143,106 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
   async get(worldPrId: string, actorId?: string): Promise<WorldPrView | null> {
     this.assertScope(worldPrId, actorId);
     return this.byWorldPrId.get(worldPrId) ?? null;
+  }
+
+  async getInitialPlanPayload(worldPrId: string, planId: string): Promise<NonNullable<CreateWorldPrStoreResult["planPayload"]> | null> {
+    const record = this.byPlanId.get(planId);
+    if (!record || record.worldPrId !== worldPrId) return null;
+    return structuredClone(record.planPayload);
+  }
+
+  async persistInitialPlanVersion(
+    worldPrId: string,
+    payload: NonNullable<CreateWorldPrStoreResult["planPayload"]>,
+    view: WorldPrView,
+    expectedPointer: InitialPlanPointer,
+  ): Promise<void> {
+    if (
+      payload.taskId !== worldPrId ||
+      view.worldPrId !== worldPrId ||
+      view.status !== "preview_ready" ||
+      !view.activePlan ||
+      view.activePlan.pointer.kind !== "initial" ||
+      view.activePlan.pointer.planId !== payload.planId ||
+      view.activePlan.pointer.version !== payload.version ||
+      view.activePlan.pointer.digest !== payload.digest
+    ) {
+      throw new StoreError("internal_error", "The refreshed plan does not belong to the World PR.");
+    }
+    WorldPrViewSchema.parse(view);
+    const current = this.byWorldPrId.get(worldPrId);
+    if (!current) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+    if (!current.activePlan || current.activePlan.pointer.kind !== "initial" || !sameInitialPointer(current.activePlan.pointer, expectedPointer)) {
+      throw new StoreError("invalid_task_state", "The World PR changed while the replacement plan was being prepared.");
+    }
+    if (payload.version !== current.activePlan.pointer.version + 1 || payload.planId === current.activePlan.pointer.planId || payload.digest === current.activePlan.pointer.digest) {
+      throw new StoreError("invalid_task_state", "The replacement plan must be the next immutable version of the active preview.");
+    }
+    const existing = this.byPlanId.get(payload.planId);
+    if (existing) {
+      if (JSON.stringify(existing.planPayload) !== JSON.stringify(payload)) throw new StoreError("internal_error", "An immutable plan version changed during refresh.");
+    } else {
+      this.byPlanId.set(payload.planId, { worldPrId, planPayload: structuredClone(payload) });
+    }
+    this.byWorldPrId.set(worldPrId, structuredClone(view));
+  }
+
+  async updateView(worldPrId: string, view: WorldPrView): Promise<void> {
+    if (view.worldPrId !== worldPrId) throw new StoreError("internal_error", "The durable World PR view identifier changed.");
+    WorldPrViewSchema.parse(view);
+    if (!this.byWorldPrId.has(worldPrId)) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+    this.byWorldPrId.set(worldPrId, structuredClone(view));
+  }
+
+  async claimMutation(input: MutationIdempotencyInput): Promise<MutationIdempotencyClaim> {
+    const key = idempotencyIdFor(input.actorId, input.endpoint, input.idempotencyKey);
+    const existing = this.byMutationIdempotency.get(key);
+    if (existing) {
+      if (existing.bodyHash !== input.bodyHash) throw new StoreError("idempotency_conflict", "This idempotency key was already used for a different request.");
+      if (existing.status === "in_progress") {
+        if (hasExpiredMutationLease(existing.claimedAt, input.claimedAt)) {
+          const claimToken = createOpaqueId("idem_");
+          this.byMutationIdempotency.set(key, { bodyHash: input.bodyHash, status: "in_progress", worldPrId: input.worldPrId, claimToken, claimedAt: input.claimedAt });
+          return { kind: "claimed", claimToken };
+        }
+        return { kind: "replay_pending", claimToken: existing.claimToken };
+      }
+      if (existing.status === "completed") return { kind: "replay_completed", response: structuredClone(existing.response) };
+      return { kind: "replay_failed", failure: structuredClone(existing.failure) };
+    }
+    const claimToken = createOpaqueId("idem_");
+    this.byMutationIdempotency.set(key, { bodyHash: input.bodyHash, status: "in_progress", worldPrId: input.worldPrId, claimToken, claimedAt: input.claimedAt });
+    return { kind: "claimed", claimToken };
+  }
+
+  async completeMutation(input: MutationIdempotencyLease, response: TaskMutationResponse): Promise<void> {
+    const parsedResponse = TaskMutationResponseSchema.parse(response);
+    const key = idempotencyIdFor(input.actorId, input.endpoint, input.idempotencyKey);
+    const existing = this.byMutationIdempotency.get(key);
+    if (!existing || existing.bodyHash !== input.bodyHash || existing.status !== "in_progress" || existing.claimToken !== input.claimToken) {
+      throw new StoreError("internal_error", "The mutation idempotency record could not be completed safely.");
+    }
+    this.byMutationIdempotency.set(key, { bodyHash: input.bodyHash, status: "completed", worldPrId: input.worldPrId, response: structuredClone(parsedResponse) });
+  }
+
+  async recoverMutation(input: MutationIdempotencyLease, response: TaskMutationResponse): Promise<void> {
+    const parsedResponse = TaskMutationResponseSchema.parse(response);
+    const key = idempotencyIdFor(input.actorId, input.endpoint, input.idempotencyKey);
+    const existing = this.byMutationIdempotency.get(key);
+    if (!existing || existing.bodyHash !== input.bodyHash || existing.status !== "in_progress" || existing.claimToken !== input.claimToken) {
+      throw new StoreError("internal_error", "The pending mutation idempotency record could not be recovered safely.");
+    }
+    this.byMutationIdempotency.set(key, { bodyHash: input.bodyHash, status: "completed", worldPrId: input.worldPrId, response: structuredClone(parsedResponse) });
+  }
+
+  async failMutation(input: MutationIdempotencyLease, failure: MutationIdempotencyFailure): Promise<void> {
+    const parsedFailure = IdempotencyFailureSchema.parse(failure);
+    const key = idempotencyIdFor(input.actorId, input.endpoint, input.idempotencyKey);
+    const existing = this.byMutationIdempotency.get(key);
+    if (!existing || existing.bodyHash !== input.bodyHash || existing.status !== "in_progress" || existing.claimToken !== input.claimToken) {
+      throw new StoreError("internal_error", "The mutation idempotency record could not be failed safely.");
+    }
+    this.byMutationIdempotency.set(key, { bodyHash: input.bodyHash, status: "failed", worldPrId: input.worldPrId, failure: structuredClone(parsedFailure) });
   }
 
   async cancel(input: CancelWorldPrStoreInput): Promise<CancelWorldPrStoreResult> {
@@ -163,8 +281,10 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
 
   clear(): void {
     this.byWorldPrId.clear();
+    this.byPlanId.clear();
     this.byOwner.clear();
     this.byIdempotency.clear();
+    this.byMutationIdempotency.clear();
     this.scenarioLock = undefined;
     this.activeRule = false;
     this.planningDelayMs = 0;
@@ -211,6 +331,15 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
     const owner = this.byOwner.get(worldPrId);
     if (owner && !sharesWorldPrScope(owner, actorId)) throw new StoreError("forbidden", "This World PR is outside the authenticated workspace scope.");
   }
+}
+
+function sameInitialPointer(left: InitialPlanPointer, right: InitialPlanPointer): boolean {
+  return left.planId === right.planId && left.version === right.version && left.digest === right.digest;
+}
+
+function hasExpiredMutationLease(previousClaimedAt: string, nextClaimedAt: string): boolean {
+  const elapsed = Date.parse(nextClaimedAt) - Date.parse(previousClaimedAt);
+  return Number.isFinite(elapsed) && elapsed >= 60_000;
 }
 
 type RewindGlobal = typeof globalThis & { __rewindMemoryFixtureStore?: MemoryFixtureWorldPrStore };

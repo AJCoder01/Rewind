@@ -222,11 +222,23 @@ export const InitialActionSchema = z.discriminatedUnion("type", [
   AccountBriefActionSchema,
 ]);
 
+export const PlanCandidateEvidenceSchema = z
+  .object({
+    candidateId: Id,
+    label: z.string().min(1).max(100),
+    region: z.enum(["UK", "US"]),
+    start: ZonedDateTimeSchema,
+    end: ZonedDateTimeSchema,
+    rankingEvidence: z.array(z.string().min(1).max(500)).min(1).max(10),
+  })
+  .strict();
+
 export const InitialPlanViewSchema = z
   .object({
     pointer: InitialPlanPointerSchema,
     selectedCandidate: CandidateSchema,
     alternatives: z.array(CandidateSchema).length(1),
+    candidateEvidence: z.tuple([PlanCandidateEvidenceSchema, PlanCandidateEvidenceSchema]),
     assumptions: z.array(AssumptionSchema).length(1),
     actions: z.tuple([AccountBriefActionSchema, CalendarMoveActionSchema, MailNotificationActionSchema]),
   })
@@ -310,7 +322,17 @@ export const InitialPlanPayloadSchema = InitialPlanPayloadCoreSchema.extend({
 })
   .strict()
   .superRefine((value, context) => {
-    const [artifact, calendar] = value.actions;
+    const [artifact, calendar, mail] = value.actions;
+    const actionKeys = value.actions.map((action) => action.actionKey);
+    if (JSON.stringify(actionKeys) !== JSON.stringify(value.executionOrder)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["executionOrder"], message: "Initial action order must match the immutable execution order" });
+    }
+    if (mail.requiresSucceededActionKey !== calendar.actionKey) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["actions", 2, "requiresSucceededActionKey"], message: "Initial mail must depend on the Calendar action" });
+    }
+    if (artifact.externalEffect !== false || calendar.externalEffect !== true || mail.externalEffect !== true) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["actions"], message: "Initial external-effect labels must match the fixed action types" });
+    }
     const candidateIds = new Set(value.candidateSet.map((candidate) => candidate.candidateId));
     const candidateRegions = new Set(value.candidateSet.map((candidate) => candidate.region));
     const selected = value.candidateSet.find((candidate) => candidate.candidateId === value.selectedCandidateId);
@@ -639,11 +661,15 @@ export const WorldPrViewSchema = z
     const activePlan = value.activePlan;
     if (activePlan && isInitialPlanView(activePlan)) {
       const selectedId = activePlan.selectedCandidate.candidateId;
+      const evidenceIds = activePlan.candidateEvidence.map((candidate) => candidate.candidateId);
       if (activePlan.assumptions[0].resolvedCandidateId !== selectedId) {
         context.addIssue({ code: z.ZodIssueCode.custom, path: ["activePlan", "assumptions", 0, "resolvedCandidateId"], message: "Active-plan assumption must resolve to the selected candidate" });
       }
       if (activePlan.alternatives[0].candidateId === selectedId) {
         context.addIssue({ code: z.ZodIssueCode.custom, path: ["activePlan", "alternatives", 0], message: "Selected and alternative candidates must be distinct" });
+      }
+      if (!evidenceIds.includes(selectedId) || !evidenceIds.includes(activePlan.alternatives[0].candidateId) || new Set(evidenceIds).size !== 2) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["activePlan", "candidateEvidence"], message: "Candidate evidence must cover the selected and alternative entities exactly once" });
       }
     }
   });

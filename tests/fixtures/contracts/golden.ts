@@ -170,6 +170,14 @@ export const GOLDEN_INITIAL_PLAN_VIEW = InitialPlanViewSchema.parse({
   },
   selectedCandidate: { candidateId: "cal_event_acme_uk", label: "Acme UK renewal" },
   alternatives: [{ candidateId: "cal_event_acme_us", label: "Acme US renewal" }],
+  candidateEvidence: GOLDEN_CANDIDATE_SET.map((candidate) => ({
+    candidateId: candidate.candidateId,
+    label: candidate.title,
+    region: candidate.region,
+    start: candidate.start,
+    end: candidate.end,
+    rankingEvidence: candidate.rankingEvidence,
+  })),
   assumptions: GOLDEN_INITIAL_PLAN_PAYLOAD.assumptions,
   actions: GOLDEN_INITIAL_PLAN_PAYLOAD.actions,
 });

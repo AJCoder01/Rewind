@@ -24,7 +24,8 @@ const oauthEvidence = [
 const providerEvidence = [...oauthEvidence, "artifacts/test-runs/2026-07-16-s034-provider-ports.md"];
 const calendarSetupEvidence = [...providerEvidence, "artifacts/test-runs/2026-07-16-s035-calendar-setup.md", "artifacts/test-runs/2026-07-16-s035-live-closure.md"];
 const calendarPrimitiveEvidence = [...calendarSetupEvidence, "artifacts/test-runs/2026-07-16-s036-calendar-primitives.md"];
-const artifactEvidence = [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s038-gmail-live-proof.md", "artifacts/test-runs/2026-07-16-s039-artifact-boundary.md"];
+const calendarExecutionEvidence = [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s054-calendar-execution.md"];
+const artifactEvidence = [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s038-gmail-live-proof.md", "artifacts/test-runs/2026-07-16-s039-artifact-boundary.md", "artifacts/test-runs/2026-07-16-s053-artifact-execution.md"];
 const modelEvidence = [
   ...artifactEvidence,
   "artifacts/test-runs/2026-07-16-s040-openai-responses.md",
@@ -114,27 +115,40 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     fixtureIds: ["fixture-initial.v1"], evidencePaths: g1Evidence, status: "partial",
     note: "Preview and clarification cancellation release only the owned fixture lock and return to the composer; approval/execution cancellation remains future work.",
   }),
-  planned("FR-10", "FR", "Immutable initial approval record", ["S046", "S051"], "Approval persistence is intentionally deferred until execution work."),
-  planned("FR-11", "FR", "Approval invalidation on drift", ["S051", "S054"], "Provider/version drift checks are future provider-boundary work."),
-  planned("FR-12", "FR", "Durable unique action ledger", ["S046", "S052"], "The foundation migration reserves the table; execution rows are not yet created by the service."),
+  current({
+    id: "FR-10", kind: "FR", title: "Immutable initial approval record", planTasks: ["S046", "S051", "S057"],
+    codePaths: ["lib/contracts/execution-persistence.ts", "lib/services/initial-approval.ts", "app/api/v1/world-prs/[worldPrId]/approvals/initial/route.ts"], testPaths: ["tests/unit/execution-persistence.test.ts", "tests/unit/initial-approval.test.ts", "tests/unit/initial-workflow.test.ts"], fixtureIds: ["initial-plan.v1", "traceability.v1"], evidencePaths: ["artifacts/test-runs/2026-07-16-s046-execution-persistence.md", "artifacts/test-runs/2026-07-16-s051-approval-cancel-replan.md", "artifacts/test-runs/2026-07-16-s057-initial-workflow.md"], status: "partial",
+    note: "S046 freezes the approval/plan contracts and S051 persists exact actor/time/version/digest approval with replay and MCP refusal; S057 verifies the approved workflow consumes only that immutable record, while one controlled live proof remains S058.",
+  }),
+  current({
+    id: "FR-11", kind: "FR", title: "Approval invalidation on drift", planTasks: ["S051", "S054"],
+    codePaths: ["lib/services/initial-execution.ts", "lib/services/initial-calendar-execution.ts", "lib/contracts/initial-calendar-execution.ts"],
+    testPaths: ["tests/unit/initial-execution.test.ts", "tests/unit/initial-calendar-execution.test.ts"], fixtureIds: ["initial-plan.v1"], evidencePaths: calendarExecutionEvidence,
+    status: "partial", note: "The approved Calendar action fails closed on ETag, target, ownership/type/recurrence/tag, organizer, attendee/allowlist, or time drift; Gmail and full workflow invalidation remain S055/S057.",
+  }),
+  current({
+    id: "FR-12", kind: "FR", title: "Durable unique action ledger", planTasks: ["S046", "S052"],
+    codePaths: ["lib/db/execution-store.ts", "lib/services/initial-execution.ts"], testPaths: ["tests/unit/execution-persistence.test.ts", "tests/unit/initial-execution.test.ts"], fixtureIds: ["initial-plan.v1"], evidencePaths: calendarExecutionEvidence,
+    status: "partial", note: "The memory/PostgreSQL ledgers persist immutable plans, approvals, unique action rows, leases, before/after state, typed receipts, and terminal outcomes; full workflow/UI verification remains S055–S057.",
+  }),
   current({
     id: "FR-13", kind: "FR", title: "Calendar pre-mutation validation", planTasks: ["S036", "S054"],
-    codePaths: ["lib/domain/calendar-demo.ts", "lib/services/calendar-primitives.ts", "lib/google/calendar.ts"],
-    testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: calendarPrimitiveEvidence,
-    status: "partial", note: "S036 verifies controlled ownership/type/recurrence/tag/attendee/time/version preconditions and records stale conflicts; product approval-bound execution remains S054 work.",
+    codePaths: ["lib/domain/calendar-demo.ts", "lib/services/calendar-primitives.ts", "lib/services/initial-calendar-execution.ts", "lib/contracts/initial-calendar-execution.ts", "lib/google/calendar.ts"],
+    testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/initial-calendar-execution.test.ts"], fixtureIds: ["traceability.v1", "initial-plan.v1"], evidencePaths: calendarExecutionEvidence,
+    status: "partial", note: "S036 verifies the primitive boundary and S054 rechecks the approved target/version, controlled ownership/type/recurrence/tag, organizer/attendee allowlist, and exact plan times before the action-ledger write; live product proof remains S058.",
   }),
   current({
     id: "FR-14", kind: "FR", title: "Conditional narrow Calendar write", planTasks: ["S036", "S054"],
-    codePaths: ["lib/google/calendar.ts", "lib/services/calendar-primitives.ts", "lib/db/demo-event-state.ts"],
-    testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: calendarPrimitiveEvidence,
-    status: "partial", note: "S036 proves start/end-only, If-Match, sendUpdates=none, verified rolling versions, restore, and conflict/uncertain outcomes with deterministic fakes; product action-ledger integration and live spike remain S043/S054 work.",
+    codePaths: ["lib/google/calendar.ts", "lib/services/calendar-primitives.ts", "lib/services/initial-calendar-execution.ts", "lib/contracts/initial-calendar-execution.ts", "lib/db/demo-event-state.ts"],
+    testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/initial-calendar-execution.test.ts"], fixtureIds: ["traceability.v1", "initial-plan.v1"], evidencePaths: calendarExecutionEvidence,
+    status: "partial", note: "S036 proves start/end-only, If-Match, sendUpdates=none, verified rolling versions, restore, and conflict/uncertain outcomes; S054 adds approved action-ledger ordering, before/after snapshots, new-ETag verification, and replay safety with deterministic fakes.",
   }),
   current({
     id: "FR-15", kind: "FR", title: "Allowlisted Gmail notification", planTasks: ["S037", "S038", "S055"],
-    codePaths: ["lib/config/environment.ts", "lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/gmail-live-proof.ts", "lib/domain/gmail-template.ts", "lib/adapters/gmail.ts", "lib/google/gmail.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts", "scripts/prove-gmail.ts"],
-    testPaths: ["tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/gmail-live-proof.test.ts", "tests/unit/gmail-live-proof-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/provider-ports.test.ts"],
-    fixtureIds: ["traceability.v1"], evidencePaths: [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md"], status: "partial",
-    note: "S037 proves the deterministic allowlist/template/MIME boundary, marker-before-handoff persistence hook, typed provider outcomes, and no-redispatch replay; one human-confirmed live success/replay remains S038 and full product action integration remains S046/S055.",
+    codePaths: ["lib/config/environment.ts", "lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/gmail-live-proof.ts", "lib/contracts/initial-gmail-execution.ts", "lib/domain/gmail-template.ts", "lib/adapters/gmail.ts", "lib/google/gmail.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts", "lib/services/initial-gmail-execution.ts", "scripts/prove-gmail.ts"],
+    testPaths: ["tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/gmail-live-proof.test.ts", "tests/unit/gmail-live-proof-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/initial-gmail-execution.test.ts"],
+    fixtureIds: ["traceability.v1", "initial-plan.v1"], evidencePaths: [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md", "artifacts/test-runs/2026-07-16-s055-gmail-execution.md"], status: "partial",
+    note: "S037 proves the deterministic allowlist/template/MIME boundary, marker-before-handoff persistence hook, typed provider outcomes, and no-redispatch replay; S055 integrates the exact approved action after the artifact/Calendar dependencies and records sent/permanent/uncertain/conflict outcomes; one human-confirmed live success/replay remains S038/S058.",
   }),
   current({
     id: "FR-16", kind: "FR", title: "Independent brief provenance and exact bytes", planTasks: ["S006", "S014", "S039", "S053"],
@@ -142,8 +156,20 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     fixtureIds: ["controlled-content.v1", "artifact-independence.v1"], evidencePaths: artifactEvidence, status: "partial",
     note: "S039 now generates only from the versioned source, rejects closed leakage dimensions, binds source/content hashes, and persists exact approved bytes without regeneration; product action-ledger integration remains S053.",
   }),
-  planned("FR-17", "FR", "Durable timeline receipts and honest outcomes", ["S052", "S056"], "The fixture timeline is a preview shell; action receipts are future work."),
-  planned("FR-18", "FR", "Safe retry and resume", ["S021", "S052", "S057"], "Resume semantics require the action ledger and provider adapters."),
+  current({
+    id: "FR-17", kind: "FR", title: "Durable timeline receipts and honest outcomes", planTasks: ["S052", "S056", "S057"],
+    codePaths: ["lib/contracts/execution-shared.ts", "lib/contracts/execution-timeline.ts", "lib/services/execution-timeline.ts", "app/components/execution-timeline.tsx", "app/api/v1/world-prs/[worldPrId]/execution/route.ts", "app/pr/[worldPrId]/page.tsx"],
+    testPaths: ["tests/unit/execution-timeline.test.ts", "tests/unit/initial-workflow.test.ts", "tests/unit/accessibility-contract.test.ts", "scripts/test-e2e.ts"], fixtureIds: ["initial-plan.v1", "traceability.v1"],
+    evidencePaths: ["artifacts/test-runs/2026-07-16-s056-execution-timeline.md", "artifacts/test-runs/2026-07-16-s057-initial-workflow.md"], status: "partial",
+    note: "S056 renders durable action timestamps, typed receipts, redacted errors, and honest partial/conflict/uncertain/failed states without fabricating completion; S057 verifies the complete deterministic initial workflow, and live proof remains S058.",
+  }),
+  current({
+    id: "FR-18", kind: "FR", title: "Safe retry and resume", planTasks: ["S021", "S052", "S053", "S054", "S055", "S056", "S057"],
+    codePaths: ["lib/services/initial-execution.ts", "lib/services/initial-artifact-execution.ts", "lib/services/initial-calendar-execution.ts", "lib/services/initial-gmail-execution.ts", "lib/services/execution-timeline.ts", "app/components/execution-timeline.tsx"],
+    testPaths: ["tests/unit/initial-execution.test.ts", "tests/unit/initial-artifact-execution.test.ts", "tests/unit/initial-calendar-execution.test.ts", "tests/unit/initial-gmail-execution.test.ts", "tests/unit/execution-timeline.test.ts", "tests/unit/initial-workflow.test.ts"], fixtureIds: ["initial-plan.v1", "traceability.v1"],
+    evidencePaths: ["artifacts/test-runs/2026-07-16-s052-action-ledger.md", "artifacts/test-runs/2026-07-16-s053-artifact-execution.md", "artifacts/test-runs/2026-07-16-s054-calendar-execution.md", "artifacts/test-runs/2026-07-16-s055-gmail-execution.md", "artifacts/test-runs/2026-07-16-s056-execution-timeline.md", "artifacts/test-runs/2026-07-16-s057-initial-workflow.md"], status: "partial",
+    note: "S052-S055 implement idempotent preparation, leases, dependency-aware retry/stop rules, and replay-safe action executors; S056 exposes retryable/succeeded/stopping states; S057 verifies duplicate-click/process-death/resume behavior, while live proof remains S058.",
+  }),
   planned("FR-19", "FR", "Late context only after completed execution", ["S060"], "Initial execution and late-context intake are not implemented."),
   planned("FR-20", "FR", "Explicit corrected target and provider grounding", ["S060", "S061"], "Recovery planning is not implemented."),
   current({
@@ -178,7 +204,11 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
   planned("FR-31", "FR", "Approved conditional reset", ["S080", "S081", "S082", "S083"], "Reset planning and execution are future work."),
   planned("FR-32", "FR", "Retained sent mail and audit evidence", ["S084", "S085"], "Reset UX and retention proof are future work."),
 
-  planned("SAFE-01", "SAFE", "Human approval before external effects", ["S050", "S051", "S058"], "No external-effect product path exists yet."),
+  current({
+    id: "SAFE-01", kind: "SAFE", title: "Human approval before external effects", planTasks: ["S050", "S051", "S052", "S053", "S054", "S055", "S057", "S058"],
+    codePaths: ["app/api/v1/world-prs/[worldPrId]/approvals/initial/route.ts", "lib/services/initial-approval.ts", "lib/services/initial-execution.ts", "lib/services/initial-artifact-execution.ts", "lib/services/initial-calendar-execution.ts", "lib/services/initial-gmail-execution.ts"], testPaths: ["tests/unit/initial-approval.test.ts", "tests/unit/initial-execution.test.ts", "tests/unit/initial-artifact-execution.test.ts", "tests/unit/initial-calendar-execution.test.ts", "tests/unit/initial-gmail-execution.test.ts", "tests/unit/initial-workflow.test.ts"], fixtureIds: ["initial-plan.v1", "traceability.v1"], evidencePaths: ["artifacts/test-runs/2026-07-16-s051-approval-cancel-replan.md", "artifacts/test-runs/2026-07-16-s052-action-ledger.md", "artifacts/test-runs/2026-07-16-s053-artifact-execution.md", "artifacts/test-runs/2026-07-16-s054-calendar-execution.md", "artifacts/test-runs/2026-07-16-s055-gmail-execution.md", "artifacts/test-runs/2026-07-16-s057-initial-workflow.md"], status: "partial",
+    note: "S051 binds approval to the immutable plan version/digest and rejects MCP approval; S052-S055 and S057 reject execution without that approval and preserve action/provider ordering; one controlled live proof remains S058.",
+  }),
   planned("SAFE-02", "SAFE", "Exact recovery correction/intended mail disclosure", ["S064", "S066"], "Recovery mail preview is future work."),
   current({
     id: "SAFE-03", kind: "SAFE", title: "MCP cannot approve or execute", planTasks: ["S006", "S025"],
@@ -197,13 +227,17 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     fixtureIds: ["traceability.v1"], evidencePaths: calendarSetupEvidence, status: "partial",
     note: "S032 verifies the signed configured Google subject/email and exact identity scope boundary, S034 freezes typed Calendar/Gmail boundaries, and S035 adds explicit calendar targeting, exact-two ownership/type/tag validation, and deterministic setup failure outcomes; live ownership/seed proof and recipient allowlist enforcement remain S035/S037 provider-gate work.",
   }),
-  planned("SAFE-06", "SAFE", "Calendar ETag conflict protection", ["S036", "S054", "S067"], "Calendar conditional execution is future work."),
   current({
-    id: "SAFE-07", kind: "SAFE", title: "Ambiguous Gmail delivery is not retried", planTasks: ["S034", "S037", "S055", "S069"],
-    codePaths: ["lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/gmail-live-proof.ts", "lib/google/gmail.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts", "scripts/prove-gmail.ts"],
-    testPaths: ["tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/gmail-live-proof.test.ts", "tests/unit/gmail-live-proof-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/provider-ports.test.ts"],
-    fixtureIds: ["traceability.v1"], evidencePaths: [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md"], status: "partial",
-    note: "S037 classifies permanent 4xx and every post-marker ambiguous class, persists the stopping receipt, and replays it without a second dispatch; live Gmail proof and full action-ledger lease reconciliation remain S038/S046/S055/S069.",
+    id: "SAFE-06", kind: "SAFE", title: "Calendar ETag conflict protection", planTasks: ["S036", "S054", "S057", "S067"],
+    codePaths: ["lib/adapters/calendar.ts", "lib/google/calendar.ts", "lib/services/calendar-primitives.ts", "lib/services/initial-calendar-execution.ts"], testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/initial-calendar-execution.test.ts", "tests/unit/initial-workflow.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: [...calendarExecutionEvidence, "artifacts/test-runs/2026-07-16-s057-initial-workflow.md"],
+    status: "partial", note: "S036, S054, and S057 fail closed on stale ETags and never rebase; recovery ETag protection remains S067.",
+  }),
+  current({
+    id: "SAFE-07", kind: "SAFE", title: "Ambiguous Gmail delivery is not retried", planTasks: ["S034", "S037", "S055", "S057", "S069"],
+    codePaths: ["lib/contracts/provider-ports.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/gmail-live-proof.ts", "lib/contracts/initial-gmail-execution.ts", "lib/google/gmail.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts", "lib/services/initial-gmail-execution.ts", "scripts/prove-gmail.ts"],
+    testPaths: ["tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/gmail-live-proof.test.ts", "tests/unit/gmail-live-proof-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/initial-gmail-execution.test.ts", "tests/unit/initial-workflow.test.ts"],
+    fixtureIds: ["traceability.v1", "initial-plan.v1"], evidencePaths: [...calendarPrimitiveEvidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md", "artifacts/test-runs/2026-07-16-s055-gmail-execution.md", "artifacts/test-runs/2026-07-16-s057-initial-workflow.md"], status: "partial",
+    note: "S037 classifies permanent 4xx and every post-marker ambiguous class, persists the stopping receipt, and replays it without a second dispatch; S055 and S057 apply the no-redispatch rule through the approved action ledger with leases and dependency ordering; live Gmail proof and recovery remain S038/S058/S069.",
   }),
   current({
     id: "SAFE-08", kind: "SAFE", title: "Closed strict model/action boundary", planTasks: ["S004", "S006", "S034", "S040", "S041", "S042", "S043"],
@@ -223,11 +257,15 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
 
   planned("NFR-01", "NFR", "Five consecutive live runs", ["S093", "S096"], "Live rehearsal is a final release gate."),
   current({
-    id: "NFR-02", kind: "NFR", title: "Replay cannot duplicate work", planTasks: ["S006", "S021", "S027", "S037", "S052"],
-    codePaths: ["lib/db/store.ts", "lib/db/memory-store.ts", "lib/db/postgres-store.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts"], testPaths: ["tests/unit/world-pr.test.ts", "tests/unit/g1-memory-store.test.ts", "tests/unit/postgres-store.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/gmail-live-proof.test.ts", "tests/unit/gmail-live-proof-store.test.ts"], fixtureIds: ["fixture-initial.v1", "traceability.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md"], status: "partial",
-    note: "Create replay and the S037 Gmail terminal/retryable/uncertain replay rules are covered without a second send; complete Calendar/artifact/action-ledger replay remains S052.",
+    id: "NFR-02", kind: "NFR", title: "Replay cannot duplicate work", planTasks: ["S006", "S021", "S027", "S037", "S052", "S053", "S054", "S055", "S056", "S057"],
+    codePaths: ["lib/db/store.ts", "lib/db/memory-store.ts", "lib/db/postgres-store.ts", "lib/db/execution-store.ts", "lib/db/gmail-dispatch.ts", "lib/db/gmail-live-proof.ts", "lib/contracts/execution-persistence.ts", "lib/contracts/initial-artifact-execution.ts", "lib/contracts/initial-calendar-execution.ts", "lib/contracts/initial-gmail-execution.ts", "lib/services/gmail-delivery.ts", "lib/services/gmail-live-proof.ts", "lib/services/initial-execution.ts", "lib/services/initial-artifact-execution.ts", "lib/services/initial-calendar-execution.ts", "lib/services/initial-gmail-execution.ts", "lib/contracts/execution-shared.ts", "lib/contracts/execution-timeline.ts", "lib/services/execution-timeline.ts", "app/components/execution-timeline.tsx", "app/api/v1/world-prs/[worldPrId]/execution/route.ts"], testPaths: ["tests/unit/world-pr.test.ts", "tests/unit/g1-memory-store.test.ts", "tests/unit/postgres-store.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/gmail-live-proof.test.ts", "tests/unit/gmail-live-proof-store.test.ts", "tests/unit/execution-persistence.test.ts", "tests/unit/initial-execution.test.ts", "tests/unit/initial-artifact-execution.test.ts", "tests/unit/initial-calendar-execution.test.ts", "tests/unit/initial-gmail-execution.test.ts", "tests/unit/execution-timeline.test.ts"], fixtureIds: ["fixture-initial.v1", "initial-plan.v1", "traceability.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-16-s037-gmail-at-most-once.md", "artifacts/test-runs/2026-07-16-s053-artifact-execution.md", "artifacts/test-runs/2026-07-16-s054-calendar-execution.md", "artifacts/test-runs/2026-07-16-s055-gmail-execution.md", "artifacts/test-runs/2026-07-16-s056-execution-timeline.md"], status: "partial",
+    note: "Create replay plus the S037 Gmail terminal/retryable/uncertain rules are covered without a second send; S052–S057 add durable action-ledger replay, dependency ordering, exact artifact/Calendar/Gmail execution receipts, lease/busy protection, and deterministic duplicate-click/process-death proof; recovery replay remains future work.",
   }),
-  planned("NFR-03", "NFR", "Stale Calendar changes never overwrite", ["S036", "S054", "S067"], "Provider stale-state proof is future work."),
+  current({
+    id: "NFR-03", kind: "NFR", title: "Stale Calendar changes never overwrite", planTasks: ["S036", "S054", "S057", "S067"],
+    codePaths: ["lib/services/calendar-primitives.ts", "lib/services/initial-calendar-execution.ts", "lib/adapters/calendar.ts", "lib/google/calendar.ts"], testPaths: ["tests/unit/calendar-primitives.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/initial-calendar-execution.test.ts", "tests/unit/initial-workflow.test.ts"], fixtureIds: ["traceability.v1"], evidencePaths: [...calendarExecutionEvidence, "artifacts/test-runs/2026-07-16-s057-initial-workflow.md"],
+    status: "partial", note: "S036, S054, and S057 prove stale preflight/conditional-write refusal with zero approved action writes; recovery remains S067.",
+  }),
   current({
     id: "NFR-04", kind: "NFR", title: "Unknown inputs never reach adapters", planTasks: ["S004", "S006", "S023", "S034", "S035", "S037", "S039", "S040", "S041", "S042", "S043"],
     codePaths: ["lib/contracts/v1.ts", "lib/contracts/initial-plan-server.ts", "lib/contracts/provider-ports.ts", "lib/contracts/provider-spike.ts", "lib/contracts/gmail-delivery.ts", "lib/contracts/calendar-demo.ts", "lib/services/world-pr.ts", "lib/services/calendar-demo.ts", "lib/services/gmail-delivery.ts", "lib/services/account-brief.ts", "lib/services/provider-spike.ts", "lib/ai/openai-responses.ts", "lib/ai/openai-model.ts", "lib/ai/ollama-chat.ts", "lib/ai/ollama-model.ts", "lib/ai/model-schemas.ts", "lib/ai/model-safety.ts", "lib/db/memory-store.ts", "lib/db/demo-event-state.ts", "lib/db/gmail-dispatch.ts", "lib/adapters/calendar.ts", "lib/google/calendar.ts", "lib/adapters/gmail.ts", "lib/google/gmail.ts", "lib/adapters/artifact.ts", "lib/ai/model.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/g1-contracts.test.ts", "tests/unit/provider-ports.test.ts", "tests/unit/calendar-demo.test.ts", "tests/unit/google-calendar.test.ts", "tests/unit/gmail-delivery.test.ts", "tests/unit/gmail-dispatch-store.test.ts", "tests/unit/google-gmail.test.ts", "tests/unit/world-pr.test.ts", "tests/unit/account-brief.test.ts", "tests/unit/openai-responses.test.ts", "tests/unit/openai-model.test.ts", "tests/unit/ollama-chat.test.ts", "tests/unit/ollama-model.test.ts", "tests/unit/model-schemas.test.ts", "tests/unit/model-safety.test.ts", "tests/unit/provider-spike.test.ts", "tests/unit/g1-memory-store.test.ts"], fixtureIds: [...initialFixtures, "model-safety.v1"], evidencePaths: modelEvidence, status: "partial",
@@ -239,9 +277,9 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     note: "S042 records representative valid/schema/semantic/injection/refusal/fallback checks with zero unsafe adapter calls; the complete 25-paraphrase and 100%-negative release gates remain S070/S071/S091.",
   }),
   current({
-    id: "NFR-06", kind: "NFR", title: "Digest/actor/action traceability", planTasks: ["S004", "S005", "S006", "S015", "S046"],
-    codePaths: ["lib/domain/digest.ts", "lib/db/migrate.ts", "lib/db/postgres-store.ts", "lib/db/store.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/migration-contract.test.ts", "tests/unit/postgres-store.test.ts", "tests/unit/g1-memory-store.test.ts"], fixtureIds: ["initial-plan.v1", "traceability.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-15-s015-traceability.md"], status: "partial",
-    note: "Plan digest, idempotency actor/endpoint keys, transactional persistence, and this executable catalog are covered; approval/action receipts are future work.",
+    id: "NFR-06", kind: "NFR", title: "Digest/actor/action traceability", planTasks: ["S004", "S005", "S006", "S015", "S046", "S052", "S053", "S054", "S055", "S056", "S057"],
+    codePaths: ["lib/domain/digest.ts", "lib/db/migrate.ts", "lib/db/postgres-store.ts", "lib/db/store.ts", "lib/contracts/execution-persistence.ts", "lib/contracts/execution-shared.ts", "lib/contracts/execution-timeline.ts", "lib/services/execution-timeline.ts", "app/components/execution-timeline.tsx", "app/api/v1/world-prs/[worldPrId]/execution/route.ts"], testPaths: ["tests/unit/contracts-v1.test.ts", "tests/unit/migration-contract.test.ts", "tests/unit/postgres-store.test.ts", "tests/unit/g1-memory-store.test.ts", "tests/unit/execution-persistence.test.ts", "tests/unit/execution-timeline.test.ts", "tests/unit/initial-workflow.test.ts"], fixtureIds: ["initial-plan.v1", "traceability.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-15-s015-traceability.md", "artifacts/test-runs/2026-07-16-s052-action-ledger.md", "artifacts/test-runs/2026-07-16-s053-artifact-execution.md", "artifacts/test-runs/2026-07-16-s054-calendar-execution.md", "artifacts/test-runs/2026-07-16-s055-gmail-execution.md", "artifacts/test-runs/2026-07-16-s056-execution-timeline.md", "artifacts/test-runs/2026-07-16-s057-initial-workflow.md"], status: "partial",
+    note: "Plan digest, actor/idempotency keys, transactional action persistence, exact provider receipts, dashboard timeline timestamps/plan binding, and the deterministic complete initial-workflow trace are covered; recovery evidence is future work.",
   }),
   current({
     id: "NFR-07", kind: "NFR", title: "Five-second recovery comprehension", planTasks: ["S065", "S072", "S090"],
@@ -249,9 +287,9 @@ export const REQUIREMENT_TRACEABILITY: readonly RequirementTrace[] = [
     note: "The current composer/review states expose the important assumption, exact actions, dependencies, status labels, and safe failure states; the recovery screen and timed recovery review are not implemented.",
   }),
   current({
-    id: "NFR-08", kind: "NFR", title: "Accessible reduced-motion demo", planTasks: ["S014", "S017", "S090"],
-    codePaths: ["app/globals.css", "app/page.tsx", "app/login/page.tsx", "app/pr/[worldPrId]/page.tsx", "docs/CONTROLLED_CONTENT_UI_INVENTORY.md"], testPaths: ["tests/unit/accessibility-contract.test.ts", "scripts/test-e2e.ts"], fixtureIds: ["controlled-content.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-15-s014-content-ui.md", "artifacts/test-runs/2026-07-15-s017-accessibility.md"], status: "partial",
-    note: "Stable selectors, semantic labels, focus, reduced-motion, responsive behavior, loading/empty/error/clarification/cancelled states, and honest fixture labeling cover the current screens; future surfaces remain planned.",
+    id: "NFR-08", kind: "NFR", title: "Accessible reduced-motion demo", planTasks: ["S014", "S017", "S056", "S090"],
+    codePaths: ["app/globals.css", "app/page.tsx", "app/login/page.tsx", "app/pr/[worldPrId]/page.tsx", "app/components/execution-timeline.tsx", "app/api/v1/world-prs/[worldPrId]/execution/route.ts", "docs/CONTROLLED_CONTENT_UI_INVENTORY.md"], testPaths: ["tests/unit/accessibility-contract.test.ts", "tests/unit/execution-timeline.test.ts", "scripts/test-e2e.ts"], fixtureIds: ["controlled-content.v1", "traceability.v1"], evidencePaths: [...g1Evidence, "artifacts/test-runs/2026-07-15-s014-content-ui.md", "artifacts/test-runs/2026-07-15-s017-accessibility.md", "artifacts/test-runs/2026-07-16-s056-execution-timeline.md"], status: "partial",
+    note: "Stable selectors, semantic labels, focus, reduced-motion, responsive behavior, loading/empty/error/clarification/cancelled states, honest fixture labeling, and the execution timeline's labeled status/receipt surface cover the current screens; recovery surfaces remain planned.",
   }),
   planned("NFR-09", "NFR", "Reset returns baselines and retains mail", ["S080", "S082", "S085", "S093"], "Reset is future work."),
   current({

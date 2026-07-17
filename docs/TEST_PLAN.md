@@ -192,7 +192,35 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 
 `tests/unit/g2-closure.test.ts` validates the strict `g2-closure.v1` report, binds the selected `local_ollama` runtime to `ollama`/`local_model`, checks all six fixed evidence-risk categories, rejects matched secrets without returning their values, and proves that `assertG3Admission` throws for a blocked report. `npm run verify:g2-closure` reads only the committed S032–S044 sanitized evidence manifest and returns one safe JSON report. It performs no provider, database, OAuth, Calendar, Gmail, model, or product operation. G3 may begin only when the command returns `status: passed`, `g3Admission: unlocked`, and an empty blocker list.
 
-### 4.11 Integration tests with deterministic adapters
+### 4.11 S051 initial approval/cancel/replan
+
+`tests/unit/initial-approval.test.ts` covers exact actor/time/version/digest approval persistence, three planned rows before dispatch, duplicate approval replay, stale pointer rejection, different-actor and MCP refusal, approved-plan cancellation lock preservation, immutable unapproved preview supersession, replacement digest/tamper rejection, and the dashboard-only route boundary. `tests/unit/execution-persistence.test.ts` additionally proves that the execution-plan schema rejects a payload/digest mismatch. All S051 tests use the deterministic memory fixture and ledger; no provider, database, model, or external effect is claimed.
+
+### 4.12 S052 durable action ledger
+
+`tests/unit/initial-execution.test.ts` covers idempotent preparation of exactly three rows, fixed action order, stable row identity, active lease/busy behavior, succeeded skip, retryable-only claims, dependency blocking, expired Gmail uncertainty, expired Calendar reconciliation stops, terminal conflict blocking, and approval/digest authorization. Existing execution-persistence tests retain the lower-level duplicate-claim and lease contract. No provider or external effect is claimed.
+
+### 4.13 S053 exact approved artifact execution
+
+`tests/unit/initial-artifact-execution.test.ts` covers exact planned-byte handoff, durable before-state ordering, typed receipt/after-state persistence, succeeded replay without a second write, retryable artifact unavailability, permanent validation rejection, receipt-hash mismatch conflict, before-state persistence failure with zero artifact calls, and task-scoped immutable PostgreSQL artifact replay. No live database/provider or external effect is claimed.
+
+### 4.14 S054 exact approved Calendar execution
+
+`tests/unit/initial-calendar-execution.test.ts` covers exact plan/approval binding, artifact dependency ordering, complete before-state persistence before the provider call, start/end-only conditional input with `sendUpdates: "none"`, new-ETag verification, succeeded replay without a second update, stale ETag, allowlist drift, pre-write unavailability/retry, ambiguous update conflict, before-state persistence failure, and post-write verification failure. The tests use deterministic candidate resolution/plan expansion and `FakeCalendarPort`; no live database/provider or external effect is claimed.
+
+### 4.15 S055 exact approved Gmail execution
+
+`tests/unit/initial-gmail-execution.test.ts` covers exact approved message reconstruction, approval and artifact/Calendar dependency ordering, local preparation before dispatch claim, marker/before-state ordering before send, sent receipt persistence, explicit permanent rejection, all uncertainty/transport failure handling, local retry without a marker, allowlist/sender drift conflict, duplicate-click busy behavior, before-state persistence failure with zero sends, terminal replay, and MCP refusal. Existing Gmail delivery/Google wire tests retain the lower-level MIME, provider-status, and standalone at-most-once proof; no live database/provider or external effect is claimed.
+
+### 4.16 S056 execution/timeline UX
+
+`tests/unit/execution-timeline.test.ts` covers the dashboard read boundary for awaiting approval, fixed action order, planned/in-progress timestamps, typed artifact and Calendar receipts, partial conflict, delivery uncertainty, completed-only-after-all-receipts, cancellation, and dashboard-only access. `tests/unit/accessibility-contract.test.ts` freezes the execution selector, and `scripts/test-e2e.ts` checks the unapproved review renders “Awaiting approval” and never claims an action ledger success. The browser view renders only safe action metadata, typed receipts, redacted errors, and explicit loading/error/empty/partial/attention/cancelled states; no live database/provider or external effect is claimed.
+
+### 4.17 S057 initial-workflow verification
+
+`tests/unit/initial-workflow.test.ts` composes deterministic candidate resolution, bounded reasoning, exact plan expansion, immutable approval, action-row preparation, `FakeArtifactPort`, `FakeCalendarPort`, and a recording Gmail port. It covers one exact artifact → Calendar → Gmail run, byte/provenance equality, fixed order, approval/digest/MCP refusal, retry/resume, duplicate-click busy leases, Gmail uncertainty after an expired dispatch lease, Calendar reconciliation after process death, stale ETag, allowlist drift, and replay with one provider effect per action. Together with the S052–S056 executor/timeline suites, this is the complete no-effect initial-workflow proof; no live database/provider or external effect is claimed.
+
+### 4.18 Integration tests with deterministic adapters
 
 - Dashboard and MCP entry call the same `createWorldPr` service.
 - Route auth, CSRF, validation, and error mapping.
@@ -201,7 +229,7 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 - Recovery preflight before first side effect and fixed execution order.
 - Resume skips succeeded actions and blocks conflict/uncertain actions.
 - Model client: success, refusal, truncation, invalid JSON/schema, semantic error, one retry, final failure.
-- Calendar adapter: move, verify, restore, ETag mismatch, attendee drift, wrong calendar/type.
+- Calendar adapter: move, verify, restore, ETag mismatch, attendee drift, wrong calendar/type, and approved action-ledger execution.
 - Gmail adapter: success, local pre-handoff failure, explicit 4xx rejection, every post-handoff uncertainty class, allowlist failure.
 - Reset: approved digest, two-event preflight, success, zero-write conflict, second-write race/partial result, rolling ETags, in-progress rejection, archive/rule/artifact/lock semantics.
 
