@@ -11,7 +11,7 @@ import { buildControlledCalendarSeeds } from "@/lib/domain/calendar-demo";
 import { assertAccountBriefIndependent } from "@/lib/domain/account-brief";
 import { sha256Text } from "@/lib/domain/digest";
 import { FakeModelPort } from "@/lib/ai/model";
-import { ACCOUNT_BRIEF_TITLE } from "@/lib/domain/account-brief";
+import { ACCOUNT_BRIEF_CONTENT_FIXTURE, ACCOUNT_BRIEF_TITLE } from "@/lib/domain/account-brief";
 import { resolveControlledCandidates } from "@/lib/services/candidate-resolution";
 import { reasonInitialRequest } from "@/lib/services/initial-reasoning";
 import { expandInitialPlan } from "@/lib/services/initial-plan-expansion";
@@ -51,7 +51,7 @@ const proposal = {
     { actionKey: "initial.calendar.move" as const, assumptionIds: ["assumption_acme_region" as const] },
     { actionKey: "initial.mail.notify" as const, assumptionIds: ["assumption_acme_region" as const] },
   ],
-  accountBrief: { title: ACCOUNT_BRIEF_TITLE, content: "Parent-account risks only.", sourceId: "acme_parent_account_notes" as const },
+  accountBrief: { title: ACCOUNT_BRIEF_TITLE, content: ACCOUNT_BRIEF_CONTENT_FIXTURE, sourceId: "acme_parent_account_notes" as const },
 };
 
 type WorkflowSetup = Readonly<{

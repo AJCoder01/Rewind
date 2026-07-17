@@ -51,6 +51,16 @@ const identifierSchema = (label: string, maximumLength = 512) =>
     .max(maximumLength, `${label} is too long`)
     .refine((value) => value === value.trim() && !/\s/.test(value), `${label} must not contain whitespace`);
 
+const modelRuntimeSchema = z.enum(["openai_responses", "local_ollama"] as const);
+const modelIdentifierSchema = (label: string) => identifierSchema(label, 200).refine(
+  (value) => /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value),
+  `${label} contains unsupported characters`,
+);
+const localModelIdentifierSchema = modelIdentifierSchema("REWIND_LOCAL_MODEL").refine(
+  (value) => !value.toLowerCase().endsWith(":cloud"),
+  "REWIND_LOCAL_MODEL must be a local model",
+);
+
 const recipientAllowlistSchema = z
   .object({
     UK: z.array(emailSchema).length(1, "UK must contain exactly one recipient"),
@@ -74,11 +84,13 @@ const rawApplicationEnvironmentSchema = z
     REWIND_SESSION_SECRET: privateSecretSchema(32, "REWIND_SESSION_SECRET"),
     REWIND_DASHBOARD_PASSCODE: privateSecretSchema(12, "REWIND_DASHBOARD_PASSCODE"),
     MCP_BACKEND_TOKEN: privateSecretSchema(32, "MCP_BACKEND_TOKEN"),
-    OPENAI_API_KEY: privateSecretSchema(20, "OPENAI_API_KEY"),
-    OPENAI_MODEL: identifierSchema("OPENAI_MODEL", 128).refine(
-      (value) => /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value),
-      "OPENAI_MODEL contains unsupported characters",
-    ),
+    OPENAI_API_KEY: privateSecretSchema(20, "OPENAI_API_KEY").optional(),
+    OPENAI_MODEL: modelIdentifierSchema("OPENAI_MODEL").optional(),
+    REWIND_MODEL_RUNTIME: modelRuntimeSchema.optional(),
+    // Retained as a backwards-compatible fallback for the already-recorded
+    // S043 local proof. New product configuration should use the unscoped key.
+    REWIND_S043_MODEL_RUNTIME: modelRuntimeSchema.optional(),
+    REWIND_LOCAL_MODEL: localModelIdentifierSchema.optional(),
     GOOGLE_CLIENT_ID: z
       .string({ required_error: "GOOGLE_CLIENT_ID is required" })
       .regex(/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/, "GOOGLE_CLIENT_ID is not a web client ID"),
@@ -123,8 +135,11 @@ export type ApplicationEnvironment = Readonly<{
   REWIND_SESSION_SECRET: string;
   REWIND_DASHBOARD_PASSCODE: string;
   MCP_BACKEND_TOKEN: string;
-  OPENAI_API_KEY: string;
-  OPENAI_MODEL: string;
+  OPENAI_API_KEY?: string;
+  OPENAI_MODEL?: string;
+  REWIND_MODEL_RUNTIME?: "openai_responses" | "local_ollama";
+  REWIND_S043_MODEL_RUNTIME?: "openai_responses" | "local_ollama";
+  REWIND_LOCAL_MODEL?: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   GOOGLE_REDIRECT_URI: string;
@@ -241,6 +256,9 @@ const applicationKeys = [
   "MCP_BACKEND_TOKEN",
   "OPENAI_API_KEY",
   "OPENAI_MODEL",
+  "REWIND_MODEL_RUNTIME",
+  "REWIND_S043_MODEL_RUNTIME",
+  "REWIND_LOCAL_MODEL",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "GOOGLE_REDIRECT_URI",
@@ -266,6 +284,21 @@ export function parseApplicationEnvironment(environment: Environment): Applicati
 
   if (value.REWIND_STORAGE_MODE === "postgres" && !value.DATABASE_URL) {
     issues.push(issue("DATABASE_URL", "required_for_postgres"));
+  }
+  if (
+    value.REWIND_MODEL_RUNTIME &&
+    value.REWIND_S043_MODEL_RUNTIME &&
+    value.REWIND_MODEL_RUNTIME !== value.REWIND_S043_MODEL_RUNTIME
+  ) {
+    issues.push(issue("REWIND_MODEL_RUNTIME", "conflicts_with_s043_runtime"));
+  }
+  const modelRuntime = value.REWIND_MODEL_RUNTIME ?? value.REWIND_S043_MODEL_RUNTIME ?? "openai_responses";
+  if (value.REWIND_STORAGE_MODE === "postgres" && modelRuntime === "openai_responses") {
+    if (!value.OPENAI_API_KEY) issues.push(issue("OPENAI_API_KEY", "required_for_openai_runtime"));
+    if (!value.OPENAI_MODEL) issues.push(issue("OPENAI_MODEL", "required_for_openai_runtime"));
+  }
+  if (value.REWIND_STORAGE_MODE === "postgres" && modelRuntime === "local_ollama" && !value.REWIND_LOCAL_MODEL) {
+    issues.push(issue("REWIND_LOCAL_MODEL", "required_for_local_runtime"));
   }
   if (mode === "production" && value.REWIND_STORAGE_MODE !== "postgres") {
     issues.push(issue("REWIND_STORAGE_MODE", "fixture_storage_forbidden_in_production"));
@@ -326,8 +359,11 @@ export function parseApplicationEnvironment(environment: Environment): Applicati
     REWIND_SESSION_SECRET: value.REWIND_SESSION_SECRET,
     REWIND_DASHBOARD_PASSCODE: value.REWIND_DASHBOARD_PASSCODE,
     MCP_BACKEND_TOKEN: value.MCP_BACKEND_TOKEN,
-    OPENAI_API_KEY: value.OPENAI_API_KEY,
-    OPENAI_MODEL: value.OPENAI_MODEL,
+    ...(value.OPENAI_API_KEY ? { OPENAI_API_KEY: value.OPENAI_API_KEY } : {}),
+    ...(value.OPENAI_MODEL ? { OPENAI_MODEL: value.OPENAI_MODEL } : {}),
+    ...(value.REWIND_MODEL_RUNTIME ? { REWIND_MODEL_RUNTIME: value.REWIND_MODEL_RUNTIME } : {}),
+    ...(value.REWIND_S043_MODEL_RUNTIME ? { REWIND_S043_MODEL_RUNTIME: value.REWIND_S043_MODEL_RUNTIME } : {}),
+    ...(value.REWIND_LOCAL_MODEL ? { REWIND_LOCAL_MODEL: value.REWIND_LOCAL_MODEL } : {}),
     GOOGLE_CLIENT_ID: value.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: value.GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI: value.GOOGLE_REDIRECT_URI,

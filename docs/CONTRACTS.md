@@ -129,16 +129,16 @@ interface TaskMutationResponse {
 
 Readiness failure returns the canonical error envelope with HTTP `503`, `code: "provider_unavailable"`, `retryable: true`, and the generic message `Rewind is not ready.` Neither endpoint exposes connection strings, roles, provider diagnostics, SQL, or stack traces. Both endpoints set `Cache-Control: no-store`.
 
-`GET /api/v1/connection/status` is an authenticated dashboard-only, read-only projection of connection prerequisites. It accepts neither MCP bearer authentication nor a browser mutation. It may inspect validated private configuration, restricted database readiness, and the stored OAuth credential metadata; it never refreshes a token, calls Calendar/Gmail/model providers, changes state, or runs the human-gated Calendar preflight. The exact response is the strict `connection-preflight.v1` contract in `lib/contracts/connection-preflight.ts`:
+`GET /api/v1/connection/status` is an authenticated dashboard-only, read-only projection of connection prerequisites. It accepts neither MCP bearer authentication nor a browser mutation. It may inspect validated private configuration, restricted database readiness, and the stored OAuth credential metadata; it never refreshes a token, calls Calendar/Gmail/model providers, changes state, or runs the human-gated Calendar preflight. The exact response is the strict `connection-preflight.v2` contract in `lib/contracts/connection-preflight.ts`:
 
 ```json
 {
-  "contractVersion": "connection-preflight.v1",
+  "contractVersion": "connection-preflight.v2",
   "overall": "attention | blocked",
   "runtime": {
     "mode": "fixture | live_capable | blocked",
     "modelRuntime": "openai_responses | local_ollama | not_configured",
-    "productExecution": "disabled",
+    "productExecution": "enabled | disabled",
     "productReset": "disabled"
   },
   "configuration": { "status": "complete | incomplete", "issues": [{ "field": "...", "code": "..." }] },
@@ -150,12 +150,12 @@ Readiness failure returns the canonical error envelope with HTTP `503`, `code: "
     "status": "blocked | not_run",
     "checks": [{ "id": "configuration | database | google_identity | calendar", "status": "passed | failed | not_run", "detail": "..." }]
   },
-  "workflow": { "status": "disabled", "message": "..." },
+  "workflow": { "status": "ready | disabled", "message": "..." },
   "requestId": "req_..."
 }
 ```
 
-Configuration issues contain only safe field names and validation codes. A connected email is returned only when the stored Google subject and normalized email match the configured account; mismatches never return the stored email. Fixture mode, pending preflight, and disabled execution/reset are always visible and cannot be represented as a passed product workflow. Unauthorized requests return the standard `401` error envelope; unexpected status failures return a sanitized `503` and `Cache-Control: no-store`.
+Configuration issues contain only safe field names and validation codes. A connected email is returned only when the stored Google subject and normalized email match the configured account; mismatches never return the stored email. `productExecution` is enabled only for complete PostgreSQL configuration, a ready database, the exact connected identity/scopes, configured controlled Calendar/date, and a strict selected model runtime. Local Ollama mode requires `REWIND_MODEL_RUNTIME=local_ollama` and a non-cloud `REWIND_LOCAL_MODEL`; it does not require OpenAI credentials. Fixture mode and disabled reset are always visible and cannot be represented as a passed product workflow. Unauthorized requests return the standard `401` error envelope; unexpected status failures return a sanitized `503` and `Cache-Control: no-store`.
 
 ### 3.2 Create World PR
 
@@ -336,41 +336,44 @@ Request:
 
 The approval mutation is dashboard-only and runs its durable approval write and action-ledger preparation synchronously. MCP may create and read safe status, but may never approve or replan. The endpoint records the exact actor/time/plan-version/digest, materializes exactly three immutable `planned` action rows before any dispatch, and calls no provider. S053–S055 extend this same approved-plan boundary with exact artifact, Calendar, and Gmail execution. It does not return `202` and continue an unobserved background task.
 
-Success `200` at S052:
+Success `200`:
 
 ```json
 {
   "worldPrId": "wpr_01...",
-  "status": "preview_ready",
+  "status": "executing",
   "activePlan": { "planId": "plan_01...", "kind": "initial", "version": 1, "digest": "sha256:..." },
   "requestId": "req_01..."
 }
 ```
 
-The handler verifies session, CSRF, task state, the exact current plan ID/version/digest, and absence of an existing different approval. An identical approval replays without a second approval or timeline entry; another actor or any changed pointer/content fails closed. The approved plan cannot be cancelled or replanned, and the scenario lock is not released. Provider/recipient/template/version drift is rejected by the execution preflight before any action row claim or provider dispatch.
+The handler verifies session, CSRF, task state, the exact current plan ID/version/digest, and absence of an existing different approval. An identical approval replays without a second approval or timeline entry; another actor or any changed pointer/content fails closed. The approved task enters `executing` as an approved-ready state, but no provider or artifact call occurs until the separate execution mutation. The approved plan cannot be cancelled or manually replanned, and the scenario lock is not released. Provider/recipient/template/version drift is rejected by the execution preflight before any action row claim or provider dispatch.
 
-If provider state differs before any action row starts, return `409 plan_stale`, mark the plan superseded, execute nothing, and direct the user to section 3.11.1. Never mutate an approved plan in place.
+If provider state differs before any action starts, execution may build and persist the next provider-grounded immutable plan version, mark all old pristine actions `conflict/plan_stale`, return `preview_ready`, and require a new approval. If any action has started, drift returns a provider conflict and requires reconciliation. Never mutate an approved plan in place.
 
 ### 3.5.1 Supersede an unapproved initial preview
 
 `POST /api/v1/world-prs/:worldPrId/plans/initial/refresh`
 
-The request body is the same strict `{ planId, planVersion, planDigest }` pointer. It is dashboard-only, requires `Idempotency-Key`, and is allowed only for the current `preview_ready` plan before approval or durable action state. The S051 fixture-safe boundary persists a server-owned successor with a new plan ID, version, digest, and pointer while retaining the old payload unchanged; a later provider-backed implementation must supply a freshly resolved successor before claiming provider drift is repaired. The HTTP caller cannot supply provider IDs, recipients, content, dependencies, or action payloads. A stale pointer, approved plan, or existing action row returns `409` and no plan is mutated.
+The request body is the same strict `{ planId, planVersion, planDigest }` pointer. It is dashboard-only, requires `Idempotency-Key`, and is allowed only for the current `preview_ready` plan before approval or durable action state. The provider-backed implementation refetches controlled candidates and reruns strict model reasoning before persisting a server-owned successor with a new plan ID, version, digest, and pointer while retaining the old payload unchanged. Fixture mode fails closed instead of substituting a deterministic plan. The HTTP caller cannot supply provider IDs, recipients, content, dependencies, or action payloads. A stale pointer, approved plan, or existing action row returns `409` without a provider call or plan mutation.
 
-### 3.6 Resume known-safe work
+### 3.6 Execute or resume the approved initial plan
 
-`POST /api/v1/world-prs/:worldPrId/resume`
+`POST /api/v1/world-prs/:worldPrId/execution`
 
 Request:
 
 ```json
 {
   "planId": "plan_01...",
+  "planVersion": 1,
   "planDigest": "sha256:..."
 }
 ```
 
-Resume never approves a plan and never retries `delivery_uncertain`, `conflict`, or `permanently_failed` actions. It only continues an already approved plan's `planned` or explicitly `retryable_failed` actions.
+This dashboard-only same-origin mutation requires `Idempotency-Key` and the exact active approved plan pointer. It validates actor/version/digest approval, verifies the complete three-row ledger, loads the exact connected Google runtime, and performs whole-plan Calendar and Gmail preflight before the first artifact write. It then executes synchronously in artifact → Calendar → Gmail order and returns only after the durable task state is `completed` or `attention_required`; it never starts fire-and-forget work.
+
+Requests are serialized per World PR in the application process, and action-level attempt/lease fences remain the durable provider-effect guard. Identical replay and a second request after completion return the durable completed state without loading provider runtime or dispatching another action. Resume never approves a plan and never retries `delivery_uncertain`, `conflict`, or `permanently_failed` actions. It only continues an already approved plan's `planned` or explicitly pre-handoff `retryable_failed` actions.
 
 Success and attention responses use `TaskMutationResponse`. Relevant errors: `invalid_task_state`, `plan_digest_mismatch`, `action_not_retryable`, `provider_conflict`.
 
@@ -575,7 +578,8 @@ The complete G1 v1 error-code-to-HTTP mapping, implemented route inventory, froz
 | Endpoint | Success state | Principal typed errors |
 |---|---|---|
 | Create | `201 preview_ready` or `clarification_required`; replay `200` | `unsupported_request`, `idempotency_conflict`, `scenario_busy`, `candidate_set_invalid` |
-| Initial approval | `200 preview_ready` with three planned action rows | `plan_digest_mismatch`, `plan_stale`, `invalid_task_state`, `provider_conflict` |
+| Initial approval | `200 executing` with three planned action rows and no effect | `plan_digest_mismatch`, `plan_stale`, `invalid_task_state`, `provider_conflict` |
+| Initial execute/resume | `200 completed`, `attention_required`, or fresh `preview_ready` after pristine drift | `approval_required`, `plan_digest_mismatch`, `plan_stale`, `provider_conflict`, `invalid_task_state` |
 | Resume | current completed/recovered/attention state | `action_not_retryable`, `plan_digest_mismatch`, `invalid_task_state` |
 | Submit context | `200 recovery_ready` | `clarification_required`, `provider_conflict`, `model_output_invalid`, `invalid_task_state` |
 | Recovery approval | `200 recovered` or durable attention | `plan_digest_mismatch`, `plan_stale`, `provider_conflict`, `invalid_task_state` |
@@ -1220,7 +1224,7 @@ interface OllamaModelMetadata {
 }
 ```
 
-`OPENAI_MODEL` supplies the optional OpenAI model. Explicit local S043 mode uses `REWIND_LOCAL_MODEL`, defaulting to `qwen2.5-coder:latest`, through the fixed loopback Ollama endpoint. Store the actual returned model metadata and label local evidence `local_model`; it is a real local inference, not external OpenAI evidence. `FixtureModelMetadata` remains limited to deterministic tests and the visibly non-effecting deployed G1 contract proof. It cannot authorize or support an external effect. A fallback source remains forbidden during the recorded demo.
+`REWIND_MODEL_RUNTIME` selects the product model runtime. `openai_responses` requires both `OPENAI_API_KEY` and `OPENAI_MODEL`. `local_ollama` requires `REWIND_LOCAL_MODEL`, uses the fixed loopback endpoint, rejects `:cloud` aliases, and requires no OpenAI credentials. `REWIND_S043_MODEL_RUNTIME` remains a backwards-compatible fallback for the recorded spike, but conflicting selectors fail configuration. Store the actual returned model metadata and label local evidence `local_model`; it is real local inference, not external OpenAI evidence. `FixtureModelMetadata` remains limited to deterministic tests and the visibly non-effecting fixture contract proof. It cannot authorize or support an external effect. A fallback source remains forbidden during the recorded demo.
 
 ## 13. Plan hashing and idempotency
 

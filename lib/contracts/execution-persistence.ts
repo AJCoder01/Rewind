@@ -1,9 +1,16 @@
 import { z } from "zod";
 import {
+  CalendarExecutionReceiptSchema,
   ExecutionActionTypeSchema,
   ExecutionReceiptSchema,
   RedactedActionErrorSchema,
 } from "@/lib/contracts/execution-shared";
+import {
+  ArtifactReceiptSchema,
+  GmailPermanentFailureReceiptSchema,
+  GmailSentReceiptSchema,
+  GmailUncertainReceiptSchema,
+} from "@/lib/contracts/provider-ports";
 import { ActionStatusSchema, OpaqueIdSchema, Rfc3339Schema, Sha256DigestSchema, VersionSchema } from "@/lib/contracts/v1";
 import { sha256Digest } from "@/lib/domain/digest";
 
@@ -71,33 +78,94 @@ export const ActionExecutionRecordSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    const terminal = new Set(["succeeded", "retryable_failed", "delivery_uncertain", "conflict", "permanently_failed"]);
+    const terminal = value.status === "succeeded" || value.status === "retryable_failed" || value.status === "delivery_uncertain" || value.status === "conflict" || value.status === "permanently_failed";
+    const mail = value.type === "mail.notify" || value.type === "mail.correct";
+    const addIssue = (path: (string | number)[], message: string) => {
+      context.addIssue({ code: z.ZodIssueCode.custom, path, message });
+    };
     if (value.status === "planned") {
-      if (value.attempts !== 0 || value.startedAt !== null || value.finishedAt !== null || value.leaseUntil !== null || value.receipt || value.error) {
-        context.addIssue({ code: z.ZodIssueCode.custom, path: ["status"], message: "Planned actions cannot have execution state" });
+      if (
+        value.attempts !== 0 ||
+        value.startedAt !== null ||
+        value.finishedAt !== null ||
+        value.leaseUntil !== null ||
+        value.beforeState ||
+        value.afterState ||
+        value.receipt ||
+        value.error
+      ) {
+        addIssue(["status"], "Planned actions cannot have execution state");
       }
     }
-    if (value.status === "in_progress" && (!value.startedAt || !value.leaseUntil || value.finishedAt !== null || value.receipt || value.error)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["status"], message: "In-progress actions require an active lease and no terminal outcome" });
+    if (
+      value.status === "in_progress" &&
+      (value.attempts < 1 || !value.startedAt || !value.leaseUntil || value.finishedAt !== null || value.receipt || value.error)
+    ) {
+      addIssue(["status"], "In-progress actions require an attempted active lease and no terminal outcome");
     }
-    if (terminal.has(value.status) && value.finishedAt === null) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["finishedAt"], message: "Terminal actions require a completion timestamp" });
+    if (terminal && (value.finishedAt === null || value.leaseUntil !== null)) {
+      addIssue(["finishedAt"], "Terminal actions require a completion timestamp and no active lease");
     }
     if (value.status === "succeeded" && !value.receipt) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["receipt"], message: "Succeeded actions require a typed receipt" });
+      addIssue(["receipt"], "Succeeded actions require a typed receipt");
+    }
+    if (value.status === "succeeded" && value.error) {
+      addIssue(["error"], "Succeeded actions cannot carry an error");
     }
     if (value.status === "retryable_failed" && (!value.error || !value.error.retryable)) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["error"], message: "Retryable actions require a retryable redacted error" });
+      addIssue(["error"], "Retryable actions require a retryable redacted error");
     }
-    if ((value.status === "delivery_uncertain" || value.status === "conflict" || value.status === "permanently_failed") && !value.error) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["error"], message: "Stopped actions require a redacted error" });
+    if (
+      (value.status === "delivery_uncertain" || value.status === "conflict" || value.status === "permanently_failed") &&
+      (!value.error || value.error.retryable)
+    ) {
+      addIssue(["error"], "Stopped actions require a non-retryable redacted error");
     }
-    if (value.type === "mail.notify" || value.type === "mail.correct") {
-      if (value.status === "in_progress" || value.status === "succeeded" || value.status === "delivery_uncertain" || value.status === "permanently_failed") {
-        if (!value.dispatchStartedAt) context.addIssue({ code: z.ZodIssueCode.custom, path: ["dispatchStartedAt"], message: "Gmail handoff requires a persisted dispatch marker" });
+
+    if (mail) {
+      const postHandoff = value.status === "in_progress" || value.status === "succeeded" || value.status === "delivery_uncertain" || value.status === "permanently_failed";
+      if (postHandoff && !value.dispatchStartedAt) {
+        addIssue(["dispatchStartedAt"], "Gmail handoff requires a persisted dispatch marker");
       }
-      if (value.status === "retryable_failed" && value.dispatchStartedAt !== null) {
-        context.addIssue({ code: z.ZodIssueCode.custom, path: ["dispatchStartedAt"], message: "Pre-handoff Gmail failures cannot have a dispatch marker" });
+      if (postHandoff && (value.attempts < 1 || !value.startedAt)) {
+        addIssue(["attempts"], "Post-handoff Gmail states require a claimed execution attempt");
+      }
+      if (!postHandoff && value.dispatchStartedAt !== null) {
+        addIssue(["dispatchStartedAt"], "Pre-handoff Gmail states cannot have a dispatch marker");
+      }
+      if (
+        (value.status === "retryable_failed" || value.status === "conflict") &&
+        (value.attempts !== 0 || value.startedAt !== null)
+      ) {
+        addIssue(["attempts"], "Pre-handoff Gmail failures cannot claim a provider execution attempt");
+      }
+
+      const validReceipt = value.status === "succeeded"
+        ? GmailSentReceiptSchema.safeParse(value.receipt).success
+        : value.status === "delivery_uncertain"
+          ? GmailUncertainReceiptSchema.safeParse(value.receipt).success
+          : value.status === "permanently_failed"
+            ? GmailPermanentFailureReceiptSchema.safeParse(value.receipt).success
+            : value.receipt === undefined;
+      if (!validReceipt) {
+        addIssue(["receipt"], "The Gmail receipt must match the durable action status");
+      }
+    } else {
+      if (value.dispatchStartedAt !== null) {
+        addIssue(["dispatchStartedAt"], "Non-mail actions cannot have a Gmail dispatch marker");
+      }
+      if (value.status === "delivery_uncertain") {
+        addIssue(["status"], "Delivery uncertainty is a Gmail-only action state");
+      }
+
+      const validSuccessReceipt = value.type === "artifact.account_brief"
+        ? ArtifactReceiptSchema.safeParse(value.receipt).success
+        : CalendarExecutionReceiptSchema.safeParse(value.receipt).success &&
+          value.receipt !== undefined &&
+          "operation" in value.receipt &&
+          value.receipt.operation === (value.type === "calendar.move" ? "move" : "restore");
+      if (value.status === "succeeded" ? !validSuccessReceipt : value.receipt !== undefined) {
+        addIssue(["receipt"], "The non-mail receipt must match a successful immutable action type");
       }
     }
   });

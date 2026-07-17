@@ -29,8 +29,8 @@ describe("S017 accessibility and testability contract", () => {
     for (const selector of ["login-screen", "dashboard-passcode", "login-submit"]) expect(login).toContain(`data-testid=\"${selector}\"`);
     for (const selector of ["review-screen", "assumption-panel", "planned-actions", "review-timeline", "fixture-mode-notice", "clarification-panel"]) expect(review).toContain(`data-testid=\"${selector}\"`);
     expect(execution).toContain('data-testid="execution-timeline"');
-    expect(composer).toContain("G1 non-effecting mode");
-    expect(review).toContain("not live-provider evidence");
+    expect(composer).toContain("Exact dashboard approval");
+    expect(review).toContain("this deterministic review cannot approve or execute");
   });
 
   it("keeps semantic status/error labels, visible focus, and reduced-motion rules", () => {

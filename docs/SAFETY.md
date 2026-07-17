@@ -41,6 +41,8 @@ One grouped recovery approval is acceptable because every action in the bundle i
 
 Approval records are immutable and contain actor, timestamp, plan ID/version, and SHA-256 plan digest. Provider drift or any plan-relevant content change requires a new plan and approval.
 
+Approval and execution are separate dashboard mutations. Approval may move the task into an approved-ready `executing` state and materialize the action ledger, but it performs no artifact or provider operation. The execution mutation must recheck the exact approval and complete action ledger before loading provider adapters.
+
 ### 2.1 Setup and live-spike exception
 
 Seed and provider-risk-spike utilities may perform controlled writes before the product approval UI exists only under all of these constraints:
@@ -150,6 +152,8 @@ Immediately before mutation:
 6. set `sendUpdates=none` so Gmail is the sole intended email channel;
 7. persist the resulting ETag and verify desired start/end.
 
+For the initial product flow, whole-plan preflight refetches the Calendar target and revalidates the exact Gmail sender/UK-recipient/template/body binding before the artifact write. If provider drift is detected while all three action rows are still pristine, invalidate the old approval, persist a fresh immutable provider-grounded preview, and execute nothing. If any action has started, stop for reconciliation rather than generating or approving a replacement automatically.
+
 Restore is allowed only when the current event still equals Rewind's recorded after-state. A mismatch or `412 Precondition Failed` becomes `conflict`; do not retry with a fresh ETag or overwrite.
 
 Reset requires its own immutable approved plan. Preflight both events against that plan before the first write. Because two provider calls cannot be atomic, persist each resulting ETag immediately; a race/partial reset remains `attention_required`, retains the scenario lock, and requires a new exact reset plan. Only two verified baseline states may produce `reset_complete`.
@@ -163,6 +167,7 @@ Google recommends ETags and `If-Match` to prevent lost modifications: [Get speci
 - Display exact content and recipients in the plan; hash the same values into the plan digest.
 - Exclude the connected organizer, declined attendees, and every address not on the explicit allowlist.
 - Recheck the allowlist immediately before send.
+- For the initial notification, require exact equality with the UK allowlist entry and reject a US-recipient substitution even if that address is globally team-controlled.
 - Create and claim the action ledger row before dispatch.
 - Complete schema/MIME/allowlist/token preparation while `dispatch_started_at` is null. Those local failures alone may be retried through controlled resume.
 - Persist `dispatch_started_at` before transport handoff, then attempt the approved send once and store returned message/thread IDs.
@@ -177,6 +182,7 @@ The application does not have read/compose/modify scopes and therefore cannot po
 ## 8. AI safety boundary
 
 - Use one explicitly selected real model runtime: OpenAI Responses with strict Structured Outputs and `store: false`, or local-only Ollama native structured output bound to `127.0.0.1`. Local mode rejects cloud-tagged models and must be labeled `local_model`; fixture output remains forbidden for recorded reasoning.
+- Product local mode is explicitly selected with `REWIND_MODEL_RUNTIME=local_ollama` plus `REWIND_LOCAL_MODEL`; it must not require or fabricate OpenAI credentials. OpenAI credentials are required only for `openai_responses`.
 - Supply synthetic aliases/digests instead of raw attendee addresses and avoid unnecessary mail bodies/provider metadata in prompts.
 - Separate trusted instructions from untrusted task, correction, and provider strings.
 - Candidate titles/descriptions are data, never instructions. The controlled seeder must avoid adversarial content; evals still include prompt-injection-like fixtures.
@@ -234,6 +240,7 @@ The product timeline comes from explicitly redacted audit events, not copied ser
 | Public/enumerated review URL | Authenticated session and ownership check | `unauthorized`/`forbidden` |
 | MCP attempts approval | Scoped create/read token; no approval tool | Request rejected |
 | Double click or HTTP replay | Idempotency record plus unique action key | Original response; no redispatch |
+| Competing execution keys for one World PR | Per-World-PR request serialization plus fenced action leases | One executor; later request reads durable state |
 | Two active scenarios | Database scenario lock | `409 scenario_busy` |
 | Plan changes after approval | Immutable plan and digest check | New preview/approval required |
 | Human edits Calendar after preview/action | ETag and after-state checks | `provider_conflict`; no overwrite |

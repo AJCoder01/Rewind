@@ -186,7 +186,7 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 
 ### 4.9 S044 connection and preflight UI
 
-`tests/unit/connection-preflight.test.ts` covers fixture labeling, complete live-capable configuration with pending Calendar preflight, safe configuration gaps, account and approved-scope substitution, strict response parsing, dashboard authentication, and no-store output. `tests/unit/accessibility-contract.test.ts` freezes the new panel selectors. `npm run test:e2e` covers the panel's unauthenticated/authenticated route boundary alongside the existing login, non-effecting World PR, session expiry, cancellation, responsive, keyboard-focus, and reduced-motion flow. No live provider/model call or external effect is claimed for S044.
+`tests/unit/connection-preflight.test.ts` covers fixture labeling, complete live-capable configuration with pending Calendar preflight, safe configuration gaps, account and approved-scope substitution, strict response parsing, dashboard authentication, and no-store output. The pre-S058 `connection-preflight.v2` correction additionally proves that local Ollama enables the PostgreSQL product workflow without OpenAI credentials and that invalid/missing/cloud/conflicting runtime configuration fails closed. `tests/unit/accessibility-contract.test.ts` freezes the panel selectors. `npm run test:e2e` covers the panel's unauthenticated/authenticated route boundary alongside login, fixture World PR, session expiry, cancellation, responsive, keyboard-focus, and reduced-motion behavior. The status endpoint itself performs no provider/model call or external effect.
 
 ### 4.10 S045 G2 closure and G3 admission
 
@@ -219,6 +219,12 @@ The no-effect local checkpoint is `npm run prove:model-local`; its `local-model-
 ### 4.17 S057 initial-workflow verification
 
 `tests/unit/initial-workflow.test.ts` composes deterministic candidate resolution, bounded reasoning, exact plan expansion, immutable approval, action-row preparation, `FakeArtifactPort`, `FakeCalendarPort`, and a recording Gmail port. It covers one exact artifact → Calendar → Gmail run, byte/provenance equality, fixed order, approval/digest/MCP refusal, retry/resume, duplicate-click busy leases, Gmail uncertainty after an expired dispatch lease, Calendar reconciliation after process death, stale ETag, allowlist drift, and replay with one provider effect per action. Together with the S052–S056 executor/timeline suites, this is the complete no-effect initial-workflow proof; no live database/provider or external effect is claimed.
+
+### 4.17.1 Pre-S058 product correction verification
+
+`tests/unit/provider-grounded-initial-planner.test.ts` proves that provider IDs and snapshots come from controlled Calendar discovery rather than fixture substitution and that divergent model-proposed account-brief bytes are rejected. `tests/unit/initial-execution-route.test.ts` proves dashboard session/CSRF/origin/idempotency/pointer enforcement plus MCP and fixture refusal. `tests/unit/initial-workflow-execution.test.ts` proves whole-plan preflight before artifact, synchronous artifact → Calendar → Gmail completion, completed replay without provider-runtime loading, two-key concurrent request serialization, pristine stale-plan invalidation into a fresh unapproved version, and regional allowlist drift with zero effects.
+
+The lower-level persistence/provider suites additionally cover canonical immutable comparisons, atomic action-row preparation, claim fencing, strict status/receipt/error/lease combinations, Gmail repeated pre-handoff failure, marker-before-handoff retry refusal, exact UK-vs-US allowlist binding, lost preparation ownership, Calendar unchanged-ETag refusal, and owned start persistence before mutation. The fixture browser flow asserts that no approval button exists. No live Calendar/Gmail product effect is claimed by this correction packet; the only human live procedure is `docs/S058_CONTROLLED_LIVE_INITIAL_FLOW_GUIDE.md`.
 
 ### 4.18 Integration tests with deterministic adapters
 

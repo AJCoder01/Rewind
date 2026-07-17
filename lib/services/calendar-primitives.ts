@@ -135,6 +135,29 @@ async function record(
   }
 }
 
+async function recordOwnedStart(
+  state: DemoEventStateStore,
+  candidateId: DemoEventState["candidateId"],
+  currentState: DemoEventState,
+  started: CalendarOperationReceipt,
+): Promise<void> {
+  await record(state, { candidateId, receipt: started });
+  try {
+    const prepared = (await state.readAll()).find((candidate) => candidate.candidateId === candidateId);
+    if (
+      !prepared ||
+      prepared.expectedEtag !== currentState.expectedEtag ||
+      prepared.expectedUpdatedAt !== currentState.expectedUpdatedAt ||
+      canonicalJson(prepared.lastReceipt) !== canonicalJson(started)
+    ) {
+      throw new CalendarPrimitiveError("persistence_failed");
+    }
+  } catch (error) {
+    if (error instanceof CalendarPrimitiveError) throw error;
+    throw new CalendarPrimitiveError("persistence_failed");
+  }
+}
+
 function conflictReceipt(
   operation: CalendarOperation,
   runId: string,
@@ -230,7 +253,7 @@ async function executeCalendarOperation(input: OperationInput): Promise<Calendar
     lastVerifiedOperation: lastVerified?.operation ?? null,
     lastVerifiedAfter: lastVerified?.after ?? null,
   });
-  await record(input.state, { candidateId: input.candidateId, receipt: started });
+  await recordOwnedStart(input.state, input.candidateId, currentState, started);
 
   let after: CalendarEventSnapshot;
   try {
@@ -259,6 +282,7 @@ async function executeCalendarOperation(input: OperationInput): Promise<Calendar
     verified =
       after.calendarId === before.calendarId &&
       after.providerEventId === before.providerEventId &&
+      after.etag !== before.etag &&
       sameImmutableFields(before, after) &&
       sameTimes(after, desired);
   } catch {

@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { memoryFixtureStore } from "@/lib/db/memory-store";
 import { cancelWorldPr, createWorldPr, getWorldPr } from "@/lib/services/world-pr";
 import { SUPPORTED_SCENARIO_REQUEST } from "@/lib/domain/scenario";
-import { getWorldPrStore } from "@/lib/db";
-import { FakeProviderConfigurationError } from "@/lib/db/store";
+import { getWorldPrStore, memoryExecutionStore } from "@/lib/db";
+import { cancelBodyHash, FakeProviderConfigurationError } from "@/lib/db/store";
 import { PostgresWorldPrStore } from "@/lib/db/postgres-store";
+import { ExecutionPlanSchema } from "@/lib/contracts/execution-persistence";
+import { createOpaqueId } from "@/lib/domain/ids";
 
 const request = SUPPORTED_SCENARIO_REQUEST;
 
@@ -14,10 +16,12 @@ describe("S021 serialized fixture intake", () => {
     process.env.APP_BASE_URL = "http://localhost:3000";
     process.env.REWIND_STORAGE_MODE = "memory_fixture";
     memoryFixtureStore.clear();
+    memoryExecutionStore.clear();
   });
 
   afterEach(() => {
     memoryFixtureStore.clear();
+    memoryExecutionStore.clear();
     delete process.env.REWIND_STORAGE_MODE;
     delete process.env.APP_BASE_URL;
   });
@@ -78,6 +82,49 @@ describe("S021 serialized fixture intake", () => {
     expect(cancelled.response.status).toBe("cancelled");
     expect(memoryFixtureStore.hasScenarioLock()).toBe(false);
     await expect(cancelWorldPr({ actorId: "test:operator", source: "dashboard", idempotencyKey: "idem-cancel-action-2", worldPrId: created.response.worldPrId, request: {} })).rejects.toMatchObject({ code: "invalid_task_state" });
+  });
+
+  it("rechecks the approval ledger inside the atomic memory cancellation mutation", async () => {
+    const created = await createWorldPr({ actorId: "test:operator", source: "dashboard", idempotencyKey: "idem-cancel-race-create-1", request: { request } });
+    if (!created.view.activePlan || created.view.activePlan.pointer.kind !== "initial") throw new Error("Expected an initial preview.");
+    const pointer = created.view.activePlan.pointer;
+    const payload = await memoryFixtureStore.getInitialPlanPayload(created.response.worldPrId, pointer.planId);
+    if (!payload) throw new Error("Expected the immutable initial plan payload.");
+    const plan = ExecutionPlanSchema.parse({
+      planId: payload.planId,
+      taskId: payload.taskId,
+      kind: "initial",
+      version: payload.version,
+      schemaVersion: payload.schemaVersion,
+      promptVersion: payload.modelMetadata.promptVersion,
+      model: payload.modelMetadata.model,
+      payload,
+      digest: payload.digest,
+      createdAt: "2026-07-16T00:00:00.000Z",
+    });
+    await memoryExecutionStore.createPlan(plan);
+
+    const stalePrecheck = await memoryFixtureStore.get(created.response.worldPrId, "test:operator");
+    expect(stalePrecheck?.status).toBe("preview_ready");
+    await memoryExecutionStore.createApproval({
+      approvalId: createOpaqueId("appr_"),
+      planId: plan.planId,
+      planVersion: plan.version,
+      planDigest: plan.digest,
+      actorId: "test:operator",
+      approvedAt: "2026-07-16T00:00:01.000Z",
+    });
+
+    await expect(memoryFixtureStore.cancel({
+      actorId: "test:operator",
+      endpoint: `POST /api/v1/world-prs/${created.response.worldPrId}/cancel`,
+      idempotencyKey: "idem-cancel-race-action-1",
+      bodyHash: cancelBodyHash(created.response.worldPrId),
+      worldPrId: created.response.worldPrId,
+      requestId: "req_cancel_race_001",
+    })).rejects.toMatchObject({ code: "invalid_task_state" });
+    expect((await memoryFixtureStore.get(created.response.worldPrId, "test:operator"))?.status).toBe("preview_ready");
+    expect(memoryFixtureStore.hasScenarioLock()).toBe(true);
   });
 
   it("enforces resource scope on reads", async () => {

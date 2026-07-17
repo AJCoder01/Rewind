@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Pool } from "pg";
-import { FakeCalendarPort } from "@/lib/adapters/calendar";
+import { FakeCalendarPort, type CalendarPort } from "@/lib/adapters/calendar";
 import { CalendarOperationDesiredSchema } from "@/lib/contracts/calendar-demo";
 import { buildControlledCalendarSeeds } from "@/lib/domain/calendar-demo";
 import { sha256Text } from "@/lib/domain/digest";
@@ -8,6 +8,43 @@ import { MemoryDemoEventStateStore, PostgresDemoEventStateStore } from "@/lib/db
 import { moveControlledCalendarEvent, restoreControlledCalendarEvent } from "@/lib/services/calendar-primitives";
 import { preflightControlledCalendar, seedControlledCalendar } from "@/lib/services/calendar-demo";
 import type { CalendarDemoConfiguration } from "@/lib/domain/calendar-demo";
+
+class ObservedCalendarPort implements CalendarPort {
+  updateAttempts = 0;
+  preserveApprovedEtag = false;
+
+  constructor(private readonly delegate: CalendarPort) {}
+
+  listControlledEvents(input: Parameters<CalendarPort["listControlledEvents"]>[0]) {
+    return this.delegate.listControlledEvents(input);
+  }
+
+  getControlledEvent(input: Parameters<CalendarPort["getControlledEvent"]>[0]) {
+    return this.delegate.getControlledEvent(input);
+  }
+
+  createControlledEvent(input: Parameters<CalendarPort["createControlledEvent"]>[0]) {
+    return this.delegate.createControlledEvent(input);
+  }
+
+  async updateStartEnd(input: Parameters<CalendarPort["updateStartEnd"]>[0]) {
+    this.updateAttempts += 1;
+    const updated = await this.delegate.updateStartEnd(input);
+    return this.preserveApprovedEtag ? { ...updated, etag: input.expectedEtag } : updated;
+  }
+}
+
+class UnownedCalendarStartStore extends MemoryDemoEventStateStore {
+  swallowNextStart = false;
+
+  override async recordCalendarOperation(input: Parameters<MemoryDemoEventStateStore["recordCalendarOperation"]>[0]): Promise<void> {
+    if (this.swallowNextStart && input.receipt.operation !== "seed" && input.receipt.status === "started") {
+      this.swallowNextStart = false;
+      return;
+    }
+    return super.recordCalendarOperation(input);
+  }
+}
 
 const configuration: CalendarDemoConfiguration = {
   calendarId: "demo-calendar-2026",
@@ -163,6 +200,68 @@ describe("controlled Calendar move and restore primitives", () => {
 
     expect(result).toMatchObject({ status: "uncertain", reason: "provider_unavailable", after: null });
     expect(state.getCalendarOperationReceiptsForTest().map((receipt) => receipt.status)).toEqual(["started", "uncertain"]);
+  });
+
+  it("treats a move response with the unchanged approved ETag as unverified", async () => {
+    const delegate = new FakeCalendarPort({ events: [], organizerDigest: sha256Text(configuration.expectedEmail) });
+    const calendar = new ObservedCalendarPort(delegate);
+    const state = new MemoryDemoEventStateStore();
+    await seedControlledCalendar({ calendar, state, configuration, runId: "seed-primitive-etag-move" });
+    calendar.preserveApprovedEtag = true;
+    const result = await moveControlledCalendarEvent({
+      calendar,
+      state,
+      configuration,
+      candidateId: "cal_event_acme_uk",
+      desired: movedDesired,
+      runId: "move-primitive-etag-001",
+    });
+    expect(result).toMatchObject({ status: "uncertain", reason: "verification_failed", after: { etag: result.before.etag } });
+    expect(calendar.updateAttempts).toBe(1);
+    expect(state.getCalendarOperationReceiptsForTest().at(-1)).toMatchObject({ status: "uncertain", reason: "verification_failed" });
+  });
+
+  it("treats a restore response with the unchanged current ETag as unverified", async () => {
+    const { calendar: delegate, state } = await seededFixture();
+    const moved = await moveControlledCalendarEvent({
+      calendar: delegate,
+      state,
+      configuration,
+      candidateId: "cal_event_acme_uk",
+      desired: movedDesired,
+      runId: "move-primitive-etag-restore",
+    });
+    expect(moved.status).toBe("succeeded");
+    const calendar = new ObservedCalendarPort(delegate);
+    calendar.preserveApprovedEtag = true;
+    const result = await restoreControlledCalendarEvent({
+      calendar,
+      state,
+      configuration,
+      candidateId: "cal_event_acme_uk",
+      runId: "restore-primitive-etag-001",
+    });
+    expect(result).toMatchObject({ status: "uncertain", reason: "verification_failed" });
+    if (result.status !== "uncertain") throw new Error("Expected an uncertain Calendar restore");
+    expect(result.after?.etag).toBe(result.before.etag);
+    expect(calendar.updateAttempts).toBe(1);
+  });
+
+  it("does not call Calendar update when the persisted start is not owned by this run", async () => {
+    const delegate = new FakeCalendarPort({ events: [], organizerDigest: sha256Text(configuration.expectedEmail) });
+    const calendar = new ObservedCalendarPort(delegate);
+    const state = new UnownedCalendarStartStore();
+    await seedControlledCalendar({ calendar, state, configuration, runId: "seed-primitive-owned-start" });
+    state.swallowNextStart = true;
+    await expect(moveControlledCalendarEvent({
+      calendar,
+      state,
+      configuration,
+      candidateId: "cal_event_acme_uk",
+      desired: movedDesired,
+      runId: "move-primitive-owned-start",
+    })).rejects.toMatchObject({ kind: "persistence_failed" });
+    expect(calendar.updateAttempts).toBe(0);
   });
 
   it("rejects restore before a successful move and invalid duration/time-zone changes", async () => {

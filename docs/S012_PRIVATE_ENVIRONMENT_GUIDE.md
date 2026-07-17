@@ -48,8 +48,8 @@ REWIND_STORAGE_MODE=postgres
 REWIND_SESSION_SECRET=<private generated value>
 REWIND_DASHBOARD_PASSCODE=<private generated value>
 MCP_BACKEND_TOKEN=<private generated value>
-OPENAI_API_KEY=<private project key>
-OPENAI_MODEL=gpt-5.6-sol
+REWIND_MODEL_RUNTIME=local_ollama
+REWIND_LOCAL_MODEL=qwen2.5-coder:latest
 GOOGLE_CLIENT_ID=<private client ID>
 GOOGLE_CLIENT_SECRET=<private client secret>
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/v1/oauth/google/callback
@@ -58,6 +58,8 @@ REWIND_GOOGLE_EXPECTED_EMAIL=<private dedicated test-user email>
 REWIND_RECIPIENT_ALLOWLIST={"UK":["<private controlled UK address>"],"US":["<private controlled US address>"]}
 REWIND_DEMO_DATE=2026-08-20
 ```
+
+The local zero-credit path above does not require `OPENAI_API_KEY` or `OPENAI_MODEL`. To select the optional funded provider instead, use `REWIND_MODEL_RUNTIME=openai_responses` and supply both private OpenAI values. Never use a dummy key. Local Ollama is fixed to `127.0.0.1` and rejects model names ending in `:cloud`.
 
 If you are intentionally running the fixture-only local browser tests, use `REWIND_STORAGE_MODE=memory_fixture` in a separate local environment. Never use fixture mode for a deployed live claim.
 
@@ -82,6 +84,7 @@ REWIND_DASHBOARD_PASSCODE=<private generated value>
 MCP_BACKEND_TOKEN=<private generated value>
 OPENAI_API_KEY=<private OpenAI project key>
 OPENAI_MODEL=gpt-5.6-sol
+REWIND_MODEL_RUNTIME=openai_responses
 GOOGLE_CLIENT_ID=<private Google client ID>
 GOOGLE_CLIENT_SECRET=<private Google client secret>
 GOOGLE_REDIRECT_URI=https://rewind-eta-jet.vercel.app/api/v1/oauth/google/callback
@@ -90,6 +93,8 @@ REWIND_GOOGLE_EXPECTED_EMAIL=<private dedicated test-user email>
 REWIND_RECIPIENT_ALLOWLIST={"UK":["<private controlled UK address>"],"US":["<private controlled US address>"]}
 REWIND_DEMO_DATE=2026-08-20
 ```
+
+Vercel cannot reach an Ollama server on your laptop through its own loopback interface. Keep hosted product execution disabled unless a funded approved model runtime is configured; use the local application for the zero-credit S058 flow.
 
 Do **not** add `DATABASE_MIGRATION_URL` to Vercel. Do not add these deferred fields until later OAuth/provider work produces them:
 

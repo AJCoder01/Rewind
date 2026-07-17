@@ -8,7 +8,7 @@
 | Product category | Dependency-aware recovery for agent-executed workplace workflows |
 | Primary persona | Sales Ops / Customer Success operations coordinator |
 | MVP scenario | Google Calendar + Gmail, Acme UK vs Acme US |
-| Last updated | 2026-07-14 |
+| Last updated | 2026-07-17 |
 
 This document is canonical for what the MVP must do and why. `SAFETY.md` adds constraints that cannot be traded away. Technical implementation belongs in `ARCHITECTURE.md` and exact interfaces in `CONTRACTS.md`.
 
@@ -222,8 +222,8 @@ A controlled operation that conditionally returns both seeded Calendar events to
 - **FR-07:** The World PR shows request, selected entity, alternative, assumption, evidence, exact action effects, external-effect labels, dependency edges, exact account-brief content/hash/provenance, and plan version/digest.
 - **FR-08:** The preview shows exact date, local time, IANA time zone, duration, recipients, and mail content.
 - **FR-09:** A user can approve, cancel, or return to the composer. Cancelling a locked preview archives the task and releases its scenario lock; cancelling a clarification-only intake archives it without touching the lock owned by another run. Arbitrary action editing is not required.
-- **FR-10:** Approval records the authenticated actor, timestamp, plan ID, plan version, and plan digest.
-- **FR-11:** Any change to target, recipients, content, dependency, template, or relevant provider version invalidates approval and requires a new preview.
+- **FR-10:** Approval records the authenticated actor, timestamp, plan ID, plan version, and plan digest. Approval may prepare the durable action ledger but performs no artifact or provider effect; execution is a separate explicit dashboard mutation.
+- **FR-11:** Any change to target, recipients, content, dependency, template, or relevant provider version invalidates approval and requires a new provider-grounded preview. If every action remains pristine, Rewind may prepare that next immutable preview automatically but may not approve or execute it.
 
 ### Initial execution
 

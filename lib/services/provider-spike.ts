@@ -67,7 +67,7 @@ export function assertProviderSpikeExecutionDisabled(environment: Readonly<Recor
 
 export function providerSpikeModelRuntime(
   environment: Readonly<Record<string, string | undefined>>,
-  openAiModel: string,
+  openAiModel: string | undefined,
 ): ProviderSpikeModelRuntime {
   const runtime = environment.REWIND_S043_MODEL_RUNTIME ?? "openai_responses";
   if (runtime === "openai_responses") {

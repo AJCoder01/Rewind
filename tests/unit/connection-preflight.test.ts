@@ -46,6 +46,7 @@ const environmentKeys = [
   "REWIND_GOOGLE_CALENDAR_ID",
   "REWIND_RECIPIENT_ALLOWLIST",
   "REWIND_DEMO_DATE",
+  "REWIND_MODEL_RUNTIME",
   "REWIND_S043_MODEL_RUNTIME",
   "REWIND_LOCAL_MODEL",
 ] as const;
@@ -92,7 +93,7 @@ describe("S044 connection and preflight status", () => {
       }),
     });
 
-    expect(snapshot.runtime).toMatchObject({ mode: "live_capable", modelRuntime: "openai_responses" });
+    expect(snapshot.runtime).toMatchObject({ mode: "live_capable", modelRuntime: "openai_responses", productExecution: "enabled" });
     expect(snapshot.identity).toEqual({ status: "connected", email: baseEnvironment.REWIND_GOOGLE_EXPECTED_EMAIL });
     expect(snapshot.database).toEqual({ status: "ready", schemaVersion: "0002_oauth_transaction" });
     expect(snapshot.calendar).toEqual({ status: "configured" });
@@ -107,12 +108,13 @@ describe("S044 connection and preflight status", () => {
       ],
     });
     expect(snapshot.overall).toBe("attention");
+    expect(snapshot.workflow.status).toBe("ready");
   });
 
   it("returns safe configuration gaps and blocks before dependency checks", async () => {
     let databaseChecked = false;
     const snapshot = await readConnectionPreflightStatus({
-      environment: { ...baseEnvironment, REWIND_STORAGE_MODE: "memory_fixture", OPENAI_API_KEY: undefined },
+      environment: { ...baseEnvironment, REWIND_STORAGE_MODE: "memory_fixture", REWIND_SESSION_SECRET: undefined },
       checkDatabase: async () => {
         databaseChecked = true;
         return { ready: true, migrationId: "unexpected" };
@@ -122,9 +124,39 @@ describe("S044 connection and preflight status", () => {
 
     expect(databaseChecked).toBe(false);
     expect(snapshot.configuration.status).toBe("incomplete");
-    expect(snapshot.configuration.issues).toContainEqual({ field: "OPENAI_API_KEY", code: "invalid_type" });
+    expect(snapshot.configuration.issues).toContainEqual({ field: "REWIND_SESSION_SECRET", code: "invalid_type" });
     expect(snapshot.preflight.status).toBe("blocked");
     expect(JSON.stringify(snapshot)).not.toContain("sk-project-key");
+  });
+
+  it("enables the PostgreSQL workflow with local Ollama and no OpenAI credentials", async () => {
+    const snapshot = await readConnectionPreflightStatus({
+      environment: {
+        ...baseEnvironment,
+        OPENAI_API_KEY: undefined,
+        OPENAI_MODEL: undefined,
+        REWIND_MODEL_RUNTIME: "local_ollama",
+        REWIND_LOCAL_MODEL: "qwen2.5-coder:latest",
+      },
+      checkDatabase: async () => ({ ready: true, migrationId: "0002_oauth_transaction" }),
+      readCredential: async () => ({
+        provider: "google",
+        googleSub: baseEnvironment.REWIND_GOOGLE_EXPECTED_SUB,
+        email: baseEnvironment.REWIND_GOOGLE_EXPECTED_EMAIL,
+        refreshTokenCiphertext: "ciphertext-never-returned",
+        scopes: ["openid", "email", "https://www.googleapis.com/auth/calendar.events.owned", "https://www.googleapis.com/auth/gmail.send"],
+        createdAt: new Date("2026-07-16T00:00:00.000Z"),
+        updatedAt: new Date("2026-07-16T00:00:00.000Z"),
+      }),
+    });
+
+    expect(snapshot.runtime).toMatchObject({
+      mode: "live_capable",
+      modelRuntime: "local_ollama",
+      productExecution: "enabled",
+    });
+    expect(snapshot.workflow.status).toBe("ready");
+    expect(JSON.stringify(snapshot)).not.toContain("OPENAI_API_KEY");
   });
 
   it("fails closed on a stored account substitution without returning its email", async () => {

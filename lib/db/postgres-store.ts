@@ -7,9 +7,12 @@ import {
   isInitialPlanView,
   type CreateWorldPrResponse,
   type InitialPlanPayload,
+  type InitialPlanView,
   type TaskMutationResponse,
   type WorldPrView,
 } from "@/lib/contracts/v1";
+import type { CandidateResolutionSnapshot } from "@/lib/contracts/candidate-resolution";
+import type { InitialPlanExpansionResult } from "@/lib/contracts/initial-plan-expansion";
 import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import {
   buildFixtureAnalyzingView,
@@ -39,6 +42,19 @@ interface StoredWorldPrRecord {
   view: WorldPrView;
   planPayload: InitialPlanPayload;
 }
+
+export type ProviderGroundedInitialPlanner = Readonly<{
+  resolveCandidates(input: Readonly<{ request: string; now: Date }>): Promise<CandidateResolutionSnapshot>;
+  expandPlan(input: Readonly<{
+    request: string;
+    taskId: string;
+    planId: string;
+    runId: string;
+    version: number;
+    resolution: CandidateResolutionSnapshot;
+    now: Date;
+  }>): Promise<InitialPlanExpansionResult>;
+}>;
 
 interface IdempotencyRow {
   body_hash: string;
@@ -70,9 +86,13 @@ function replayMutationClaim(record: IdempotencyRow): Exclude<MutationIdempotenc
 }
 
 export class PostgresWorldPrStore implements WorldPrStore {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly providerPlanner?: ProviderGroundedInitialPlanner,
+  ) {}
 
   async createInitial(input: CreateWorldPrStoreInput): Promise<CreateWorldPrStoreResult> {
+    if (this.providerPlanner) return this.createProviderGroundedInitial(input);
     const record = buildFixtureWorldPrRecord(input.request);
     const analyzingView = buildFixtureAnalyzingView(record.view);
     const response = worldPrResponse(record.view, input);
@@ -167,6 +187,152 @@ export class PostgresWorldPrStore implements WorldPrStore {
       throw failure;
     } finally {
       client?.release();
+    }
+  }
+
+  private async createProviderGroundedInitial(input: CreateWorldPrStoreInput): Promise<CreateWorldPrStoreResult> {
+    const startedAt = new Date();
+    const worldPrId = createOpaqueId("wpr_");
+    const runId = createOpaqueId("run_");
+    const planId = createOpaqueId("plan_");
+    const analyzingView = buildProviderAnalyzingView(worldPrId, input.request, startedAt);
+    const claim = await this.pool.query(
+      `INSERT INTO idempotency_records
+        (actor_id, endpoint, key, body_hash, status, resource_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'in_progress', $5, now(), now())
+       ON CONFLICT (actor_id, endpoint, key) DO NOTHING
+       RETURNING key`,
+      [input.actorId, input.endpoint, input.idempotencyKey, input.bodyHash, worldPrId],
+    );
+    if (!claim.rowCount) return this.replayProviderGroundedCreate(input);
+
+    let completed = false;
+    try {
+      await this.pool.query(
+        `INSERT INTO tasks
+          (id, run_id, request, status, planning_lease_until, read_model, created_at, updated_at)
+         VALUES ($1, NULL, $2, 'analyzing', now() + interval '10 minutes', $3::jsonb, now(), now())`,
+        [worldPrId, input.request, JSON.stringify(analyzingView)],
+      );
+
+      // Provider discovery intentionally precedes the active-rule check and
+      // scenario lock. It is read-only and gives the rule a closed candidate
+      // universe without stranding an effect-bearing lock on clarification.
+      const resolution = await this.providerPlanner!.resolveCandidates({ request: input.request, now: startedAt });
+
+      let client = await this.pool.connect();
+      try {
+        await client.query("BEGIN");
+        const activeRule = await client.query<{ id: string }>(
+          `SELECT id FROM prevention_rules
+           WHERE status = 'active'
+             AND condition @> '{"type":"calendar_company_region_ambiguity","company":"Acme"}'::jsonb
+           LIMIT 1`,
+        );
+        if (activeRule.rows.length > 0) {
+          const clarificationView = buildProviderClarificationView(analyzingView, resolution, startedAt);
+          await client.query(
+            `UPDATE tasks
+             SET status = 'clarification_required', run_id = NULL, planning_lease_until = NULL,
+                 read_model = $2::jsonb, updated_at = now()
+             WHERE id = $1 AND status = 'analyzing'`,
+            [worldPrId, JSON.stringify(clarificationView)],
+          );
+          await this.insertAudit(client, worldPrId, "world_pr.clarification_required", input.actorId);
+          const response = CreateWorldPrResponseSchema.parse({
+            worldPrId,
+            status: "clarification_required",
+            reviewUrl: input.reviewUrl.replace("{worldPrId}", worldPrId),
+            clarification: clarificationView.clarification,
+            requestId: input.requestId,
+          });
+          await this.completeIdempotency(client, input, response);
+          await client.query("COMMIT");
+          completed = true;
+          return { kind: "create", view: clarificationView, response, replay: false };
+        }
+
+        await this.expireReclaimablePlanningLeases(client, input.actorId);
+        const scenarioLock = await client.query(
+          `INSERT INTO scenario_locks (scenario_key, task_id, acquired_at, lease_until)
+           VALUES ('acme-demo', $1, now(), now() + interval '10 minutes')
+           ON CONFLICT (scenario_key) DO NOTHING
+           RETURNING scenario_key`,
+          [worldPrId],
+        );
+        if (!scenarioLock.rowCount) throw new StoreError("scenario_busy", "The controlled demo scenario is already in use.");
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+
+      const expansion = await this.providerPlanner!.expandPlan({
+        request: input.request,
+        taskId: worldPrId,
+        planId,
+        runId,
+        version: 1,
+        resolution,
+        now: new Date(),
+      });
+      const planPayload = VerifiedInitialPlanPayloadSchema.parse(expansion.planPayload);
+      if (
+        planPayload.taskId !== worldPrId ||
+        planPayload.planId !== planId ||
+        planPayload.version !== 1 ||
+        planPayload.request !== input.request
+      ) {
+        throw new StoreError("internal_error", "Provider-grounded planning returned a mismatched immutable plan.");
+      }
+      const finalView = buildProviderPreviewView(analyzingView, runId, expansion.planView, new Date(expansion.createdAt));
+      const response = worldPrResponse(finalView, input);
+
+      client = await this.pool.connect();
+      try {
+        await client.query("BEGIN");
+        const updated = await client.query(
+          `UPDATE tasks
+           SET run_id = $2, status = 'preview_ready', planning_lease_until = now() + interval '10 minutes',
+               read_model = $3::jsonb, updated_at = now()
+           WHERE id = $1 AND status = 'analyzing'`,
+          [worldPrId, runId, JSON.stringify(finalView)],
+        );
+        if (updated.rowCount !== 1) throw new StoreError("invalid_task_state", "The planning task changed before its immutable plan was persisted.");
+        await client.query(
+          `INSERT INTO plans
+            (id, task_id, kind, version, schema_version, prompt_version, model, payload, digest, created_at)
+           VALUES ($1, $2, 'initial', 1, 'initial-plan.v1', $3, $4, $5::jsonb, $6, now())`,
+          [planId, worldPrId, planPayload.modelMetadata.promptVersion, planPayload.modelMetadata.model, JSON.stringify(planPayload), planPayload.digest],
+        );
+        await this.insertAudit(client, worldPrId, "world_pr.created", input.actorId);
+        await this.completeIdempotency(client, input, response);
+        await client.query("COMMIT");
+        completed = true;
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+      return { kind: "create", view: finalView, planPayload, response, replay: false };
+    } catch (error) {
+      const failure = toStoreError(error);
+      if (!completed) {
+        try {
+          await this.reconcileProviderPlanningFailure(worldPrId, input.actorId);
+        } catch (reconcileError) {
+          throw new StoreError("internal_error", "The provider-grounded planning state could not be reconciled safely.", { cause: reconcileError });
+        }
+        try {
+          await this.markIdempotencyFailed(input, failure);
+        } catch (reconcileError) {
+          throw new StoreError("internal_error", "The provider-grounded planning failure could not be reconciled safely.", { cause: reconcileError });
+        }
+      }
+      throw failure;
     }
   }
 
@@ -298,7 +464,20 @@ export class PostgresWorldPrStore implements WorldPrStore {
       const current = await client.query<{ read_model: unknown }>("SELECT read_model FROM tasks WHERE id = $1 FOR UPDATE", [worldPrId]);
       if (!current.rowCount) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
       const currentView = WorldPrViewSchema.parse(current.rows[0].read_model);
-      if (currentView.status !== "preview_ready" || !currentView.activePlan || !isInitialPlanView(currentView.activePlan) || !sameInitialPointer(currentView.activePlan.pointer, expectedPointer)) {
+      const staleRows = await client.query<{ count: string }>(
+        `SELECT count(*)::text AS count
+           FROM action_executions
+          WHERE plan_id = $1
+            AND status = 'conflict'
+            AND attempts = 0
+            AND started_at IS NULL
+            AND dispatch_started_at IS NULL
+            AND receipt IS NULL
+            AND error ->> 'code' = 'plan_stale'`,
+        [expectedPointer.planId],
+      );
+      const approvedStaleInvalidation = currentView.status === "executing" && staleRows.rows[0]?.count === "3";
+      if ((currentView.status !== "preview_ready" && !approvedStaleInvalidation) || !currentView.activePlan || !isInitialPlanView(currentView.activePlan) || !sameInitialPointer(currentView.activePlan.pointer, expectedPointer)) {
         throw new StoreError("invalid_task_state", "The World PR changed while the replacement plan was being prepared.");
       }
       if (parsedPayload.version !== currentView.activePlan.pointer.version + 1 || parsedPayload.planId === currentView.activePlan.pointer.planId || parsedPayload.digest === currentView.activePlan.pointer.digest) {
@@ -313,7 +492,7 @@ export class PostgresWorldPrStore implements WorldPrStore {
           LIMIT 1`,
         [worldPrId],
       );
-      if (approvedPlan.rowCount) throw new StoreError("invalid_task_state", "An approved initial plan cannot be superseded.");
+      if (approvedPlan.rowCount && !approvedStaleInvalidation) throw new StoreError("invalid_task_state", "An approved initial plan cannot be superseded unless provider drift invalidated it before every action began.");
       const existingPlan = await client.query<{ payload: unknown }>("SELECT payload FROM plans WHERE id = $1 AND task_id = $2 AND kind = 'initial'", [parsedPayload.planId, worldPrId]);
       if (existingPlan.rowCount === 1) {
         if (canonicalJson(VerifiedInitialPlanPayloadSchema.parse(existingPlan.rows[0].payload)) !== canonicalJson(parsedPayload)) {
@@ -388,11 +567,9 @@ export class PostgresWorldPrStore implements WorldPrStore {
       const approvedPlan = await client.query(
         `SELECT 1
            FROM approvals
-           JOIN plans ON plans.id = approvals.plan_id
-          WHERE plans.task_id = $1
-            AND plans.kind = 'initial'
+          WHERE approvals.plan_id = $1
           LIMIT 1`,
-        [input.worldPrId],
+        [current.activePlan?.pointer.planId ?? ""],
       );
       if (approvedPlan.rowCount) throw new StoreError("invalid_task_state", "This World PR has an approved plan and cannot be cancelled before durable execution is resolved.");
       if (current.status !== "preview_ready" && current.status !== "clarification_required") {
@@ -433,6 +610,81 @@ export class PostgresWorldPrStore implements WorldPrStore {
 
   async close(): Promise<void> {
     await this.pool.end();
+  }
+
+  private async replayProviderGroundedCreate(input: CreateWorldPrStoreInput): Promise<CreateWorldPrStoreResult> {
+    const existing = await this.readIdempotency(input.actorId, input.endpoint, input.idempotencyKey);
+    if (!existing || existing.body_hash !== input.bodyHash) {
+      throw new StoreError("idempotency_conflict", "This idempotency key was already used for a different request.");
+    }
+    if (existing.status === "failed") throw readFailedError(existing.response);
+    if (!existing.resource_id) throw new StoreError("internal_error", "The planning idempotency record has no durable resource identifier.");
+    const view = await this.readTaskView(existing.resource_id);
+    if (!view) throw new StoreError("internal_error", "The planning idempotency record has no durable task.");
+    if (existing.status === "in_progress") {
+      return {
+        kind: "create",
+        view,
+        response: CreateWorldPrResponseSchema.parse({
+          worldPrId: view.worldPrId,
+          status: "analyzing",
+          reviewUrl: input.reviewUrl.replace("{worldPrId}", view.worldPrId),
+          requestId: input.requestId,
+          replayPending: true,
+        }),
+        replay: true,
+      };
+    }
+    if (!existing.response) throw new StoreError("internal_error", "The completed planning record has no durable response.");
+    const response = CreateWorldPrResponseSchema.parse(existing.response);
+    if (!view.activePlan || !isInitialPlanView(view.activePlan)) {
+      return { kind: "create", view, response, replay: true };
+    }
+    const record = await this.readRecord(view.worldPrId, view.activePlan.pointer.version);
+    if (!record) throw new StoreError("internal_error", "The completed planning record is missing its immutable plan.");
+    return { kind: "create", ...record, response, replay: true };
+  }
+
+  private async reconcileProviderPlanningFailure(worldPrId: string, actorId: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const task = await client.query<{ read_model: unknown }>("SELECT read_model FROM tasks WHERE id = $1 FOR UPDATE", [worldPrId]);
+      if (!task.rowCount) {
+        await client.query("ROLLBACK");
+        return;
+      }
+      const approvedOrStarted = await client.query(
+        `SELECT 1
+           FROM plans
+           LEFT JOIN approvals ON approvals.plan_id = plans.id
+           LEFT JOIN action_executions ON action_executions.plan_id = plans.id
+          WHERE plans.task_id = $1
+            AND (approvals.id IS NOT NULL OR action_executions.id IS NOT NULL)
+          LIMIT 1`,
+        [worldPrId],
+      );
+      if (approvedOrStarted.rowCount) {
+        throw new StoreError("invalid_task_state", "Planning failure cleanup cannot release approved or prepared state.");
+      }
+      const current = WorldPrViewSchema.parse(task.rows[0].read_model);
+      const failed = buildProviderPlanningFailedView(current);
+      await client.query("DELETE FROM scenario_locks WHERE scenario_key = 'acme-demo' AND task_id = $1", [worldPrId]);
+      await client.query(
+        `UPDATE tasks
+         SET status = 'failed', run_id = NULL, planning_lease_until = NULL,
+             read_model = $2::jsonb, updated_at = now()
+         WHERE id = $1`,
+        [worldPrId, JSON.stringify(failed)],
+      );
+      await this.insertAudit(client, worldPrId, "planning.failed_safely", actorId);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async replayExisting(input: CreateWorldPrStoreInput, fixtureRecord: ReturnType<typeof buildFixtureWorldPrRecord>): Promise<CreateWorldPrStoreResult> {
@@ -646,6 +898,105 @@ function assertStoredRecordConsistency(record: StoredWorldPrRecord): void {
   ) {
     throw new StoreError("internal_error", "Stored World PR read model does not match its immutable plan payload.");
   }
+}
+
+function buildProviderAnalyzingView(worldPrId: string, request: string, now: Date): WorldPrView {
+  const occurredAt = now.toISOString();
+  return WorldPrViewSchema.parse({
+    worldPrId,
+    request,
+    status: "analyzing",
+    timeline: [{
+      eventId: createOpaqueId("evt_"),
+      type: "task.analyzing",
+      occurredAt,
+      label: "Provider-grounded review is being analyzed",
+      status: "analyzing",
+    }],
+    createdAt: occurredAt,
+    updatedAt: occurredAt,
+  });
+}
+
+function buildProviderClarificationView(
+  base: WorldPrView,
+  resolution: CandidateResolutionSnapshot,
+  now: Date,
+): WorldPrView {
+  const occurredAt = now.toISOString();
+  return WorldPrViewSchema.parse({
+    worldPrId: base.worldPrId,
+    request: base.request,
+    status: "clarification_required",
+    clarification: {
+      question: "I found Acme UK and Acme US. Which one did you mean?",
+      candidates: resolution.candidates.map((candidate) => ({
+        candidateId: candidate.candidateId,
+        label: candidate.label,
+      })),
+    },
+    timeline: [
+      ...base.timeline,
+      {
+        eventId: createOpaqueId("evt_"),
+        type: "task.clarification_required",
+        occurredAt,
+        label: "An active rule requires region clarification before planning",
+        status: "clarification_required",
+      },
+    ],
+    createdAt: base.createdAt,
+    updatedAt: occurredAt,
+  });
+}
+
+function buildProviderPreviewView(
+  base: WorldPrView,
+  runId: string,
+  plan: InitialPlanView,
+  now: Date,
+): WorldPrView {
+  const occurredAt = now.toISOString();
+  return WorldPrViewSchema.parse({
+    worldPrId: base.worldPrId,
+    runId,
+    request: base.request,
+    status: "preview_ready",
+    activePlan: plan,
+    timeline: [
+      ...base.timeline,
+      {
+        eventId: createOpaqueId("evt_"),
+        type: "plan.persisted",
+        occurredAt,
+        label: "Provider-grounded immutable plan persisted",
+        status: "preview_ready",
+      },
+    ],
+    createdAt: base.createdAt,
+    updatedAt: occurredAt,
+  });
+}
+
+function buildProviderPlanningFailedView(base: WorldPrView, now = new Date()): WorldPrView {
+  const occurredAt = now.toISOString();
+  return WorldPrViewSchema.parse({
+    worldPrId: base.worldPrId,
+    request: base.request,
+    status: "failed",
+    timeline: [
+      ...base.timeline,
+      {
+        eventId: createOpaqueId("evt_"),
+        type: "planning.failed_safely",
+        occurredAt,
+        label: "Planning failed safely before approval or external action",
+        status: "failed",
+      },
+    ],
+    createdAt: base.createdAt,
+    updatedAt: occurredAt,
+  });
 }
 
 function sameInitialPointer(left: InitialPlanPointer, right: InitialPlanPointer): boolean {

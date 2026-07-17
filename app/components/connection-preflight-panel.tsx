@@ -28,6 +28,8 @@ const issueLabels: Record<string, string> = {
   MCP_BACKEND_TOKEN: "MCP backend token",
   OPENAI_API_KEY: "OpenAI API key",
   OPENAI_MODEL: "OpenAI model",
+  REWIND_MODEL_RUNTIME: "Model runtime",
+  REWIND_LOCAL_MODEL: "Local Ollama model",
   GOOGLE_CLIENT_ID: "Google client ID",
   GOOGLE_CLIENT_SECRET: "Google client secret",
   GOOGLE_REDIRECT_URI: "Google redirect URI",
@@ -52,7 +54,8 @@ function runtimeLabel(mode: ConnectionPreflightResponse["runtime"]["mode"]): str
 
 function runtimeDetail(data: ConnectionPreflightResponse): string {
   if (data.runtime.mode === "fixture") return "World PRs use deterministic fixture data; no provider or model call is made.";
-  if (data.runtime.mode === "live_capable") return "Provider configuration is present, but product execution and reset remain disabled.";
+  if (data.runtime.mode === "live_capable" && data.runtime.productExecution === "enabled") return "Provider-grounded planning and exact approved execution are enabled; reset remains disabled.";
+  if (data.runtime.mode === "live_capable") return "Provider configuration is present, but a required execution prerequisite is still blocked.";
   return "The application cannot safely claim a provider-ready state until the listed gaps are fixed.";
 }
 
@@ -155,7 +158,7 @@ function StatusDetails({ data }: { data: ConnectionPreflightResponse }) {
         <div>
           <dt>Model evidence</dt>
           <dd><span className="status-pill status-pill-neutral">{data.runtime.modelRuntime === "not_configured" ? "Not selected" : data.runtime.modelRuntime === "local_ollama" ? "Local Ollama" : "OpenAI Responses"}</span></dd>
-          <p>Model calls are disabled on this product path.</p>
+          <p>{data.runtime.productExecution === "enabled" ? "The selected strict model runtime is enabled for bounded planning." : "Model-backed product planning is not currently available."}</p>
         </div>
         <div>
           <dt>Demo date</dt>

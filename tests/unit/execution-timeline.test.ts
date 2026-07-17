@@ -199,6 +199,11 @@ describe("S056 durable execution timeline", () => {
     await memoryExecutionStore.recordActionState({ actionExecutionId: calendar.actionExecutionId, status: "succeeded", now: later, claimFence: { attempts: calendarClaim.record.attempts, leaseUntil: calendarClaim.record.leaseUntil! }, receipt: { provider: "google_calendar", operation: "move", providerEventId: payload.actions[1].target.providerEventId, resultingEtag: "fixture-uk-etag-v2", verified: true } });
     const mailClaim = await memoryExecutionStore.claimAction({ actionExecutionId: mail.actionExecutionId, now: fixedNow, leaseUntil: "2026-07-16T12:01:00.000Z", dispatchStartedAt: later });
     await memoryExecutionStore.recordActionState({ actionExecutionId: mail.actionExecutionId, status: "succeeded", now: later, claimFence: { attempts: mailClaim.record.attempts, leaseUntil: mailClaim.record.leaseUntil! }, dispatchStartedAt: later, receipt: { status: "sent", messageId: "fake-gmail-message-1", threadId: "fake-gmail-thread-1" } });
+    const inconsistent = await getExecutionTimeline(created.response.worldPrId, "demo-operator", { worldStore: memoryFixtureStore, executionStore: memoryExecutionStore });
+    expect(inconsistent?.overallStatus).toBe("attention_required");
+    const current = await memoryFixtureStore.get(created.response.worldPrId, "demo-operator");
+    if (!current) throw new Error("Expected the durable task view.");
+    await memoryFixtureStore.updateView(current.worldPrId, { ...current, status: "completed", updatedAt: later });
     const timeline = await getExecutionTimeline(created.response.worldPrId, "demo-operator", { worldStore: memoryFixtureStore, executionStore: memoryExecutionStore });
 
     expect(timeline?.overallStatus).toBe("completed");

@@ -80,7 +80,9 @@ function safeIdentifier(value: string | undefined): string | undefined {
 }
 
 function modelRuntimeOf(environment: Environment): ConnectionPreflightSnapshot["runtime"]["modelRuntime"] {
-  const selectedRuntime = environment.REWIND_S043_MODEL_RUNTIME;
+  const selectedRuntime = environment.REWIND_MODEL_RUNTIME
+    ?? environment.REWIND_S043_MODEL_RUNTIME
+    ?? (safeIdentifier(environment.OPENAI_MODEL) ? "openai_responses" : undefined);
   if (selectedRuntime === "local_ollama" && safeIdentifier(environment.REWIND_LOCAL_MODEL)) return "local_ollama";
   if (selectedRuntime === "openai_responses" && safeIdentifier(environment.OPENAI_MODEL)) return "openai_responses";
   return "not_configured";
@@ -184,14 +186,22 @@ export async function readConnectionPreflightStatus(
     : configuration.storageMode === "postgres" && configuration.complete
       ? "live_capable"
       : "blocked";
+  const modelRuntime = modelRuntimeOf(environment);
+  const workflowReady = runtimeMode === "live_capable"
+    && configuration.complete
+    && database.status === "ready"
+    && identity.status === "connected"
+    && configuration.calendarConfigured
+    && configuration.demoDateConfigured
+    && modelRuntime !== "not_configured";
 
   return ConnectionPreflightSnapshotSchema.parse({
-    contractVersion: "connection-preflight.v1",
+    contractVersion: "connection-preflight.v2",
     overall: hasFailure || runtimeMode !== "live_capable" ? "blocked" : "attention",
     runtime: {
       mode: runtimeMode,
-      modelRuntime: modelRuntimeOf(environment),
-      productExecution: "disabled",
+      modelRuntime,
+      productExecution: workflowReady ? "enabled" : "disabled",
       productReset: "disabled",
     },
     configuration: { status: configuration.complete ? "complete" : "incomplete", issues: configuration.issues },
@@ -201,8 +211,10 @@ export async function readConnectionPreflightStatus(
     demoDate: { status: configuration.demoDateConfigured ? "configured" : "not_configured" },
     preflight: { status: preflightStatus, checks },
     workflow: {
-      status: "disabled",
-      message: "Product execution is disabled; this status does not approve or execute external actions.",
+      status: workflowReady ? "ready" : "disabled",
+      message: workflowReady
+        ? "Provider-grounded planning is ready; exact dashboard approval and just-in-time preflight are still required before execution."
+        : "Product execution remains disabled until every required configuration, storage, identity, Calendar, and model check is available.",
     },
   });
 }

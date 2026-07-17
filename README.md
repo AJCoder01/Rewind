@@ -12,13 +12,13 @@ The first demonstration is deliberately narrow: one team-owned Google Calendar, 
 
 | Field | Value |
 |---|---|
-| Phase | G2 — OAuth, provider, and model risk retirement |
-| Implementation | G1 closed; S031–S045 complete; G2 closed; S046 execution persistence is next |
+| Phase | G3 — Initial workflow product proof |
+| Implementation | S001–S057 complete; pre-S058 product correction and verification pass complete; S058 is the next human gate |
 | Repository at kickoff | Documentation-only kickoff; now superseded by the scaffold below |
 | Repository now | `main` tracks `origin/main` at `https://github.com/AJCoder01/Rewind.git` |
-| Last updated | 2026-07-16 |
+| Last updated | 2026-07-17 |
 
-The initial executable slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, a reviewable World PR, and a verified PostgreSQL foundation. S031–S039 establish the controlled Google/provider and artifact boundaries. S040–S042 close strict model transport, schemas, and semantic validation. S043 retains the optional OpenAI Responses adapter and adds an explicitly labeled, loopback-only Ollama runtime so the real model proof can run without paid API balance; `qwen2.5-coder:latest` passed all three no-effect operations. Fixture output is still forbidden from masquerading as model evidence.
+The initial executable product slice now exists. It supports fixture-backed local development, signed dashboard sessions, one authenticated backend application service, the thin `create_world_pr` MCP client, provider-grounded PostgreSQL planning, exact dashboard approval, and synchronous artifact → Calendar → Gmail execution. S031–S039 establish the controlled Google/provider and artifact boundaries. S040–S042 close strict model transport, schemas, and semantic validation. S043 retains the optional OpenAI Responses adapter and adds an explicitly labeled, loopback-only Ollama runtime so the real model proof and local product planning can run without paid API balance; `qwen2.5-coder:latest` passed all three strict operations. Fixture output is still forbidden from masquerading as model evidence or enabling an external effect.
 
 S019–S027 extend this slice with session expiry, CSRF/origin and resource scope checks, transactional idempotency and planning leases, rule-first clarification, thin status/cancel routes, a read-only MCP status tool, safe loading/error/empty UI states, and a tested cancel/back flow. S038’s controlled Gmail proof recorded one real sent message and a no-redispatch replay. The fixture path remains visibly non-effecting and production rejects fake-provider mode.
 
@@ -31,7 +31,7 @@ Codex MCP create_world_pr call
 → authenticated dashboard review page
 ```
 
-Calendar/Gmail product execution, recovery, rules, and animation remain deferred until their provider/model risk gates are closed. The S035 Calendar commands and S038 `prove:gmail` command are live-effect admin exceptions requiring a human TTY confirmation; automated tests never invoke their provider effects. See the [S038 Gmail live-proof guide](docs/S038_GMAIL_LIVE_PROOF_GUIDE.md).
+The controlled initial Calendar/Gmail product path is implemented but has not yet been run as S058. Recovery, rules, product reset, release rehearsal, and animation remain deferred to their numbered tasks. The S035 Calendar commands and S038 `prove:gmail` command are live-effect admin exceptions requiring a human TTY confirmation; automated tests never invoke their provider effects. See the [S058 controlled live-flow guide](docs/S058_CONTROLLED_LIVE_INITIAL_FLOW_GUIDE.md) before running any product effect.
 
 ## Product in one minute
 
@@ -132,6 +132,7 @@ Read these in order:
 15. [Agent instructions](AGENTS.md) — durable implementation rules for Codex and contributors.
 16. [S028 deployed G1 guide](docs/S028_DEPLOYED_G1_GUIDE.md) — the credential-safe human checkpoint for the deployed non-effecting slice.
 17. [G1 interface packet](docs/G1_INTERFACE_PACKET.md) — the frozen schemas, migration/catalog, error matrix, fixtures, routes, and evidence boundary.
+18. [S058 controlled live initial-flow guide](docs/S058_CONTROLLED_LIVE_INITIAL_FLOW_GUIDE.md) — the credential-safe human procedure for the next real product effect.
 
 Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot be traded away, Architecture owns **how**, Contracts own boundary shapes, and the Implementation Plan owns the exact implementation sequence and gates. Executable schemas/tests become canonical for exact fields once implemented. Progress and the runbook never create new requirements.
 
@@ -165,8 +166,8 @@ The migration command applies `0001_phase0_foundation.sql` and then `0002_oauth_
 
 ## First contributor actions
 
-1. Continue with S046, execution persistence, after confirming `npm run verify:g2-closure` remains green.
+1. Follow the S058 guide and run exactly one controlled live initial flow after confirming the complete preflight matrix remains green.
 2. Continue in numeric order; do not skip a red gate.
 3. Record command output and sanitized evidence in `PROGRESS.md` as each task closes.
 
-Do not begin Calendar, Gmail, Causal Revert, or animation work until the vertical-slice gate is green.
+Do not begin S059 or later recovery work until S058 has a sanitized successful receipt. Do not begin product reset or animation work before their numbered gates.

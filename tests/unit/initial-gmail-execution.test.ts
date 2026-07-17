@@ -4,13 +4,13 @@ import {
   type GmailPort,
 } from "@/lib/adapters/gmail";
 import { FakeArtifactPort } from "@/lib/adapters/artifact";
-import { type ActionExecutionRecord, type ExecutionPlan } from "@/lib/contracts/execution-persistence";
+import { computePlanPayloadDigest, type ActionExecutionRecord, type ExecutionPlan } from "@/lib/contracts/execution-persistence";
 import { GmailApprovedMessageSchema, type GmailApprovedMessage, type GmailSendReceipt } from "@/lib/contracts/provider-ports";
 import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-server";
 import { MemoryExecutionPersistenceStore, ExecutionPersistenceError } from "@/lib/db/execution-store";
 import { buildControlledCalendarSeeds, type CalendarDemoConfiguration } from "@/lib/domain/calendar-demo";
 import { sha256Text } from "@/lib/domain/digest";
-import { ACCOUNT_BRIEF_TITLE } from "@/lib/domain/account-brief";
+import { ACCOUNT_BRIEF_CONTENT_FIXTURE, ACCOUNT_BRIEF_TITLE } from "@/lib/domain/account-brief";
 import { FakeModelPort } from "@/lib/ai/model";
 import { FakeCalendarPort } from "@/lib/adapters/calendar";
 import { resolveControlledCandidates } from "@/lib/services/candidate-resolution";
@@ -50,7 +50,7 @@ const proposal = {
     { actionKey: "initial.calendar.move" as const, assumptionIds: ["assumption_acme_region" as const] },
     { actionKey: "initial.mail.notify" as const, assumptionIds: ["assumption_acme_region" as const] },
   ],
-  accountBrief: { title: ACCOUNT_BRIEF_TITLE, content: "Parent-account risks only.", sourceId: "acme_parent_account_notes" as const },
+  accountBrief: { title: ACCOUNT_BRIEF_TITLE, content: ACCOUNT_BRIEF_CONTENT_FIXTURE, sourceId: "acme_parent_account_notes" as const },
 };
 
 const now = "2026-07-16T12:00:00.000Z";
@@ -79,7 +79,7 @@ class LateTerminalGmailStore extends MemoryExecutionPersistenceStore {
   override async recordActionState(input: Parameters<MemoryExecutionPersistenceStore["recordActionState"]>[0]) {
     if (this.replaceNextSuccessfulGmailOutcome && input.status === "succeeded") {
       this.replaceNextSuccessfulGmailOutcome = false;
-      await super.recordActionState({
+      return super.recordActionState({
         ...input,
         status: "delivery_uncertain",
         receipt: { status: "delivery_uncertain", reason: "process_interrupted" },
@@ -94,13 +94,47 @@ class LateTerminalGmailStore extends MemoryExecutionPersistenceStore {
   }
 }
 
+class LostGmailPreparationStore extends MemoryExecutionPersistenceStore {
+  replaceNextPreparation = false;
+
+  override async recordActionState(input: Parameters<MemoryExecutionPersistenceStore["recordActionState"]>[0]) {
+    const beforeState = input.beforeState as Record<string, unknown> | undefined;
+    if (this.replaceNextPreparation && input.status === "in_progress" && beforeState && "messageHash" in beforeState) {
+      this.replaceNextPreparation = false;
+      return super.recordActionState({
+        ...input,
+        status: "delivery_uncertain",
+        receipt: { status: "delivery_uncertain", reason: "process_interrupted" },
+        error: {
+          code: "delivery_uncertain",
+          retryable: false,
+          safeMessage: "A concurrent terminal outcome replaced the Gmail preparation row.",
+        },
+      });
+    }
+    return super.recordActionState(input);
+  }
+}
+
+class MarkedUnclaimedGmailStore extends MemoryExecutionPersistenceStore {
+  exposeUnexpectedDispatchMarker = false;
+
+  override async listActions(planId: string): Promise<readonly ActionExecutionRecord[]> {
+    const actions = await super.listActions(planId);
+    if (!this.exposeUnexpectedDispatchMarker) return actions;
+    return actions.map((action) => action.actionKey === "initial.mail.notify" && action.status === "planned"
+      ? { ...action, dispatchStartedAt: now }
+      : action);
+  }
+}
+
 type Setup = {
   store: MemoryExecutionPersistenceStore;
   calendar: FakeCalendarPort;
   plan: ExecutionPlan;
 };
 
-async function createApproved(options: { store?: MemoryExecutionPersistenceStore; completeCalendar?: boolean } = {}): Promise<Setup> {
+async function createApproved(options: { store?: MemoryExecutionPersistenceStore; completeCalendar?: boolean; mailRecipient?: string } = {}): Promise<Setup> {
   const calendar = new FakeCalendarPort({ events: [], organizerDigest: sha256Text(calendarConfiguration.expectedEmail) });
   for (const seed of buildControlledCalendarSeeds(calendarConfiguration)) await calendar.createControlledEvent(seed);
   const resolution = await resolveControlledCandidates({ calendar, configuration: calendarConfiguration });
@@ -119,16 +153,32 @@ async function createApproved(options: { store?: MemoryExecutionPersistenceStore
     configuration: planConfiguration,
     now: new Date(now),
   });
+  const substitutedPayload = options.mailRecipient
+    ? {
+        ...expanded.planPayload,
+        actions: [
+          expanded.planPayload.actions[0],
+          expanded.planPayload.actions[1],
+          {
+            ...expanded.planPayload.actions[2],
+            desired: { ...expanded.planPayload.actions[2].desired, to: [options.mailRecipient] },
+          },
+        ],
+      }
+    : expanded.planPayload;
+  const planPayload = options.mailRecipient
+    ? VerifiedInitialPlanPayloadSchema.parse({ ...substitutedPayload, digest: computePlanPayloadDigest(substitutedPayload) })
+    : expanded.planPayload;
   const plan = {
-    planId: expanded.planPayload.planId,
-    taskId: expanded.planPayload.taskId,
+    planId: planPayload.planId,
+    taskId: planPayload.taskId,
     kind: "initial" as const,
-    version: expanded.planPayload.version,
-    schemaVersion: expanded.planPayload.schemaVersion,
-    promptVersion: expanded.planPayload.modelMetadata.promptVersion,
-    model: expanded.planPayload.modelMetadata.model,
-    payload: expanded.planPayload,
-    digest: expanded.planPayload.digest,
+    version: planPayload.version,
+    schemaVersion: planPayload.schemaVersion,
+    promptVersion: planPayload.modelMetadata.promptVersion,
+    model: planPayload.modelMetadata.model,
+    payload: planPayload,
+    digest: planPayload.digest,
     createdAt: expanded.createdAt,
   } satisfies ExecutionPlan;
   const store = options.store ?? new MemoryExecutionPersistenceStore();
@@ -264,12 +314,46 @@ describe("S055 exact approved Gmail execution", () => {
     expect(port.attempts).toBe(1);
   });
 
+  it("keeps repeated pre-handoff failures and later config drift in a valid retryable state", async () => {
+    const { store, plan } = await createApproved();
+    const port = new RecordingGmailPort();
+    port.prepareFailure = new GmailProviderError();
+    const first = await executeApprovedInitialGmail(executionInput(plan), { executionStore: store, gmail: port, expectedSenderGoogleSub: planConfiguration.senderGoogleSub, allowlist });
+    const second = await executeApprovedInitialGmail(executionInput(plan, { now: "2026-07-16T12:02:00.000Z", leaseUntil: "2026-07-16T12:03:00.000Z" }), { executionStore: store, gmail: port, expectedSenderGoogleSub: planConfiguration.senderGoogleSub, allowlist });
+    port.prepareFailure = undefined;
+    const drifted = await executeApprovedInitialGmail(executionInput(plan, { now: "2026-07-16T12:04:00.000Z", leaseUntil: "2026-07-16T12:05:00.000Z" }), {
+      executionStore: store,
+      gmail: port,
+      expectedSenderGoogleSub: planConfiguration.senderGoogleSub,
+      allowlist: { UK: ["us-team@example.com"], US: ["uk-team@example.com"] },
+    });
+    expect(first).toMatchObject({ decision: "retryable_failed", record: { status: "retryable_failed", dispatchStartedAt: null } });
+    expect(second).toMatchObject({ decision: "retryable_failed", reason: "local_preparation", record: { status: "retryable_failed", dispatchStartedAt: null } });
+    expect(drifted).toMatchObject({ decision: "blocked", reason: "recipient_not_allowed", record: { status: "conflict", dispatchStartedAt: null } });
+    expect(port.preparations).toBe(2);
+    expect(port.attempts).toBe(0);
+  });
+
   it.each(driftCases)("fails closed for %s before preparation or handoff", async (_label, runtimeAllowlist, expectedSenderGoogleSub) => {
     const { store, plan } = await createApproved();
     const port = new RecordingGmailPort();
     const result = await executeApprovedInitialGmail(executionInput(plan), { executionStore: store, gmail: port, expectedSenderGoogleSub, allowlist: runtimeAllowlist });
     expect(result).toMatchObject({ decision: "blocked", record: { status: "conflict" } });
     expect(result.reason).toBe(_label);
+    expect(port.preparations).toBe(0);
+    expect(port.attempts).toBe(0);
+  });
+
+  it("rejects a UK/US allowlist substitution even when the approved recipient remains globally allowlisted", async () => {
+    const { store, plan } = await createApproved({ mailRecipient: allowlist.US[0] });
+    const port = new RecordingGmailPort();
+    const result = await executeApprovedInitialGmail(executionInput(plan), {
+      executionStore: store,
+      gmail: port,
+      expectedSenderGoogleSub: planConfiguration.senderGoogleSub,
+      allowlist,
+    });
+    expect(result).toMatchObject({ decision: "blocked", reason: "recipient_not_allowed", record: { status: "conflict", dispatchStartedAt: null } });
     expect(port.preparations).toBe(0);
     expect(port.attempts).toBe(0);
   });
@@ -301,6 +385,41 @@ describe("S055 exact approved Gmail execution", () => {
       receipt: { status: "delivery_uncertain", reason: "process_interrupted" },
     });
     expect(port.attempts).toBe(1);
+  });
+
+  it("does not hand off when before-state preparation returns a terminal row", async () => {
+    const store = new LostGmailPreparationStore();
+    const { plan } = await createApproved({ store });
+    store.replaceNextPreparation = true;
+    const port = new RecordingGmailPort();
+    const result = await executeApprovedInitialGmail(executionInput(plan), {
+      executionStore: store,
+      gmail: port,
+      expectedSenderGoogleSub: planConfiguration.senderGoogleSub,
+      allowlist,
+    });
+    expect(result).toMatchObject({
+      decision: "blocked",
+      reason: "delivery_uncertain",
+      record: { status: "delivery_uncertain", dispatchStartedAt: now },
+    });
+    expect(port.preparations).toBe(1);
+    expect(port.attempts).toBe(0);
+  });
+
+  it("never retries a non-terminal Gmail row that already exposes dispatch_started_at", async () => {
+    const store = new MarkedUnclaimedGmailStore();
+    const { plan } = await createApproved({ store });
+    store.exposeUnexpectedDispatchMarker = true;
+    const port = new RecordingGmailPort();
+    await expect(executeApprovedInitialGmail(executionInput(plan), {
+      executionStore: store,
+      gmail: port,
+      expectedSenderGoogleSub: planConfiguration.senderGoogleSub,
+      allowlist,
+    })).rejects.toMatchObject({ code: "invalid_task_state" });
+    expect(port.preparations).toBe(0);
+    expect(port.attempts).toBe(0);
   });
 
   it("returns busy for a duplicate click while the first send holds the lease", async () => {

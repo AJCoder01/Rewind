@@ -57,7 +57,7 @@ export type InitialReplanInput = InitialPlanMutationInput & Readonly<{
   nextPayload?: unknown;
 }>;
 
-const APPROVAL_LABEL = "Initial plan approved; no external action has started.";
+const APPROVAL_LABEL = "Initial plan approved; execution is ready and no external action has started.";
 const REPLAN_LABEL = "Initial preview superseded with a new immutable plan version.";
 const initialMutationTails = new Map<string, Promise<void>>();
 
@@ -519,13 +519,24 @@ async function ensureApprovalTimeline(worldStore: WorldPrStore, current: WorldPr
   if (pointer.planId !== approval.planId || pointer.version !== approval.planVersion || pointer.digest !== approval.planDigest) {
     throw new ServiceError("plan_digest_mismatch", "The approval no longer matches the active immutable preview.");
   }
-  if (current.timeline.some((item) => item.type === "approval.recorded" && item.label === APPROVAL_LABEL)) return current;
-  const nextView = appendTimeline(current, {
-    eventId: `evt_${approval.approvalId}`,
-    type: "approval.recorded",
-    occurredAt: approval.approvedAt,
-    label: APPROVAL_LABEL,
-    status: "preview_ready",
+  const alreadyRecorded = current.timeline.some((item) => item.type === "approval.recorded");
+  if (alreadyRecorded && current.status === "executing") return current;
+  const nextView = WorldPrViewSchema.parse({
+    ...current,
+    status: "executing",
+    timeline: alreadyRecorded
+      ? current.timeline
+      : [
+          ...current.timeline,
+          {
+            eventId: `evt_${approval.approvalId}`,
+            type: "approval.recorded",
+            occurredAt: approval.approvedAt,
+            label: APPROVAL_LABEL,
+            status: "executing",
+          },
+        ],
+    updatedAt: approval.approvedAt,
   });
   await worldStore.updateView(current.worldPrId, nextView);
   return nextView;

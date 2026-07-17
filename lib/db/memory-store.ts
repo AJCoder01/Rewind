@@ -24,6 +24,8 @@ import {
   sharesWorldPrScope,
 } from "@/lib/db/store";
 import { createOpaqueId } from "@/lib/domain/ids";
+import { canonicalJson } from "@/lib/domain/digest";
+import { hasApprovedInitialPlanInMemory } from "@/lib/db/execution-store";
 
 type IdempotencyRecord =
   | { bodyHash: string; status: "in_progress"; result: CreateWorldPrStoreResult | CancelWorldPrStoreResult }
@@ -180,7 +182,7 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
     }
     const existing = this.byPlanId.get(payload.planId);
     if (existing) {
-      if (JSON.stringify(existing.planPayload) !== JSON.stringify(payload)) throw new StoreError("internal_error", "An immutable plan version changed during refresh.");
+      if (canonicalJson(existing.planPayload) !== canonicalJson(payload)) throw new StoreError("internal_error", "An immutable plan version changed during refresh.");
     } else {
       this.byPlanId.set(payload.planId, { worldPrId, planPayload: structuredClone(payload) });
     }
@@ -260,6 +262,9 @@ export class MemoryFixtureWorldPrStore implements WorldPrStore {
     this.assertScope(input.worldPrId, input.actorId);
     const current = this.byWorldPrId.get(input.worldPrId);
     if (!current) throw new StoreError("task_not_found", "That World PR does not exist in the current controlled workspace.");
+    if (hasApprovedInitialPlanInMemory(input.worldPrId)) {
+      throw new StoreError("invalid_task_state", "This World PR has an approved plan and cannot be cancelled before durable execution is resolved.");
+    }
     if (current.status !== "preview_ready" && current.status !== "clarification_required") {
       throw new StoreError("invalid_task_state", "This World PR cannot be cancelled from its current state.");
     }

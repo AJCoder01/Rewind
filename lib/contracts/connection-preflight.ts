@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONNECTION_PREFLIGHT_CONTRACT_VERSION = "connection-preflight.v1" as const;
+export const CONNECTION_PREFLIGHT_CONTRACT_VERSION = "connection-preflight.v2" as const;
 
 const EnvironmentIssueSchema = z
   .object({
@@ -41,7 +41,7 @@ export const ConnectionPreflightSnapshotSchema = z
       .object({
         mode: z.enum(["fixture", "live_capable", "blocked"]),
         modelRuntime: z.enum(["openai_responses", "local_ollama", "not_configured"]),
-        productExecution: z.literal("disabled"),
+        productExecution: z.enum(["enabled", "disabled"]),
         productReset: z.literal("disabled"),
       })
       .strict(),
@@ -81,8 +81,8 @@ export const ConnectionPreflightSnapshotSchema = z
       .strict(),
     workflow: z
       .object({
-        status: z.literal("disabled"),
-        message: z.literal("Product execution is disabled; this status does not approve or execute external actions."),
+        status: z.enum(["ready", "disabled"]),
+        message: z.string().min(1).max(240),
       })
       .strict(),
   })

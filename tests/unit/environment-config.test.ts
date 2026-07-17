@@ -80,6 +80,40 @@ describe("private environment contract", () => {
     expectConfigError(() => parseApplicationEnvironment(withEnvironment({ OPENAI_API_KEY: "change-me" })), [
       "OPENAI_API_KEY",
     ]);
+    expectConfigError(() => parseApplicationEnvironment(withEnvironment({ OPENAI_API_KEY: undefined })), [
+      "OPENAI_API_KEY",
+    ]);
+  });
+
+  it("supports a zero-credit local runtime without OpenAI credentials", () => {
+    const parsed = parseApplicationEnvironment(withEnvironment({
+      OPENAI_API_KEY: undefined,
+      OPENAI_MODEL: undefined,
+      REWIND_MODEL_RUNTIME: "local_ollama",
+      REWIND_LOCAL_MODEL: "qwen2.5-coder:latest",
+    }));
+
+    expect(parsed.REWIND_MODEL_RUNTIME).toBe("local_ollama");
+    expect(parsed.REWIND_LOCAL_MODEL).toBe("qwen2.5-coder:latest");
+    expect(parsed.OPENAI_API_KEY).toBeUndefined();
+    expect(parsed.OPENAI_MODEL).toBeUndefined();
+  });
+
+  it("fails closed for a missing, cloud-backed, or conflicting local runtime", () => {
+    expectConfigError(() => parseApplicationEnvironment(withEnvironment({
+      OPENAI_API_KEY: undefined,
+      OPENAI_MODEL: undefined,
+      REWIND_MODEL_RUNTIME: "local_ollama",
+    })), ["REWIND_LOCAL_MODEL"]);
+    expectConfigError(() => parseApplicationEnvironment(withEnvironment({
+      REWIND_MODEL_RUNTIME: "local_ollama",
+      REWIND_LOCAL_MODEL: "remote:cloud",
+    })), ["REWIND_LOCAL_MODEL"]);
+    expectConfigError(() => parseApplicationEnvironment(withEnvironment({
+      REWIND_MODEL_RUNTIME: "local_ollama",
+      REWIND_S043_MODEL_RUNTIME: "openai_responses",
+      REWIND_LOCAL_MODEL: "qwen2.5-coder:latest",
+    })), ["REWIND_MODEL_RUNTIME"]);
   });
 
   it("rejects production HTTP/local origins and fixture storage", () => {
