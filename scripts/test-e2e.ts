@@ -19,8 +19,6 @@ export function createFixtureE2EServerEnvironment(baseUrl: string) {
   REWIND_SESSION_SECRET: "playwright-session-secret-000000000001",
   REWIND_DASHBOARD_PASSCODE: "playwright-demo-passcode",
   MCP_BACKEND_TOKEN: "playwright-mcp-token-000000000000001",
-  OPENAI_API_KEY: "fixture-openai-key-not-used-by-e2e",
-  OPENAI_MODEL: "fixture-model-v1",
   GOOGLE_CLIENT_ID: "fixture-client.apps.googleusercontent.com",
   GOOGLE_CLIENT_SECRET: "fixture-google-client-secret-000001",
   GOOGLE_REDIRECT_URI: `${baseUrl}/api/v1/oauth/google/callback`,
@@ -126,6 +124,9 @@ async function main(): Promise<void> {
     await page.waitForURL((url) => url.pathname === "/");
     await page.waitForTimeout(1_000);
     await page.getByTestId("composer-screen").waitFor({ state: "visible" });
+    await page.getByTestId("connection-preflight").waitFor({ state: "visible" });
+    await expect(page.getByTestId("model-runtime")).toHaveText("Not selected");
+    await expect(page.getByTestId("connection-summary")).toContainText("Fixture mode");
     await page.getByRole("button", { name: "Create World PR" }).click();
     await page.waitForURL((url) => url.pathname.startsWith("/pr/wpr_"));
     await page.setViewportSize({ width: 390, height: 844 });

@@ -104,6 +104,7 @@ npm run db:verify
 npm run eval:recovery
 npm run eval:model-safety
 npm run prove:model-local
+npm run verify:zero-credit-runtime
 npm run seed:demo
 npm run preflight:demo
 npm run reset:demo

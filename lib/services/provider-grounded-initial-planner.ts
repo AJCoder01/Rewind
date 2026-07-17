@@ -1,9 +1,6 @@
 import type { CalendarPort } from "@/lib/adapters/calendar";
-import { OllamaChatClient } from "@/lib/ai/ollama-chat";
-import { OllamaModelPort } from "@/lib/ai/ollama-model";
 import type { ModelProposalPort } from "@/lib/ai/model";
-import { OpenAIModelPort } from "@/lib/ai/openai-model";
-import { OpenAIResponsesClient } from "@/lib/ai/openai-responses";
+import { createProductModel } from "@/lib/ai/product-model";
 import { parseApplicationEnvironment, type Environment } from "@/lib/config/environment";
 import type { CandidateResolutionSnapshot } from "@/lib/contracts/candidate-resolution";
 import type { OAuthStore } from "@/lib/db/oauth-store";
@@ -73,7 +70,7 @@ export function createProviderGroundedInitialPlanner(
     async expandPlan(input) {
       const environment = parseApplicationEnvironment(rawEnvironment);
       if (!environment.REWIND_GOOGLE_CALENDAR_ID) throw new Error("The controlled Calendar target is not configured.");
-      const model = dependencies.model ?? productModel(rawEnvironment, environment.OPENAI_API_KEY, environment.OPENAI_MODEL);
+      const model = dependencies.model ?? createProductModel(environment);
       const reasoning = await reasonInitialRequest({
         request: input.request,
         resolution: input.resolution,
@@ -98,18 +95,6 @@ export function createProviderGroundedInitialPlanner(
       });
     },
   };
-}
-
-function productModel(environment: Environment, openAiApiKey?: string, openAiModel?: string): ModelProposalPort {
-  const runtime = environment.REWIND_MODEL_RUNTIME ?? environment.REWIND_S043_MODEL_RUNTIME ?? "openai_responses";
-  if (runtime === "local_ollama") {
-    const model = environment.REWIND_LOCAL_MODEL;
-    if (!model) throw new Error("The local product model is not configured.");
-    return new OllamaModelPort({ client: new OllamaChatClient(), model });
-  }
-  if (runtime !== "openai_responses") throw new Error("The product model runtime is invalid.");
-  if (!openAiApiKey || !openAiModel) throw new Error("The OpenAI product model is not configured.");
-  return new OpenAIModelPort({ client: new OpenAIResponsesClient({ apiKey: openAiApiKey }), model: openAiModel });
 }
 
 function assertConnectedCredential(

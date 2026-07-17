@@ -37,7 +37,7 @@ The controlled initial Calendar/Gmail product path is implemented but has not ye
 
 1. A Sales Ops coordinator asks Rewind to move an Acme renewal meeting, create an Acme parent-account risk brief, and notify attendees.
 2. Rewind finds Acme UK and Acme US. It ranks Acme UK as the nearest upcoming tagged match and shows Acme US as an alternative.
-3. GPT proposes the bounded assumption/dependency reasoning and account brief; validation expands it into an immutable World PR containing the exact event, time, recipients, brief content/hash/provenance, and dependencies.
+3. The explicitly selected strict model runtime proposes the bounded assumption/dependency reasoning and account brief; validation expands it into an immutable World PR containing the exact event, time, recipients, brief content/hash/provenance, and dependencies.
 4. After approval, Rewind persists that exact brief, updates the UK event, and then emails its allowlisted attendees.
 5. After execution, the coordinator manually pastes a late Sales clarification that Acme US was intended.
 6. Rewind proposes a Causal Revert: restore the UK event, correct the UK email, preserve the region-independent brief, and apply the approved change to the US event and attendees.
@@ -148,7 +148,7 @@ Source-of-truth rule: the PRD owns **what**, Safety owns constraints that cannot
 - Official TypeScript MCP SDK with one primary tool: `create_world_pr`
 - Vitest, React Testing Library where useful, and mandatory Playwright coverage of the critical flow
 
-The OpenAI adapter remains available when funded. The zero-spend demo uses Ollama on loopback with the same strict runtime schemas and semantic validators. See [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) and [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs).
+The OpenAI adapter remains available only when explicitly selected and funded. The zero-spend demo uses Ollama on the same machine through loopback with the same strict runtime schemas and semantic validators; a normal hosted deployment cannot reach Ollama on a developer laptop. Product and historical S043 selectors are separate, required where used, and never fall back to one another or infer OpenAI from stale credentials. See [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs) and [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs).
 
 ## PostgreSQL foundation
 

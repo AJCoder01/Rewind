@@ -51,9 +51,10 @@ In a normal terminal:
 ```text
 ollama list
 npm run prove:model-local
+npm run verify:zero-credit-runtime
 ```
 
-Expected result: the selected model is installed and the proof returns a sanitized `local-model-spike.v1` success with three validated operations and `externalEffects: false`.
+Expected result: the exact product-selected model is installed, the proof returns a sanitized `local-model-spike.v1` success with three validated operations and `externalEffects: false`, and the deterministic runtime guard reports loopback Ollama with `externalCalls: 0` even when synthetic stale OpenAI fields are present.
 
 If Ollama is not running, start the local Ollama application/service and rerun the no-effect proof. Do not switch to a cloud model or fabricate an OpenAI key.
 
@@ -120,8 +121,8 @@ On the connection/preflight panel, require all of the following:
 - Runtime boundary: live-capable configuration
 - Storage: PostgreSQL ready
 - Google account: connected identity
-- Model evidence: Local Ollama
-- Product execution: enabled / workflow ready
+- Model runtime: Local Ollama
+- Workflow prerequisites: configured; local proof already passed
 - Product reset: disabled
 
 The Calendar check may still say that human-gated preflight has not run from the dashboard. That is expected because the dashboard status endpoint never performs a provider call.

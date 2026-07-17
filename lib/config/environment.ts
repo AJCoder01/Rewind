@@ -52,6 +52,7 @@ const identifierSchema = (label: string, maximumLength = 512) =>
     .refine((value) => value === value.trim() && !/\s/.test(value), `${label} must not contain whitespace`);
 
 const modelRuntimeSchema = z.enum(["openai_responses", "local_ollama"] as const);
+export type ModelRuntime = z.infer<typeof modelRuntimeSchema>;
 const modelIdentifierSchema = (label: string) => identifierSchema(label, 200).refine(
   (value) => /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value),
   `${label} contains unsupported characters`,
@@ -87,8 +88,8 @@ const rawApplicationEnvironmentSchema = z
     OPENAI_API_KEY: privateSecretSchema(20, "OPENAI_API_KEY").optional(),
     OPENAI_MODEL: modelIdentifierSchema("OPENAI_MODEL").optional(),
     REWIND_MODEL_RUNTIME: modelRuntimeSchema.optional(),
-    // Retained as a backwards-compatible fallback for the already-recorded
-    // S043 local proof. New product configuration should use the unscoped key.
+    // Spike-only selector retained for the historical S043 admin command. It
+    // never selects or overrides the product runtime.
     REWIND_S043_MODEL_RUNTIME: modelRuntimeSchema.optional(),
     REWIND_LOCAL_MODEL: localModelIdentifierSchema.optional(),
     GOOGLE_CLIENT_ID: z
@@ -137,8 +138,8 @@ export type ApplicationEnvironment = Readonly<{
   MCP_BACKEND_TOKEN: string;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
-  REWIND_MODEL_RUNTIME?: "openai_responses" | "local_ollama";
-  REWIND_S043_MODEL_RUNTIME?: "openai_responses" | "local_ollama";
+  REWIND_MODEL_RUNTIME?: ModelRuntime;
+  REWIND_S043_MODEL_RUNTIME?: ModelRuntime;
   REWIND_LOCAL_MODEL?: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
@@ -285,14 +286,10 @@ export function parseApplicationEnvironment(environment: Environment): Applicati
   if (value.REWIND_STORAGE_MODE === "postgres" && !value.DATABASE_URL) {
     issues.push(issue("DATABASE_URL", "required_for_postgres"));
   }
-  if (
-    value.REWIND_MODEL_RUNTIME &&
-    value.REWIND_S043_MODEL_RUNTIME &&
-    value.REWIND_MODEL_RUNTIME !== value.REWIND_S043_MODEL_RUNTIME
-  ) {
-    issues.push(issue("REWIND_MODEL_RUNTIME", "conflicts_with_s043_runtime"));
+  if (value.REWIND_STORAGE_MODE === "postgres" && !value.REWIND_MODEL_RUNTIME) {
+    issues.push(issue("REWIND_MODEL_RUNTIME", "required_for_postgres"));
   }
-  const modelRuntime = value.REWIND_MODEL_RUNTIME ?? value.REWIND_S043_MODEL_RUNTIME ?? "openai_responses";
+  const modelRuntime = value.REWIND_MODEL_RUNTIME;
   if (value.REWIND_STORAGE_MODE === "postgres" && modelRuntime === "openai_responses") {
     if (!value.OPENAI_API_KEY) issues.push(issue("OPENAI_API_KEY", "required_for_openai_runtime"));
     if (!value.OPENAI_MODEL) issues.push(issue("OPENAI_MODEL", "required_for_openai_runtime"));

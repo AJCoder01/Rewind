@@ -1,6 +1,4 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { loadEnvFile } from "node:process";
+import { loadEnvConfig } from "@next/env";
 
 export type DatabaseUrlVariable = "DATABASE_URL" | "DATABASE_MIGRATION_URL";
 export type StringEnvironment = Readonly<Record<string, string | undefined>>;
@@ -9,13 +7,9 @@ const localHostnames = new Set(["localhost", "127.0.0.1", "::1"]);
 const acceptedTlsModes = new Set(["require", "verify-ca", "verify-full"]);
 
 export function loadPrivateLocalEnvironment(cwd = process.cwd()): string | null {
-  for (const filename of [".env.local", ".env"] as const) {
-    const path = resolve(cwd, filename);
-    if (!existsSync(path)) continue;
-    loadEnvFile(path);
-    return filename;
-  }
-  return null;
+  const development = process.env.NODE_ENV !== "production";
+  const result = loadEnvConfig(cwd, development, { info: () => undefined, error: () => undefined }, true);
+  return result.loadedEnvFiles[0]?.path ?? null;
 }
 
 export function requireDatabaseUrl(variable: DatabaseUrlVariable, environment: StringEnvironment = process.env): string {

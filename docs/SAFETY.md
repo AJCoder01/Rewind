@@ -183,6 +183,8 @@ The application does not have read/compose/modify scopes and therefore cannot po
 
 - Use one explicitly selected real model runtime: OpenAI Responses with strict Structured Outputs and `store: false`, or local-only Ollama native structured output bound to `127.0.0.1`. Local mode rejects cloud-tagged models and must be labeled `local_model`; fixture output remains forbidden for recorded reasoning.
 - Product local mode is explicitly selected with `REWIND_MODEL_RUNTIME=local_ollama` plus `REWIND_LOCAL_MODEL`; it must not require or fabricate OpenAI credentials. OpenAI credentials are required only for `openai_responses`.
+- PostgreSQL product planning requires `REWIND_MODEL_RUNTIME`; it never defaults to OpenAI, infers a provider from stale credentials, or inherits the historical `REWIND_S043_MODEL_RUNTIME` selector. The S043 selector is independently mandatory for that admin command and never changes product planning.
+- `prove:model-local` must load the same effective environment as the application and prove the exact product-selected local model. A forced or default model that can pass while product planning selects another provider is forbidden.
 - Supply synthetic aliases/digests instead of raw attendee addresses and avoid unnecessary mail bodies/provider metadata in prompts.
 - Separate trusted instructions from untrusted task, correction, and provider strings.
 - Candidate titles/descriptions are data, never instructions. The controlled seeder must avoid adversarial content; evals still include prompt-injection-like fixtures.

@@ -54,7 +54,7 @@ function runtimeLabel(mode: ConnectionPreflightResponse["runtime"]["mode"]): str
 
 function runtimeDetail(data: ConnectionPreflightResponse): string {
   if (data.runtime.mode === "fixture") return "World PRs use deterministic fixture data; no provider or model call is made.";
-  if (data.runtime.mode === "live_capable" && data.runtime.productExecution === "enabled") return "Provider-grounded planning and exact approved execution are enabled; reset remains disabled.";
+  if (data.runtime.mode === "live_capable" && data.runtime.productExecution === "enabled") return "Provider-grounded planning and exact approved execution are configured; model reachability and Calendar preflight are proven separately.";
   if (data.runtime.mode === "live_capable") return "Provider configuration is present, but a required execution prerequisite is still blocked.";
   return "The application cannot safely claim a provider-ready state until the listed gaps are fixed.";
 }
@@ -156,9 +156,9 @@ function StatusDetails({ data }: { data: ConnectionPreflightResponse }) {
           <p>{data.database.schemaVersion ? `Schema ${data.database.schemaVersion}` : "No live schema version is being claimed."}</p>
         </div>
         <div>
-          <dt>Model evidence</dt>
-          <dd><span className="status-pill status-pill-neutral">{data.runtime.modelRuntime === "not_configured" ? "Not selected" : data.runtime.modelRuntime === "local_ollama" ? "Local Ollama" : "OpenAI Responses"}</span></dd>
-          <p>{data.runtime.productExecution === "enabled" ? "The selected strict model runtime is enabled for bounded planning." : "Model-backed product planning is not currently available."}</p>
+          <dt>Model runtime</dt>
+          <dd><span className="status-pill status-pill-neutral" data-testid="model-runtime">{data.runtime.modelRuntime === "not_configured" ? "Not selected" : data.runtime.modelRuntime === "local_ollama" ? "Local Ollama" : "OpenAI Responses"}</span></dd>
+          <p>{data.runtime.productExecution === "enabled" ? "The selected strict runtime is configured for bounded planning; reachability is proven separately." : "Model-backed product planning is not currently available."}</p>
         </div>
         <div>
           <dt>Demo date</dt>

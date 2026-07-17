@@ -19,6 +19,10 @@ describe("fixture E2E server environment", () => {
     expect(keys).not.toContain("DATABASE_MIGRATION_URL");
     expect(keys).not.toContain("GOOGLE_REFRESH_TOKEN_CIPHERTEXT");
     expect(keys).not.toContain("REWIND_GOOGLE_CALENDAR_ID");
+    expect(keys).not.toContain("OPENAI_API_KEY");
+    expect(keys).not.toContain("OPENAI_MODEL");
+    expect(keys).not.toContain("REWIND_MODEL_RUNTIME");
+    expect(keys).not.toContain("REWIND_S043_MODEL_RUNTIME");
   });
 
   it("binds each isolated server to its selected loopback origin", () => {

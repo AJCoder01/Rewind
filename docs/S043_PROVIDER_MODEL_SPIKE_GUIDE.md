@@ -1,12 +1,12 @@
 # S043 controlled provider/model spike guide
 
-This is the human-only checkpoint for S043. It runs the low-level Calendar provider proof and three strict model-only calls. It is not a product execution route, approval route, reset route, or recovery route.
+This is the human-only checkpoint for S043. It runs the low-level Calendar provider proof and three strict model operations. Each operation has a maximum of two attempts, so an explicitly funded OpenAI run can make up to six provider requests. It is not a product execution route, approval route, reset route, or recovery route.
 
 ## Before running
 
 - Use the `codex/s043-provider-model-spikes` branch in the Rewind workspace.
-- Keep the private `.env.local` credentials unchanged. It must already contain the connected, expected Google identity, explicit demo Calendar ID, PostgreSQL runtime URL, and recipient allowlist. The existing OpenAI fields remain part of the application contract but are not called in explicit local mode.
-- Install and start Ollama locally. `qwen2.5-coder:latest` is the verified default local model. Confirm it appears in `ollama list`; do not select any model ending in `:cloud`.
+- Keep the private `.env.local` credentials unchanged. It must already contain the connected, expected Google identity, explicit demo Calendar ID, PostgreSQL runtime URL, recipient allowlist, and explicit product runtime. The command below supplies the independent S043 runtime inline. OpenAI fields are optional and are not called in local mode.
+- Install and start Ollama locally. `qwen2.5-coder:latest` is the verified local model. Confirm the exact configured `REWIND_LOCAL_MODEL` appears in `ollama list`; do not select any model ending in `:cloud`.
 - Run `npm run db:verify` first. Do not paste its connection details or any environment values into chat.
 - Confirm the two S035 controlled events are already seeded and the S035 preflight is recorded. Do not run `seed:demo` again.
 - Do not enable `REWIND_PRODUCT_EXECUTION_ENABLED` or `REWIND_PRODUCT_RESET_ENABLED`. Do not run `reset:demo` or any product execution action during this checkpoint.
@@ -19,7 +19,7 @@ First run the no-effect local proof:
 npm run prove:model-local
 ```
 
-It must return `status: ok`, `operation: local_model_spike`, `runtime: local_ollama`, `evidenceClass: local_model`, and `externalEffects: false`. This is real local inference, not fixture output and not OpenAI evidence.
+It must return `status: ok`, `operation: local_model_spike`, `runtime: local_ollama`, `evidenceClass: local_model`, and `externalEffects: false`. This command is bound to the product selector `REWIND_MODEL_RUNTIME=local_ollama` and the exact configured `REWIND_LOCAL_MODEL`; it does not force a separate hidden default. This is real local inference, not fixture output and not OpenAI evidence.
 
 ## Run the Calendar and model spike
 
@@ -38,7 +38,7 @@ The command then:
 3. Sends one deliberately stale `If-Match` Calendar patch for the US candidate; Google must return a provider conflict and the event must remain unchanged.
 4. Moves the UK candidate by one hour with `sendUpdates=none`, verifies the after-state, and restores the recorded move exactly once.
 
-The Calendar move and restore are the only external effects in this command. The stale US request is intended to produce no Calendar mutation. Local model calls have no external or paid-provider effect and use the fixed loopback Ollama endpoint. OpenAI mode remains available only when selected by omitting the local runtime flag; it is not used for the zero-spend path.
+The Calendar move and restore are the only external effects in this command. The stale US request is intended to produce no Calendar mutation. Local model operations have no external or paid-provider effect and use the fixed loopback Ollama endpoint. S043 fails closed if `REWIND_S043_MODEL_RUNTIME` is omitted. OpenAI mode remains available only with explicit `REWIND_S043_MODEL_RUNTIME=openai_responses`, valid funded credentials, and the matching TTY confirmation; it is not used for the zero-spend path and may make up to six Responses requests.
 
 Do not rerun the command after a timeout or uncertain provider result. Stop and report the sanitized failure code; a Calendar `uncertain` outcome requires review before any further action. Known safe diagnostic codes include `credential_unavailable`, `oauth_*`, `provider_unavailable`, `preflight_failed`, and `model_<operation>_<kind>`. Model kinds distinguish `invalid_request`, `unauthorized`, `forbidden`, `not_found`, `rate_limited`, `timeout`, `unavailable`, `refusal`, `truncated`, and `invalid_output`; they never contain provider text. Deterministic request/auth/permission/model-lookup failures are not retried. A model failure occurs before any Calendar mutation.
 
