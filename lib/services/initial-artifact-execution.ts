@@ -73,6 +73,14 @@ export async function executeApprovedInitialArtifact(
   } catch (error) {
     throw toInitialArtifactServiceError(error, "The approved artifact could not be marked in progress; no artifact write was attempted.");
   }
+  if (
+    prepared.status !== "in_progress" ||
+    !prepared.leaseUntil ||
+    prepared.attempts !== claim.record.attempts ||
+    prepared.leaseUntil !== claim.record.leaseUntil
+  ) {
+    throw new ServiceError("invalid_task_state", "The artifact execution claim was lost before persistence; no artifact write was attempted.");
+  }
 
   let receipt: ArtifactReceipt;
   try {

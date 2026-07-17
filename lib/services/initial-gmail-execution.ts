@@ -87,15 +87,13 @@ export async function executeApprovedInitialGmail(
     validatedMessage = validateApprovedMessage(message, dependencies.expectedSenderGoogleSub, dependencies.allowlist);
   } catch (error) {
     if (!(error instanceof InitialGmailValidationError)) throw toInitialGmailServiceError(error, "The approved Gmail message could not be validated safely.");
-    return terminalGmailResult(
+    return preHandoffGmailResult(
       dependencies.executionStore,
       current.record,
       "conflict",
       request.data.now,
       error.reason,
       { code: `gmail_${error.reason}`, retryable: false, safeMessage: "The approved Gmail sender, recipient, template, or content boundary failed before handoff." },
-      undefined,
-      undefined,
     );
   }
 
@@ -103,7 +101,7 @@ export async function executeApprovedInitialGmail(
     dependencies.gmail.prepareApprovedMessage(validatedMessage);
   } catch (error) {
     if (error instanceof GmailProviderError && error.kind === "local_failure") {
-      return terminalGmailResult(
+      return preHandoffGmailResult(
         dependencies.executionStore,
         current.record,
         "retryable_failed",
@@ -112,7 +110,7 @@ export async function executeApprovedInitialGmail(
         { code: "gmail_local_preparation_failed", retryable: true, safeMessage: "Gmail preparation failed before a dispatch marker was persisted." },
       );
     }
-    return terminalGmailResult(
+    return preHandoffGmailResult(
       dependencies.executionStore,
       current.record,
       "retryable_failed",
@@ -152,6 +150,10 @@ export async function executeApprovedInitialGmail(
     throw toInitialGmailServiceError(error, "The Gmail before-state could not be persisted; no mail handoff was attempted.");
   }
 
+  if (!isOwnedGmailPreparation(prepared, claim.record, beforeState, request.data.now)) {
+    return gmailResultForLostPreparation(prepared, claim.record);
+  }
+
   let receipt: GmailSendReceipt;
   try {
     receipt = GmailSendReceiptSchema.parse(await dependencies.gmail.sendApprovedMessage(validatedMessage));
@@ -180,6 +182,9 @@ async function readInitialMailAction(
   if (!current) throw new ServiceError("invalid_task_state", "The approved plan has not been prepared with its complete action ledger.");
   if (canonicalJson(current.action) !== canonicalJson(action as unknown as Record<string, unknown>)) {
     throw new ServiceError("plan_digest_mismatch", "The durable Gmail action no longer matches the immutable approved payload.");
+  }
+  if (current.dispatchStartedAt && current.status !== "in_progress" && current.status !== "succeeded" && current.status !== "delivery_uncertain" && current.status !== "permanently_failed") {
+    throw new ServiceError("invalid_task_state", "A Gmail action with a durable dispatch marker must never be retried.");
   }
   if (current.status === "succeeded") return { decision: "skipped", record: current };
   if (current.status === "delivery_uncertain" || current.status === "conflict" || current.status === "permanently_failed") {
@@ -216,8 +221,9 @@ function validateApprovedMessage(message: GmailApprovedMessage, expectedSenderGo
   }
   if (parsed.senderGoogleSub !== expectedSenderGoogleSub) throw new InitialGmailValidationError("sender_not_allowed");
   if (sha256Text(parsed.bodyText) !== parsed.bodyHash) throw new InitialGmailValidationError("unknown_template");
-  const allowed = new Set([...parsedAllowlist.data.UK, ...parsedAllowlist.data.US].map((recipient) => recipient.toLowerCase()));
-  if (parsed.to.some((recipient) => !allowed.has(recipient.toLowerCase()))) throw new InitialGmailValidationError("recipient_not_allowed");
+  const actualRecipients = parsed.to.map((recipient) => recipient.toLowerCase()).sort();
+  const expectedRecipients = parsedAllowlist.data.UK.map((recipient) => recipient.toLowerCase()).sort();
+  if (canonicalJson(actualRecipients) !== canonicalJson(expectedRecipients)) throw new InitialGmailValidationError("recipient_not_allowed");
   return parsed;
 }
 
@@ -288,6 +294,20 @@ async function terminalGmailResult(
   }
 }
 
+async function preHandoffGmailResult(
+  store: ExecutionPersistenceStore,
+  current: ActionExecutionRecord,
+  status: "retryable_failed" | "conflict",
+  now: string,
+  reason: "local_preparation" | "recipient_not_allowed" | "sender_not_allowed" | "unknown_template" | "invalid_message",
+  error: { code: string; retryable: boolean; safeMessage: string },
+): Promise<InitialGmailExecutionResult> {
+  if (current.dispatchStartedAt) {
+    throw new ServiceError("invalid_task_state", "A Gmail pre-handoff outcome cannot be retried after dispatch has started.");
+  }
+  return terminalGmailResult(store, current, status, now, reason, error);
+}
+
 async function loadVerifiedPlan(planId: string, digest: string, store: ExecutionPersistenceStore): Promise<ExecutionPlan> {
   const plan = await store.getPlan(planId);
   if (!plan) throw new ServiceError("plan_not_found", "The requested immutable plan does not exist.");
@@ -327,6 +347,40 @@ function claimFenceFor(record: ActionExecutionRecord): { attempts: number; lease
     throw new ServiceError("invalid_task_state", "The Gmail action no longer holds a durable execution claim.");
   }
   return { attempts: record.attempts, leaseUntil: record.leaseUntil };
+}
+
+function isOwnedGmailPreparation(
+  prepared: ActionExecutionRecord,
+  claimed: ActionExecutionRecord,
+  beforeState: InitialGmailBeforeState,
+  dispatchStartedAt: string,
+): boolean {
+  return prepared.status === "in_progress" &&
+    prepared.actionExecutionId === claimed.actionExecutionId &&
+    prepared.planId === claimed.planId &&
+    prepared.actionKey === claimed.actionKey &&
+    prepared.operationKey === claimed.operationKey &&
+    prepared.attempts === claimed.attempts &&
+    prepared.leaseUntil === claimed.leaseUntil &&
+    prepared.dispatchStartedAt === dispatchStartedAt &&
+    canonicalJson(prepared.beforeState) === canonicalJson(beforeState);
+}
+
+function gmailResultForLostPreparation(
+  prepared: ActionExecutionRecord,
+  claimed: ActionExecutionRecord,
+): InitialGmailExecutionResult {
+  if (prepared.actionExecutionId !== claimed.actionExecutionId || prepared.planId !== claimed.planId || prepared.actionKey !== claimed.actionKey) {
+    throw new ServiceError("invalid_task_state", "Gmail preparation did not return the owned action ledger row; no handoff was attempted.");
+  }
+  const receipt = gmailReceiptFromRecord(prepared);
+  if (prepared.status === "succeeded") return gmailResult("skipped", prepared, receipt);
+  if (prepared.status === "delivery_uncertain") return gmailResult("blocked", prepared, receipt, "delivery_uncertain");
+  if (prepared.status === "conflict") return gmailResult("blocked", prepared, receipt, "conflict");
+  if (prepared.status === "permanently_failed") return gmailResult("blocked", prepared, receipt, "permanently_failed");
+  if (prepared.status === "retryable_failed") return gmailResult("retryable_failed", prepared, receipt, "local_preparation");
+  if (prepared.status === "in_progress") return gmailResult("busy", prepared, undefined, "active_lease");
+  throw new ServiceError("invalid_task_state", "Gmail preparation did not preserve an owned in-progress action; no handoff was attempted.");
 }
 
 function gmailResultFromRecord(

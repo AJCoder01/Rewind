@@ -121,7 +121,7 @@ function Timeline({ view }: { view: WorldPrView }) {
 }
 
 function FixtureNotice() {
-  return <div className="notice fixture-notice" data-testid="fixture-mode-notice" role="status"><strong>G1 non-effecting mode:</strong> this review is persisted in PostgreSQL, but it does not approve or execute Calendar, Gmail, artifact, or model effects. This contract fixture is not live-provider evidence.</div>;
+  return <div className="notice fixture-notice" data-testid="fixture-mode-notice" role="status"><strong>Fixture mode:</strong> this deterministic review cannot approve or execute Calendar, Gmail, artifact, or model effects. Use PostgreSQL with the provider-grounded runtime for a controlled live plan.</div>;
 }
 
 export default function ReviewPage({ params }: { params: Promise<{ worldPrId: string }> }) {
@@ -130,8 +130,11 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
   const [message, setMessage] = useState<string | null>(null);
   const [loginRequired, setLoginRequired] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [mutating, setMutating] = useState<"approval" | "execution" | null>(null);
   const [cancelled, setCancelled] = useState(false);
   const cancelKey = useRef<string | null>(null);
+  const approvalKey = useRef<string | null>(null);
+  const executionKey = useRef<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -213,6 +216,58 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
     }
   }
 
+  async function submitPlanMutation(operation: "approval" | "execution", plan: InitialPlanView): Promise<void> {
+    if (mutating) return;
+    const csrfToken = readCsrfToken();
+    if (!csrfToken) {
+      setMessage("Your review session needs to be renewed before this plan can be approved or executed.");
+      return;
+    }
+    setMutating(operation);
+    setMessage(null);
+    const keyRef = operation === "approval" ? approvalKey : executionKey;
+    keyRef.current ??= newIdempotencyKey();
+    const endpoint = operation === "approval"
+      ? `/api/v1/world-prs/${encodeURIComponent(worldPrId)}/approvals/initial`
+      : `/api/v1/world-prs/${encodeURIComponent(worldPrId)}/execution`;
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": keyRef.current,
+          "x-rewind-csrf": csrfToken,
+        },
+        body: JSON.stringify({
+          planId: plan.pointer.planId,
+          planVersion: plan.pointer.version,
+          planDigest: plan.pointer.digest,
+        }),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      if (response.status === 401) {
+        setLoginRequired(true);
+        setMessage("Your review session has expired. Sign in again.");
+        return;
+      }
+      if (!response.ok) {
+        const parsedError = ApiErrorResponseSchema.safeParse(body);
+        setMessage(parsedError.success ? parsedError.data.error.message : `The ${operation} stopped safely.`);
+        return;
+      }
+      const result = TaskMutationResponseSchema.safeParse(body);
+      if (!result.success || result.data.worldPrId !== worldPrId) {
+        setMessage(`The ${operation} service returned an invalid durable result.`);
+        return;
+      }
+      window.location.reload();
+    } catch {
+      setMessage(`The ${operation} service could not be reached. Review durable state before retrying.`);
+    } finally {
+      setMutating(null);
+    }
+  }
+
   if (message && !view) {
     return <main className="shell" data-testid="review-screen"><div className="content"><div className="notice" role="alert">{message}{loginRequired ? <> <Link href={`/login?next=${encodeURIComponent(`/pr/${worldPrId}`)}`}>Sign in</Link></> : null}</div></div></main>;
   }
@@ -223,11 +278,13 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
   }
 
   if (view.status === "failed") {
-    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Planning stopped</p><h1>This review could not be prepared.</h1><p className="lede">Planning stopped before approval or any external action. No reviewable plan is available and this screen will not retry automatically.</p><ExecutionTimeline worldPrId={worldPrId} /><Link href="/" className="primary-button button-link">Back to composer</Link><FixtureNotice /></div></main>;
+    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Planning stopped</p><h1>This review could not be prepared.</h1><p className="lede">Planning stopped before approval or any external action. No reviewable plan is available and this screen will not retry automatically.</p><ExecutionTimeline worldPrId={worldPrId} /><Link href="/" className="primary-button button-link">Back to composer</Link></div></main>;
   }
 
   if (view.status === "attention_required") {
-    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Operator attention</p><h1>This World PR needs attention.</h1><p className="lede">The recorded state is visible, but this G1 screen will not retry or approve it automatically.</p><div className="notice" role="alert">Attention reason: {view.attention?.kind ?? "recorded failure"}.</div><ExecutionTimeline worldPrId={worldPrId} /><Link href="/" className="secondary-button button-link">Back to composer</Link><FixtureNotice /></div></main>;
+    const resumablePlan = view.activePlan && isInitialPlanView(view.activePlan) ? view.activePlan : null;
+    const fixture = resumablePlan?.actions[1].target.calendarId === "fixture-demo-calendar";
+    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">Operator attention</p><h1>This World PR needs attention.</h1><p className="lede">Review the durable action receipts before resuming any proven-safe incomplete action.</p><div className="notice" role="alert">Attention reason: {view.attention?.kind ?? "recorded failure"}.</div><ExecutionTimeline worldPrId={worldPrId} />{resumablePlan && !fixture ? <button className="primary-button" type="button" onClick={() => void submitPlanMutation("execution", resumablePlan)} disabled={mutating !== null}>{mutating === "execution" ? "Resuming safely..." : "Resume approved execution"}</button> : null}<Link href="/" className="secondary-button button-link">Back to composer</Link>{fixture ? <FixtureNotice /> : null}{message ? <div className="notice" role="alert">{message}</div> : null}</div></main>;
   }
 
   if (view.status === "clarification_required") {
@@ -235,7 +292,7 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
       <main className="shell" data-testid="review-screen">
         <header className="topbar" role="banner"><Link href="/" className="wordmark">rewind</Link><div className="topbar-note">World PR <span aria-hidden="true">&middot;</span> clarification required</div></header>
         <div className="content">
-          <div className="review-header"><div><p className="eyebrow">Clarification before planning</p><h1>Which Acme region did you mean?</h1><p className="lede">The active fixture guardrail stopped before plan generation, action creation, and scenario locking.</p></div><span className="status-pill status-pill-amber">Clarification required</span></div>
+          <div className="review-header"><div><p className="eyebrow">Clarification before planning</p><h1>Which Acme region did you mean?</h1><p className="lede">The active guardrail stopped before plan generation, action creation, and scenario locking.</p></div><span className="status-pill status-pill-amber">Clarification required</span></div>
           <div className="review-grid">
             <section className="panel panel-wide" data-testid="clarification-panel"><div className="panel-inner"><h2>{view.clarification?.question}</h2><div className="candidate-grid">{view.clarification?.candidates.map((candidate) => <div className="candidate-choice" key={candidate.candidateId}><strong>{candidate.label}</strong><span>Known controlled candidate</span></div>)}</div><p className="muted">This proof record owns no plan, action ledger, or effect-bearing scenario lock.</p></div></section>
             <Timeline view={view} />
@@ -243,14 +300,13 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
           </div>
           <div className="review-actions"><button className="secondary-button" type="button" onClick={() => void cancel()} disabled={canceling}>{canceling ? "Cancelling..." : "Cancel intake"}</button><Link href="/" className="secondary-button">Back to composer</Link></div>
           {message ? <div className="notice" role="alert">{message}</div> : null}
-          <FixtureNotice />
         </div>
       </main>
     );
   }
 
   if (view.status === "analyzing" || !view.activePlan) {
-    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">World PR status</p><h1>Rewind is still preparing this review.</h1><p className="lede">The planning lease is active. Refresh to read the durable state; no external action has been attempted.</p><ExecutionTimeline worldPrId={worldPrId} /><button className="secondary-button" type="button" onClick={() => window.location.reload()}>Refresh review</button><FixtureNotice /></div></main>;
+    return <main className="shell" data-testid="review-screen"><div className="content empty-state"><p className="eyebrow">World PR status</p><h1>Rewind is still preparing this review.</h1><p className="lede">The planning lease is active. Refresh to read the durable state; no external action has been attempted.</p><ExecutionTimeline worldPrId={worldPrId} /><button className="secondary-button" type="button" onClick={() => window.location.reload()}>Refresh review</button></div></main>;
   }
 
   const activePlan = view.activePlan;
@@ -258,13 +314,14 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
   const plan = activePlan;
   const assumption = plan.assumptions[0];
   const canCancel = view.status === "preview_ready";
+  const fixturePlan = plan.actions[1].target.calendarId === "fixture-demo-calendar";
 
   return (
     <main className="shell" data-testid="review-screen">
       <header className="topbar" role="banner"><Link href="/" className="wordmark">rewind</Link><div className="topbar-note">World PR <span aria-hidden="true">&middot;</span> {view.status}</div></header>
       <div className="content">
         <div className="review-header">
-          <div><p className="eyebrow">Review proposed workspace changes</p><h1>{plan.selectedCandidate.label}</h1><p className="lede">The controlled fixture selects the nearest upcoming Acme candidate and keeps the other candidate visible as an alternative.</p></div>
+          <div><p className="eyebrow">Review proposed workspace changes</p><h1>{plan.selectedCandidate.label}</h1><p className="lede">Rewind selects the earliest validated controlled Acme candidate and keeps the other candidate visible as an alternative.</p></div>
           <span className="status-pill">{lifecycleLabel(view.status)}</span>
         </div>
         <div className="review-grid">
@@ -277,12 +334,14 @@ export default function ReviewPage({ params }: { params: Promise<{ worldPrId: st
           <ExecutionTimeline worldPrId={worldPrId} />
         </div>
         <div className="review-actions">
+          {!fixturePlan && view.status === "preview_ready" ? <button className="primary-button" type="button" onClick={() => void submitPlanMutation("approval", plan)} disabled={mutating !== null || canceling}>{mutating === "approval" ? "Recording approval..." : "Approve exact plan"}</button> : null}
+          {!fixturePlan && view.status === "executing" ? <button className="primary-button" type="button" onClick={() => void submitPlanMutation("execution", plan)} disabled={mutating !== null}>{mutating === "execution" ? "Executing approved actions..." : "Execute approved plan"}</button> : null}
           {canCancel ? <button className="secondary-button" type="button" onClick={() => void cancel()} disabled={canceling}>{canceling ? "Cancelling..." : "Cancel review"}</button> : null}
           <Link href="/" className="secondary-button">Back to composer</Link>
         </div>
-        {!canCancel ? <div className="notice" role="status">Current durable state: {lifecycleLabel(view.status)}. This G1 screen will not approve, execute, or cancel a plan from this state.</div> : null}
+        {!canCancel ? <div className="notice" role="status">Current durable state: {lifecycleLabel(view.status)}. Only the exact approved plan can execute, and every replay reads the durable action ledger.</div> : null}
         {message ? <div className="notice" role="alert">{message}</div> : null}
-        <FixtureNotice />
+        {fixturePlan ? <FixtureNotice /> : null}
       </div>
     </main>
   );

@@ -45,6 +45,7 @@ export async function reasonInitialRequest(input: InitialReasoningInput): Promis
   const validated = await requestValidatedInitialProposal(input.model, modelInput, {
     expectedSelectedCandidateId: resolution.selectedCandidateId,
     expectedAccountBriefTitle: accountBrief.title,
+    expectedAccountBriefContent: accountBrief.content,
   });
   return InitialReasoningRecordSchema.parse({
     contractVersion: "initial-reasoning-record.v1",

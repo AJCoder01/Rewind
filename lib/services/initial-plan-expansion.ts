@@ -143,7 +143,11 @@ export function expandInitialPlan(input: InitialPlanExpansionInput): InitialPlan
   }
 
   const accountBrief = generateAccountBriefForPlanning(CONTROLLED_ACCOUNT_BRIEF_PLANNING_INPUT);
-  if (reasoning.proposal.accountBrief.title !== accountBrief.title || reasoning.proposal.accountBrief.sourceId !== accountBrief.provenance.sourceId) {
+  if (
+    reasoning.proposal.accountBrief.title !== accountBrief.title ||
+    reasoning.proposal.accountBrief.content !== accountBrief.content ||
+    reasoning.proposal.accountBrief.sourceId !== accountBrief.provenance.sourceId
+  ) {
     throw new InitialPlanExpansionError("reasoning_mismatch");
   }
 

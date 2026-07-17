@@ -11,7 +11,7 @@ import { VerifiedInitialPlanPayloadSchema } from "@/lib/contracts/initial-plan-s
 import { MemoryExecutionPersistenceStore, ExecutionPersistenceError } from "@/lib/db/execution-store";
 import { buildControlledCalendarSeeds, type CalendarDemoConfiguration } from "@/lib/domain/calendar-demo";
 import { sha256Text } from "@/lib/domain/digest";
-import { ACCOUNT_BRIEF_TITLE } from "@/lib/domain/account-brief";
+import { ACCOUNT_BRIEF_CONTENT_FIXTURE, ACCOUNT_BRIEF_TITLE } from "@/lib/domain/account-brief";
 import { FakeModelPort } from "@/lib/ai/model";
 import { resolveControlledCandidates } from "@/lib/services/candidate-resolution";
 import { reasonInitialRequest } from "@/lib/services/initial-reasoning";
@@ -49,7 +49,7 @@ const proposal = {
     { actionKey: "initial.calendar.move" as const, assumptionIds: ["assumption_acme_region" as const] },
     { actionKey: "initial.mail.notify" as const, assumptionIds: ["assumption_acme_region" as const] },
   ],
-  accountBrief: { title: ACCOUNT_BRIEF_TITLE, content: "Parent-account risks only.", sourceId: "acme_parent_account_notes" as const },
+  accountBrief: { title: ACCOUNT_BRIEF_TITLE, content: ACCOUNT_BRIEF_CONTENT_FIXTURE, sourceId: "acme_parent_account_notes" as const },
 };
 
 const now = "2026-07-16T12:00:00.000Z";

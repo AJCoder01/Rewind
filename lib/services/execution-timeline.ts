@@ -208,7 +208,7 @@ function deriveOverallStatus(taskStatus: TaskStatus, statuses: readonly ActionEx
   if (statuses.length === 0) return statusWithoutLedger(taskStatus);
   const allSucceeded = statuses.every((status) => status === "succeeded");
   if (taskStatus === "completed" && !allSucceeded) return "attention_required";
-  if (allSucceeded) return "completed";
+  if (allSucceeded) return taskStatus === "completed" ? "completed" : "attention_required";
   if (statuses.some((status) => status === "in_progress")) return "in_progress";
   const succeededCount = statuses.filter((status) => status === "succeeded").length;
   const stopped = statuses.some((status) => status === "delivery_uncertain" || status === "conflict" || status === "permanently_failed" || status === "retryable_failed");

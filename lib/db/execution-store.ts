@@ -12,6 +12,7 @@ import {
 } from "@/lib/contracts/execution-persistence";
 import { createOpaqueId } from "@/lib/domain/ids";
 import { WorldPrViewSchema } from "@/lib/contracts/v1";
+import { canonicalJson } from "@/lib/domain/digest";
 
 export type ExecutionPersistenceErrorCode =
   | "plan_immutable_conflict"
@@ -90,15 +91,21 @@ function isTerminal(status: ActionExecutionRecord["status"]): boolean {
   return status === "succeeded" || status === "delivery_uncertain" || status === "conflict" || status === "permanently_failed";
 }
 
+function isMailAction(type: ActionExecutionRecord["type"]): boolean {
+  return type === "mail.notify" || type === "mail.correct";
+}
+
 function sameInitialPointer(left: { planId: string; version: number; digest: string }, right: { planId: string; version: number; digest: string }): boolean {
   return left.planId === right.planId && left.version === right.version && left.digest === right.digest;
 }
 
 function assertActionTransition(current: ActionExecutionRecord, input: RecordActionStateInput): void {
-  const allowed = current.status === "planned"
+  const allowed: ActionExecutionRecord["status"][] = current.status === "planned"
     ? ["in_progress", "retryable_failed", "conflict", "permanently_failed"]
     : current.status === "retryable_failed"
-      ? ["in_progress"]
+      ? isMailAction(current.type) && current.dispatchStartedAt === null
+        ? ["in_progress", "retryable_failed", "conflict"]
+        : ["in_progress"]
       : current.status === "in_progress"
         ? ["in_progress", "succeeded", "retryable_failed", "delivery_uncertain", "conflict", "permanently_failed"]
         : [];
@@ -106,10 +113,11 @@ function assertActionTransition(current: ActionExecutionRecord, input: RecordAct
     throw new ExecutionPersistenceError("action_not_claimable", "The requested action state transition is not safe.");
   }
   if (
-    current.status === "in_progress" &&
-    (!input.claimFence || input.claimFence.attempts !== current.attempts || input.claimFence.leaseUntil !== current.leaseUntil)
+    isMailAction(current.type) &&
+    (input.status === "retryable_failed" || input.status === "conflict") &&
+    (current.dispatchStartedAt !== null || input.dispatchStartedAt !== undefined)
   ) {
-    throw new ExecutionPersistenceError("action_not_claimable", "The action outcome does not hold the current execution claim fence.");
+    throw new ExecutionPersistenceError("action_not_claimable", "A Gmail action cannot return to a pre-handoff state after its dispatch marker exists.");
   }
   if (input.receipt && !receiptMatchesActionType(current.type, input.receipt)) {
     throw new ExecutionPersistenceError("action_immutable_conflict", "The execution receipt does not match the immutable action type.");
@@ -140,6 +148,38 @@ function assertActionTransition(current: ActionExecutionRecord, input: RecordAct
     if (!expectedStatus || input.receipt.status !== expectedStatus) {
       throw new ExecutionPersistenceError("action_immutable_conflict", "The Gmail receipt does not match the durable terminal action status.");
     }
+  }
+}
+
+function assertClaimOwnership(current: ActionExecutionRecord, input: RecordActionStateInput): void {
+  const claimRequired = current.status === "in_progress" || input.status === "in_progress" || input.claimFence !== undefined;
+  if (!claimRequired) return;
+  if (
+    current.status !== "in_progress" ||
+    !current.leaseUntil ||
+    !input.claimFence ||
+    input.claimFence.attempts !== current.attempts ||
+    input.claimFence.leaseUntil !== current.leaseUntil
+  ) {
+    throw new ExecutionPersistenceError("action_not_claimable", "The action outcome does not hold the current execution claim fence.");
+  }
+  if (input.status === "in_progress") {
+    const now = Date.parse(input.now);
+    const leaseUntil = Date.parse(current.leaseUntil);
+    if (!Number.isFinite(now) || !Number.isFinite(leaseUntil) || leaseUntil <= now) {
+      throw new ExecutionPersistenceError("action_not_claimable", "The action preparation claim has expired and must be reconciled before any provider effect.");
+    }
+  }
+}
+
+function assertClaimDispatchBoundary(current: ActionExecutionRecord, input: ClaimActionInput): void {
+  if (isMailAction(current.type) !== (input.dispatchStartedAt !== undefined)) {
+    throw new ExecutionPersistenceError(
+      "action_not_claimable",
+      isMailAction(current.type)
+        ? "A Gmail claim requires its durable dispatch marker."
+        : "A non-mail claim cannot persist a Gmail dispatch marker.",
+    );
   }
 }
 
@@ -177,10 +217,16 @@ function assertSameAction(left: ActionExecutionRecord, right: ActionExecutionRec
     left.type !== right.type ||
     left.targetRef !== right.targetRef ||
     left.operationKey !== right.operationKey ||
-    JSON.stringify(left.action) !== JSON.stringify(right.action)
+    canonicalJson(left.action) !== canonicalJson(right.action)
   ) {
     throw new ExecutionPersistenceError("action_immutable_conflict", "The action key is already bound to a different immutable action.");
   }
+}
+
+const memoryInitialApprovalCounts = new Map<string, number>();
+
+export function hasApprovedInitialPlanInMemory(taskId: string): boolean {
+  return (memoryInitialApprovalCounts.get(taskId) ?? 0) > 0;
 }
 
 function errorFor(code: string, retryable: boolean, safeMessage: string) {
@@ -194,6 +240,7 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
   private readonly approvals = new Map<string, ApprovalRecord>();
   private readonly actions = new Map<string, ActionExecutionRecord>();
   private readonly actionKeys = new Map<string, string>();
+  private readonly registeredInitialApprovalTaskIds = new Set<string>();
 
   async createPlan(plan: ExecutionPlan): Promise<ExecutionPlan> {
     const parsed = ExecutionPlanSchema.parse(plan);
@@ -201,14 +248,14 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
     const existingByVersion = this.planVersions.get(versionKey);
     if (existingByVersion && existingByVersion !== parsed.planId) {
       const existing = this.plans.get(existingByVersion);
-      if (!existing || JSON.stringify(existing) !== JSON.stringify(parsed)) {
+      if (!existing || canonicalJson(existing) !== canonicalJson(parsed)) {
         throw new ExecutionPersistenceError("plan_immutable_conflict", "A plan version is already bound to different immutable content.");
       }
       return clonePlan(existing);
     }
     const existing = this.plans.get(parsed.planId);
     if (existing) {
-      if (JSON.stringify(existing) !== JSON.stringify(parsed)) throw new ExecutionPersistenceError("plan_immutable_conflict", "An immutable plan cannot be changed.");
+      if (canonicalJson(existing) !== canonicalJson(parsed)) throw new ExecutionPersistenceError("plan_immutable_conflict", "An immutable plan cannot be changed.");
       return clonePlan(existing);
     }
     this.plans.set(parsed.planId, clonePlan(parsed));
@@ -240,6 +287,10 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
       }
     }
     this.approvals.set(approval.planId, cloneApproval(approval));
+    if (plan.kind === "initial" && !this.registeredInitialApprovalTaskIds.has(plan.taskId)) {
+      this.registeredInitialApprovalTaskIds.add(plan.taskId);
+      memoryInitialApprovalCounts.set(plan.taskId, (memoryInitialApprovalCounts.get(plan.taskId) ?? 0) + 1);
+    }
     return { approval: cloneApproval(approval), replay: false };
   }
 
@@ -249,22 +300,33 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
   }
 
   async ensureActionRows(inputs: readonly PlannedActionInput[]): Promise<readonly ActionExecutionRecord[]> {
+    const stagedActions = new Map(this.actions);
+    const stagedActionKeys = new Map(this.actionKeys);
     const result: ActionExecutionRecord[] = [];
     for (const input of inputs) {
       if (!this.plans.has(input.planId)) throw new ExecutionPersistenceError("plan_not_found", "The action plan does not exist.");
       const candidate = actionRecord(input);
       const key = `${candidate.planId}:${candidate.actionKey}`;
-      const existingId = this.actionKeys.get(key);
+      const existingId = stagedActionKeys.get(key);
       if (existingId) {
-        const existing = this.actions.get(existingId);
+        const existing = stagedActions.get(existingId);
         if (!existing) throw new ExecutionPersistenceError("persistence_failure", "The action uniqueness index is inconsistent.");
         assertSameAction(existing, candidate);
         result.push(cloneAction(existing));
         continue;
       }
-      this.actions.set(candidate.actionExecutionId, candidate);
-      this.actionKeys.set(key, candidate.actionExecutionId);
+      if (stagedActions.has(candidate.actionExecutionId)) {
+        throw new ExecutionPersistenceError("action_immutable_conflict", "The action execution identifier is already bound to a different immutable action.");
+      }
+      stagedActions.set(candidate.actionExecutionId, candidate);
+      stagedActionKeys.set(key, candidate.actionExecutionId);
       result.push(cloneAction(candidate));
+    }
+    for (const [actionExecutionId, action] of stagedActions) {
+      if (!this.actions.has(actionExecutionId)) this.actions.set(actionExecutionId, action);
+    }
+    for (const [key, actionExecutionId] of stagedActionKeys) {
+      if (!this.actionKeys.has(key)) this.actionKeys.set(key, actionExecutionId);
     }
     return result;
   }
@@ -286,6 +348,7 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
     if (current.status !== "planned" && current.status !== "retryable_failed") {
       throw new ExecutionPersistenceError("action_not_claimable", "The action is not in a known-safe state for execution.");
     }
+    assertClaimDispatchBoundary(current, input);
     const claimed = ActionExecutionRecordSchema.parse({
       ...current,
       status: "in_progress",
@@ -304,6 +367,7 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
   async recordActionState(input: RecordActionStateInput): Promise<ActionExecutionRecord> {
     const current = this.actions.get(input.actionExecutionId);
     if (!current) throw new ExecutionPersistenceError("action_not_found", "The action ledger row does not exist.");
+    assertClaimOwnership(current, input);
     if (isTerminal(current.status)) return cloneAction(current);
     assertActionTransition(current, input);
     const next = ActionExecutionRecordSchema.parse({
@@ -349,6 +413,12 @@ export class MemoryExecutionPersistenceStore implements ExecutionPersistenceStor
   }
 
   clear(): void {
+    for (const taskId of this.registeredInitialApprovalTaskIds) {
+      const nextCount = (memoryInitialApprovalCounts.get(taskId) ?? 1) - 1;
+      if (nextCount <= 0) memoryInitialApprovalCounts.delete(taskId);
+      else memoryInitialApprovalCounts.set(taskId, nextCount);
+    }
+    this.registeredInitialApprovalTaskIds.clear();
     this.plans.clear();
     this.planVersions.clear();
     this.approvals.clear();
@@ -474,7 +544,7 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
     );
     if (existing.rowCount === 1) {
       const stored = rowToPlan(existing.rows[0]);
-      if (JSON.stringify(stored) !== JSON.stringify(parsed)) throw new ExecutionPersistenceError("plan_immutable_conflict", "The plan version is already bound to different immutable content.");
+      if (canonicalJson(stored) !== canonicalJson(parsed)) throw new ExecutionPersistenceError("plan_immutable_conflict", "The plan version is already bound to different immutable content.");
       return stored;
     }
     try {
@@ -652,6 +722,8 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
         WHERE id = $1
           AND status IN ('planned', 'retryable_failed')
           AND (lease_until IS NULL OR lease_until <= $2::timestamptz)
+          AND ((type IN ('mail.notify', 'mail.correct') AND $4::timestamptz IS NOT NULL)
+            OR (type NOT IN ('mail.notify', 'mail.correct') AND $4::timestamptz IS NULL))
         RETURNING id, plan_id, action_key, type, target_ref, status, action, before_state, after_state,
                   receipt, attempts, lease_until, dispatch_started_at, error, started_at, finished_at`,
       [input.actionExecutionId, input.now, input.leaseUntil, input.dispatchStartedAt ?? null],
@@ -659,6 +731,7 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
     if (result.rowCount === 1) return { claimed: true, record: rowToAction(result.rows[0]) };
     const existing = await this.getAction(input.actionExecutionId);
     if (!existing) throw new ExecutionPersistenceError("action_not_found", "The action ledger row does not exist.");
+    if (existing.status === "planned" || existing.status === "retryable_failed") assertClaimDispatchBoundary(existing, input);
     return { claimed: false, record: existing };
   }
 
@@ -674,6 +747,7 @@ export class PostgresExecutionPersistenceStore implements ExecutionPersistenceSt
       );
       if (existing.rowCount !== 1) throw new ExecutionPersistenceError("action_not_found", "The action ledger row does not exist.");
       const current = rowToAction(existing.rows[0]);
+      assertClaimOwnership(current, input);
       if (isTerminal(current.status)) {
         await client.query("COMMIT");
         return current;

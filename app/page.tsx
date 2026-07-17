@@ -87,7 +87,7 @@ export default function HomePage() {
               <p className="eyebrow">One supported scenario</p>
               <h2 id="composer-title">Prepare a reviewable World PR</h2>
             </div>
-            <span className="state-label">No external effect</span>
+            <span className="state-label">Planning only</span>
           </div>
           <form className="composer" onSubmit={submit} data-testid="composer-form">
             <div className="field">
@@ -110,9 +110,9 @@ export default function HomePage() {
         </section>
         {message ? <div className="notice" role="alert" data-testid="composer-error">{message}</div> : null}
         <section className="status-row" data-testid="fixture-status" aria-label="Current slice status">
-          <span className="status-pill"><span className="status-mark" aria-hidden="true">1</span> G1 non-effecting mode</span>
+          <span className="status-pill"><span className="status-mark" aria-hidden="true">1</span> Exact dashboard approval</span>
           <span className="status-pill"><span className="status-mark" aria-hidden="true">2</span> PostgreSQL persistence</span>
-          <span className="status-pill"><span className="status-mark" aria-hidden="true">3</span> No provider/model calls</span>
+          <span className="status-pill"><span className="status-mark" aria-hidden="true">3</span> No effect before approval</span>
         </section>
       </div>
     </main>

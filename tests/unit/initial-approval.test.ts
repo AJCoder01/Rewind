@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST as approveInitialPlanRoute } from "@/app/api/v1/world-prs/[worldPrId]/approvals/initial/route";
+import { POST as refreshInitialPlanRoute } from "@/app/api/v1/world-prs/[worldPrId]/plans/initial/refresh/route";
 import { createSessionValue } from "@/lib/auth/session";
 import { memoryExecutionStore } from "@/lib/db";
 import { memoryFixtureStore } from "@/lib/db/memory-store";
@@ -67,7 +68,7 @@ describe("S051 initial approval, cancellation, and replan", () => {
     const result = await approve(created.response.worldPrId, pointer);
 
     expect(result.replay).toBe(false);
-    expect(result.response).toMatchObject({ worldPrId: created.response.worldPrId, status: "preview_ready", activePlan: pointer });
+    expect(result.response).toMatchObject({ worldPrId: created.response.worldPrId, status: "executing", activePlan: pointer });
     const plan = await memoryExecutionStore.getPlan(pointer.planId);
     expect(plan).toMatchObject({ planId: pointer.planId, taskId: created.response.worldPrId, version: pointer.version, digest: pointer.digest });
     await expect(memoryExecutionStore.getApproval(pointer.planId)).resolves.toMatchObject({
@@ -86,7 +87,7 @@ describe("S051 initial approval, cancellation, and replan", () => {
     ]);
     expect(actionRows.every((action) => action.status === "planned")).toBe(true);
     expect(result.view.timeline).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: "approval.recorded", label: "Initial plan approved; no external action has started.", status: "preview_ready" }),
+      expect.objectContaining({ type: "approval.recorded", label: "Initial plan approved; execution is ready and no external action has started.", status: "executing" }),
     ]));
   });
 
@@ -332,6 +333,32 @@ describe("S051 initial approval, cancellation, and replan", () => {
     const { created, pointer } = await createPreview("demo-operator");
     const session = createSessionValue("demo-operator");
     const body = JSON.stringify({ planId: pointer.planId, planVersion: pointer.version, planDigest: pointer.digest });
+    const routeUrl = `http://localhost:3000/api/v1/world-prs/${created.response.worldPrId}/approvals/initial`;
+    const context = { params: Promise.resolve({ worldPrId: created.response.worldPrId }) };
+    const unauthenticated = await approveInitialPlanRoute(new NextRequest(routeUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": "s051-route-unauth-approval-0001" },
+      body,
+    }), context);
+    expect(unauthenticated.status).toBe(401);
+    const missingCsrf = await approveInitialPlanRoute(new NextRequest(routeUrl, {
+      method: "POST",
+      headers: { origin: "http://localhost:3000", cookie: `rewind_session=${session}; rewind_csrf=s051-csrf-token`, "content-type": "application/json", "idempotency-key": "s051-route-missing-csrf-0001" },
+      body,
+    }), context);
+    expect(missingCsrf.status).toBe(403);
+    const crossOrigin = await approveInitialPlanRoute(new NextRequest(routeUrl, {
+      method: "POST",
+      headers: { origin: "https://attacker.example", cookie: `rewind_session=${session}; rewind_csrf=s051-csrf-token`, "x-rewind-csrf": "s051-csrf-token", "content-type": "application/json", "idempotency-key": "s051-route-cross-origin-0001" },
+      body,
+    }), context);
+    expect(crossOrigin.status).toBe(403);
+    const missingIdempotency = await approveInitialPlanRoute(new NextRequest(routeUrl, {
+      method: "POST",
+      headers: { origin: "http://localhost:3000", cookie: `rewind_session=${session}; rewind_csrf=s051-csrf-token`, "x-rewind-csrf": "s051-csrf-token", "content-type": "application/json" },
+      body,
+    }), context);
+    expect(missingIdempotency.status).toBe(422);
     const dashboardResponse = await approveInitialPlanRoute(new NextRequest(`http://localhost:3000/api/v1/world-prs/${created.response.worldPrId}/approvals/initial`, {
       method: "POST",
       headers: {
@@ -344,7 +371,7 @@ describe("S051 initial approval, cancellation, and replan", () => {
       body,
     }), { params: Promise.resolve({ worldPrId: created.response.worldPrId }) });
     expect(dashboardResponse.status).toBe(200);
-    await expect(dashboardResponse.json()).resolves.toMatchObject({ worldPrId: created.response.worldPrId, status: "preview_ready" });
+    await expect(dashboardResponse.json()).resolves.toMatchObject({ worldPrId: created.response.worldPrId, status: "executing" });
 
     const mcpResponse = await approveInitialPlanRoute(new NextRequest(`http://localhost:3000/api/v1/world-prs/${created.response.worldPrId}/approvals/initial`, {
       method: "POST",
@@ -357,5 +384,33 @@ describe("S051 initial approval, cancellation, and replan", () => {
     }), { params: Promise.resolve({ worldPrId: created.response.worldPrId }) });
     expect(mcpResponse.status).toBe(401);
     await expect(mcpResponse.json()).resolves.toMatchObject({ error: { code: "unauthorized" } });
+  });
+
+  it("keeps provider-grounded refresh dashboard-only and never substitutes a fixture plan", async () => {
+    const { created, pointer } = await createPreview("demo-operator");
+    const body = JSON.stringify({ planId: pointer.planId, planVersion: pointer.version, planDigest: pointer.digest });
+    const url = `http://localhost:3000/api/v1/world-prs/${created.response.worldPrId}/plans/initial/refresh`;
+    const context = { params: Promise.resolve({ worldPrId: created.response.worldPrId }) };
+    const mcp = await refreshInitialPlanRoute(new NextRequest(url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${process.env.MCP_BACKEND_TOKEN}`, "content-type": "application/json", "idempotency-key": "s051-refresh-mcp-0001" },
+      body,
+    }), context);
+    expect(mcp.status).toBe(401);
+    const session = createSessionValue("demo-operator");
+    const blocked = await refreshInitialPlanRoute(new NextRequest(url, {
+      method: "POST",
+      headers: {
+        origin: "http://localhost:3000",
+        cookie: `rewind_session=${session}; rewind_csrf=s051-csrf-token`,
+        "x-rewind-csrf": "s051-csrf-token",
+        "content-type": "application/json",
+        "idempotency-key": "s051-refresh-fixture-0001",
+      },
+      body,
+    }), context);
+    expect(blocked.status).toBe(503);
+    await expect(blocked.json()).resolves.toMatchObject({ error: { code: "provider_unavailable" } });
+    await expect(memoryFixtureStore.getInitialPlanPayload(created.response.worldPrId, pointer.planId)).resolves.toMatchObject({ planId: pointer.planId, version: 1 });
   });
 });

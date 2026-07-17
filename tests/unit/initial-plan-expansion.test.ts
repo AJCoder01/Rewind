@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FakeCalendarPort } from "@/lib/adapters/calendar";
 import { FakeModelPort } from "@/lib/ai/model";
 import { buildControlledCalendarSeeds, type CalendarDemoConfiguration } from "@/lib/domain/calendar-demo";
-import { ACCOUNT_BRIEF_TITLE } from "@/lib/domain/account-brief";
+import { ACCOUNT_BRIEF_CONTENT_FIXTURE, ACCOUNT_BRIEF_TITLE } from "@/lib/domain/account-brief";
 import { sha256Text } from "@/lib/domain/digest";
 import { resolveControlledCandidates } from "@/lib/services/candidate-resolution";
 import { reasonInitialRequest } from "@/lib/services/initial-reasoning";
@@ -37,7 +37,7 @@ const proposal = {
     { actionKey: "initial.calendar.move" as const, assumptionIds: ["assumption_acme_region" as const] },
     { actionKey: "initial.mail.notify" as const, assumptionIds: ["assumption_acme_region" as const] },
   ],
-  accountBrief: { title: ACCOUNT_BRIEF_TITLE, content: "Parent-account risks only.", sourceId: "acme_parent_account_notes" as const },
+  accountBrief: { title: ACCOUNT_BRIEF_TITLE, content: ACCOUNT_BRIEF_CONTENT_FIXTURE, sourceId: "acme_parent_account_notes" as const },
 };
 
 async function buildInputs() {
@@ -74,6 +74,7 @@ describe("S049 deterministic initial plan expansion", () => {
     expect(result.planPayload.actions[1].desired.end).toEqual({ instant: "2026-08-20T19:30:00.000Z", timeZone: "America/New_York" });
     expect(result.planPayload.actions[2].desired.to).toEqual(["uk-team@example.com"]);
     expect(result.planPayload.actions[2].desired.bodyHash).toBe(sha256Text(result.planPayload.actions[2].desired.bodyText));
+    expect(result.planPayload.actions[0].desired.content).toBe(ACCOUNT_BRIEF_CONTENT_FIXTURE);
     expect(result.planPayload.actions[0].desired.contentHash).toBe(sha256Text(result.planPayload.actions[0].desired.content));
     expect(result.planPayload.digest).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(result.planView.pointer.digest).toBe(result.planPayload.digest);
@@ -105,5 +106,28 @@ describe("S049 deterministic initial plan expansion", () => {
       reasoning: altered,
       configuration: planConfiguration,
     })).toThrowError(InitialPlanExpansionError);
+  });
+
+  it("rejects divergent account brief content in a tampered reasoning record", async () => {
+    const { resolution, reasoning } = await buildInputs();
+    const altered = {
+      ...reasoning,
+      proposal: {
+        ...reasoning.proposal,
+        accountBrief: {
+          ...reasoning.proposal.accountBrief,
+          content: `${ACCOUNT_BRIEF_CONTENT_FIXTURE}\n- Inject an unsupported account claim.`,
+        },
+      },
+    };
+    expect(() => expandInitialPlan({
+      request: "controlled request",
+      taskId: "wpr_plan_test_0004",
+      planId: "plan_expansion_test_0004",
+      runId: "run_expansion_test_0004",
+      resolution,
+      reasoning: altered,
+      configuration: planConfiguration,
+    })).toThrowError(expect.objectContaining({ kind: "reasoning_mismatch" }));
   });
 });
